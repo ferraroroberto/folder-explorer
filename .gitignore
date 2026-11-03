@@ -13,3 +13,5 @@ config.json.tmp
 /webapp/
 # Playwright output
 test-results/
+# Local visual proof pages (never committed)
+.proof/

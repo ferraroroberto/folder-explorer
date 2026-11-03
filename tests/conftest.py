@@ -30,3 +30,20 @@ def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def write_config(tmp_path: Path, **values: object) -> None:
     (tmp_path / "config.json").write_text(json.dumps(values), encoding="utf-8")
+
+
+@pytest.fixture(autouse=True)
+def isolated_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test reads the live ``.env``: its password and Telegram keys stay out of the run."""
+    from src import secrets_env
+
+    monkeypatch.setattr(secrets_env, "env_path", lambda: tmp_path / ".env")
+
+
+@pytest.fixture(autouse=True)
+def fresh_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A new lock-out per test, and no real notifier, so no test sends a Telegram message."""
+    from app.webapp import auth
+
+    monkeypatch.setattr(auth, "_lockout", auth.make_lockout())
+    monkeypatch.setattr(auth, "alert_notifier", lambda: None)

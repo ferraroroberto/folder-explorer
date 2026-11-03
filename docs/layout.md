@@ -14,7 +14,7 @@ folder-explorer/
 │       ├── __main__.py         # `python -m app.webapp`: bind from remote_access, cert renewal, uvicorn
 │       ├── server.py           # FastAPI app: routers, sign-in gate, gzip, cache-busted static mount
 │       ├── bind.py             # remote_access + certificate -> host, scheme, state
-│       ├── auth.py             # loopback-exempt bearer gate and /api/login
+│       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool and its housekeeping
@@ -33,8 +33,9 @@ folder-explorer/
 │   ├── config.py               # config.json with defaults and validation
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison
+│   ├── login_alert.py          # the guessing alert's text and Telegram notifier
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL
-│   └── (vendored)              # build_info, compression, no_window, pooled_http, runtime_data, usage_log
+│   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py

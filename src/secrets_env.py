@@ -14,6 +14,9 @@ from src.config import PROJECT_ROOT
 
 PASSWORD_VAR = "FOLDER_EXPLORER_PASSWORD"
 TOKEN_VAR = "FOLDER_EXPLORER_TOKEN"
+# The guessing alert's Telegram bot and the "coding alerts" chat; both unset = log only.
+TELEGRAM_TOKEN_VAR = "FOLDER_EXPLORER_TELEGRAM_BOT_TOKEN"
+TELEGRAM_CHAT_VAR = "FOLDER_EXPLORER_TELEGRAM_ALERT_CHAT_ID"
 
 
 def env_path() -> Path:

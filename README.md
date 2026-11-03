@@ -37,6 +37,8 @@ One-time setup for the phone:
 2. `& .\.venv\Scripts\python.exe scripts\set_password.py` sets the password (asked twice, stored in the gitignored `.env`, never printed) and mints the token.
 3. On the phone, open the tailnet address, sign in, then **Share → Add to Home Screen**.
 
+**Wrong passwords.** Each device gets 5 free wrong passwords; every further one makes it wait 2 s, doubling to 5 minutes (the sheet shows the wait from the `429` + `Retry-After` reply), and a correct password or an hour of quiet starts it over. This PC is never locked out. The state is in memory, so a restart clears it. Three wrong passwords in a row from one device send one Telegram message to the `coding alerts` chat (app name, device address and count, never a password), at most one per five minutes. It needs `FOLDER_EXPLORER_TELEGRAM_BOT_TOKEN` and `FOLDER_EXPLORER_TELEGRAM_ALERT_CHAT_ID` in `.env`; without them the attempt is only logged.
+
 ## Scans
 
 The default roots are every local fixed drive plus each OneDrive folder, deduplicated by path. Set `roots` in `config.json` (a list of folders) or edit them in Settings. Three ways to scan, all under one lock so two scans never overlap:

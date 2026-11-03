@@ -301,7 +301,9 @@ button.list-row .lr-name { font-weight: 600; }
   }
   .tree-meta { display: contents; }
   .tree-meta .sep { display: none; }
-  .tree-files { grid-area: files; text-align: right; }
+  .tree-files { grid-area: files; text-align: right; white-space: nowrap; }
+  /* The column header says Files, so the count stands alone. */
+  .tree-unit { display: none; }
   .tree-share { grid-area: share; text-align: right; }
   .tree-size { text-align: right; }
 

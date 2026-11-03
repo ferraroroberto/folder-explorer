@@ -88,7 +88,7 @@ function treeRow(n, depth, share, open, sel) {
     '<button type="button" class="tree-main" data-act="select" data-id="' + n.id + '"' + (sel ? ' aria-current="true"' : '') + ' data-track="tree-select">' +
     '<span class="tree-name">' + glyph('folder') + '<span class="tree-label">' + esc(n.name) + '</span></span>' +
     '<span class="tree-size">' + fmtBytes(val(n)) + '</span>' +
-    '<span class="tree-meta"><span class="tree-files">' + plural(n.files, 'file') + '</span><span class="sep"> · </span><span class="tree-share">' + fmtPct(share) + '</span></span>' +
+    '<span class="tree-meta"><span class="tree-files">' + fmtNum(n.files) + '<span class="tree-unit">' + (n.files === 1 ? ' file' : ' files') + '</span></span><span class="sep"> · </span><span class="tree-share">' + fmtPct(share) + '</span></span>' +
     bar(share) + '</button></div>';
 }
 

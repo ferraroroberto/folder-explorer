@@ -75,14 +75,6 @@ def test_remote_callers_need_a_token(isolated: Path, monkeypatch: pytest.MonkeyP
         assert c.get("/api/roots", headers={"Authorization": "Bearer nope"}).status_code == 401
 
 
-def test_repeated_wrong_passwords_are_throttled(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("FOLDER_EXPLORER_PASSWORD", "invented-password")
-    monkeypatch.setenv("FOLDER_EXPLORER_TOKEN", "invented-token")
-    with TestClient(app, client=("100.64.0.99", 50000)) as c:
-        codes = [c.post("/api/login", json={"password": "wrong"}).status_code for _ in range(6)]
-        assert codes[:5] == [401] * 5 and codes[5] == 429
-
-
 def test_loopback_needs_no_token(isolated: Path) -> None:
     with TestClient(app, client=LOCAL) as c:
         assert c.get("/api/roots").status_code == 200

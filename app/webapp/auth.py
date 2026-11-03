@@ -12,12 +12,16 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from src.login_alert import alert_notifier, alert_text
+from src.login_lockout import LockoutAlert, LoginLockout, retry_after_header
+from src.notify import NotifierError
 from src.secret_compare import secrets_equal
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 
@@ -27,10 +31,6 @@ LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
 _OPEN_EXACT = frozenset({"/", "/healthz", "/api/login", "/api/version", "/favicon.ico", "/manifest.webmanifest"})
 _OPEN_PREFIXES = ("/static/",)
 
-# Failed sign-ins allowed per client before a cool-down, and its length.
-_MAX_FAILURES = 5
-_LOCKOUT_SECONDS = 300
-
 router = APIRouter()
 
 
@@ -39,6 +39,15 @@ def _client(scope_or_request: Any) -> str:
     if client is None:
         return ""
     return client.host if hasattr(client, "host") else str(client[0])
+
+
+def is_pc_itself(scope_or_request: Any) -> bool:
+    """True for a caller on this PC: it needs no token and is never locked out.
+
+    The app binds the tailnet directly (no tunnel in front), so a loopback
+    socket is this machine and nothing else.
+    """
+    return _client(scope_or_request) in LOOPBACK
 
 
 def token_ok(presented: str) -> bool:
@@ -60,7 +69,7 @@ class SignInMiddleware:
         await response(scope, receive, send)
 
     def _allowed(self, scope: Scope) -> bool:
-        if _client(scope) in LOOPBACK:
+        if is_pc_itself(scope):
             return True
         path = scope.get("path", "")
         if path in _OPEN_EXACT or path.startswith(_OPEN_PREFIXES):
@@ -70,31 +79,27 @@ class SignInMiddleware:
         return auth.lower().startswith("bearer ") and token_ok(auth[7:].strip())
 
 
-class _Throttle:
-    """Counts failed sign-ins per client address."""
+def _alert_owner(alert: LockoutAlert) -> None:
+    """Send the guessing alert from a thread, so the login never waits on Telegram."""
+    notifier = alert_notifier()
+    if notifier is None:
+        return
+    text = alert_text(alert)
 
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._fails: dict[str, list[float]] = {}
+    def send() -> None:
+        try:
+            notifier.send_text(text)
+        except NotifierError as exc:
+            logger.warning("⚠️ login alert not delivered: %s", type(exc).__name__)
 
-    def retry_after(self, client: str) -> int:
-        with self._lock:
-            recent = [t for t in self._fails.get(client, []) if time.time() - t < _LOCKOUT_SECONDS]
-            self._fails[client] = recent
-            if len(recent) < _MAX_FAILURES:
-                return 0
-            return int(_LOCKOUT_SECONDS - (time.time() - recent[0])) + 1
-
-    def fail(self, client: str) -> None:
-        with self._lock:
-            self._fails.setdefault(client, []).append(time.time())
-
-    def clear(self, client: str) -> None:
-        with self._lock:
-            self._fails.pop(client, None)
+    threading.Thread(target=send, daemon=True, name="login-alert").start()
 
 
-_throttle = _Throttle()
+def make_lockout(clock: Callable[[], float] = time.monotonic) -> LoginLockout:
+    return LoginLockout(on_alert=_alert_owner, clock=clock)
+
+
+_lockout = make_lockout()
 
 
 @router.post("/api/login")
@@ -104,18 +109,20 @@ async def login(request: Request) -> Any:
     if not password or not token:
         logger.info("ℹ️ sign-in attempt from %s, but no password is set (scripts/set_password.py)", client)
         raise HTTPException(status_code=503, detail="password sign-in is not set up")
-    wait = _throttle.retry_after(client)
-    if wait:
-        return JSONResponse({"detail": "too many attempts"}, status_code=429, headers={"Retry-After": str(wait)})
+    exempt = is_pc_itself(request)
+    wait = 0.0 if exempt else _lockout.retry_after(client)
+    if wait > 0:
+        return JSONResponse({"detail": "too many attempts"}, status_code=429, headers=retry_after_header(wait))
     try:
         body = await request.json()
     except ValueError:
         body = {}
     presented = str(body.get("password") or "") if isinstance(body, dict) else ""
     if not secrets_equal(presented, password):
-        _throttle.fail(client)
+        if not exempt:
+            _lockout.record_failure(client)
         logger.warning("⚠️ failed sign-in from %s", client)
         raise HTTPException(status_code=401, detail="wrong password")
-    _throttle.clear(client)
+    _lockout.reset(client)
     logger.info("✅ sign-in from %s", client)
     return {"token": token}

@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.log
+# Secrets (password, token) and this machine's settings
+.env
+config.json
+config.json.tmp
+# The tailnet certificate and key, issued per machine
+/webapp/
+# Playwright output
+test-results/

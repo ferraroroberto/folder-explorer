@@ -1,0 +1,136 @@
+# .fleet.toml -- this repo's card on the fleet architecture map. Keep it current:
+# update it in the same PR as any material change (layer, port, role, one-line
+# description, exposed services).
+layer       = "working-web"
+icon        = "🗂️"
+port        = ":8453"
+description = "Disk-space explorer: folder tree, largest files and file types, cloud files by size or on disk."
+depends_on  = ["project-scaffolding"]
+shape       = "webapp-tray"
+extra_roots = []
+
+# Explore is a tree with attribute columns, so it spans the window on desktop.
+[design]
+wide_views = ["explore"]
+
+# [vendored] -- components copied byte-for-byte from project-scaffolding, with the
+# scaffold commit each came from. Re-vendor from there, never edit the copy.
+[vendored]
+base = { src = "app/webapp/static/_vendored/base", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/base" }
+nav = { src = "app/webapp/static/_vendored/nav", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/nav" }
+icons = { src = "app/webapp/static/_vendored/icons", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/icons" }
+card = { src = "app/webapp/static/_vendored/card", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/card" }
+home-head = { src = "app/webapp/static/_vendored/home-head", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/home-head" }
+segmented = { src = "app/webapp/static/_vendored/segmented", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/segmented" }
+select-native = { src = "app/webapp/static/_vendored/select-native", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/select-native" }
+icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/icon-button" }
+button = { src = "app/webapp/static/_vendored/button", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/button" }
+modal = { src = "app/webapp/static/_vendored/modal", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/modal" }
+empty-state = { src = "app/webapp/static/_vendored/empty-state", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/empty-state" }
+toast = { src = "app/webapp/static/_vendored/toast", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/toast" }
+action-row = { src = "app/webapp/static/_vendored/action-row", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/action-row" }
+text-size = { src = "app/webapp/static/_vendored/text-size", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/text-size" }
+page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/page-foot" }
+usage-log = { src = "app/webapp/static/_vendored/usage-log", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/usage-log" }
+sign-in = { src = "app/webapp/static/_vendored/sign-in", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/sign-in" }
+switch = { src = "app/webapp/static/_vendored/switch", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/switch" }
+usage_log = { src = "src/usage_log.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/usage_log.py" }
+runtime_data = { src = "src/runtime_data.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/runtime_data.py" }
+build_info = { src = "src/build_info.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/build_info.py" }
+compression = { src = "src/compression.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/compression.py" }
+no_window = { src = "src/no_window.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/no_window.py" }
+pooled_http = { src = "src/pooled_http.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/pooled_http.py" }
+single_instance = { src = "app/tray/single_instance.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/tray/single_instance.py" }
+tray_watchdog = { src = "app/tray/watchdog.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/tray/watchdog.py" }
+e2e_live_guard = { src = "tests/e2e/_e2e_live_guard.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_e2e_live_guard.py" }
+layout_lint = { src = "tests/e2e/_layout_lint.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_layout_lint.py" }
+geometry = { src = "tests/e2e/_geometry.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_geometry.py" }
+shot_capture = { src = "tests/e2e/_shot.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_shot.py" }
+static_ratchet = { src = "scripts/static_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/static_ratchet.py" }
+comment_ratchet = { src = "scripts/comment_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/comment_ratchet.py" }
+docs_ratchet = { src = "scripts/docs_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/docs_ratchet.py" }
+structure_ratchet = { src = "scripts/structure_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/structure_ratchet.py" }
+structure_layout = { src = "scripts/structure_layout.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/structure_layout.py" }
+structure_band = { src = "scripts/structure_band.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/structure_band.py" }
+instruction_ratchet = { src = "scripts/instruction_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/instruction_ratchet.py" }
+doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/doc_refs_ratchet.py" }
+dead_code_ratchet = { src = "scripts/dead_code_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/dead_code_ratchet.py" }
+conventions_ratchet = { src = "scripts/conventions_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/conventions_ratchet.py" }
+usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/usage_track_ratchet.py" }
+usage_track_scan = { src = "scripts/usage_track_scan.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/usage_track_scan.py" }
+runtime_write_ratchet = { src = "scripts/runtime_write_ratchet.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/runtime_write_ratchet.py" }
+runtime_write_resolve = { src = "scripts/runtime_write_resolve.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/runtime_write_resolve.py" }
+box_lock_gate = { src = "scripts/box_lock_gate.ps1", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/box_lock_gate.ps1" }
+
+# [structure_ratchet] -- scripts/structure_ratchet.py fails when a file passes 1,000
+# lines, a function 100 lines or a directory 40 modules, when src/ imports app/, and
+# when the root folders do not match `shape` plus `extra_roots`. Exit 3 fails the gate.
+[structure_ratchet]
+enabled  = true
+baseline = ".structure-ratchet-baseline.json"
+
+# [instruction_ratchet] -- the prompt-audit lint rules and size caps over CLAUDE.md,
+# AGENTS.md and any skill. Exit 3 fails the gate.
+[instruction_ratchet]
+enabled  = true
+baseline = ".instruction-ratchet-baseline.json"
+
+# [doc_refs_ratchet] -- README.md, CLAUDE.md and docs/ naming a path, module, link or
+# loopback port that does not exist. The app's own port comes from `port` above;
+# 8445 is app-launcher, whose jobs API registers the nightly scan.
+[doc_refs_ratchet]
+enabled    = true
+baseline   = ".doc-refs-ratchet-baseline.json"
+allow_refs = ["8445"]
+
+# [dead_code_ratchet] -- a Python function, class or method nothing names. Route
+# handlers, tests and [vendored] files are never reported. Exit 3 fails the gate.
+[dead_code_ratchet]
+enabled  = true
+baseline = ".dead-code-ratchet-baseline.json"
+
+# [static_ratchet] -- duplicated blocks (jscpd), unused imports and variables and
+# likely-bug/security patterns (ruff). Needs Node (npx) and ruff. [vendored] files
+# are left out automatically. Exit 3 (a detector could not run) fails the gate.
+[static_ratchet]
+enabled  = true
+baseline = ".static-ratchet-baseline.json"
+exclude  = ["**/_vendored/**"]
+
+# [docs_ratchet] -- the root README.md size budget and history markers (issue
+# references, dated or changelog headings) in README.md and docs/.
+[docs_ratchet]
+enabled  = true
+baseline = ".docs-ratchet-baseline.json"
+
+# [comment_ratchet] -- issue references in product-code comments: a comment says why
+# the code is the way it is now; history lives in the issue and git log.
+[comment_ratchet]
+enabled  = true
+baseline = ".comment-ratchet-baseline.json"
+
+# [conventions_ratchet] -- fleet conventions as stdlib `ast` rules: every spawn
+# passes creationflags, app/ and src/ log instead of printing, no hardcoded drive
+# path, secrets are compared only in src/secret_compare.py, git runs only through
+# the vendored build identity, and the one password field is the vendored sign-in sheet.
+[conventions_ratchet]
+enabled        = true
+baseline       = ".conventions-ratchet-baseline.json"
+rules          = ["no-window", "logging-not-print", "no-drive-path", "secret-compare", "git-wrapper", "password-input-vendored"]
+secret_helpers = ["src/secret_compare.py"]
+git_wrappers   = ["src/build_info.py"]
+
+# [runtime_write_ratchet] -- a write target resolving under a code folder (runtime
+# output goes to the runtime-data folder); --snapshot/--probe bracket the tests.
+# store.data_dir/index_dir/state_path resolve under the runtime-data root, outside the tree.
+[runtime_write_ratchet]
+enabled    = true
+baseline   = ".runtime-write-ratchet-baseline.json"
+safe_calls = ["data_dir", "index_dir", "state_path", "runtime_data_dir"]
+
+# [usage_track_ratchet] -- every web control carries a constant data-track id and
+# every <dialog> a data-track-view; usage-log-wired holds the app to its usage log.
+[usage_track_ratchet]
+enabled  = true
+baseline = ".usage-track-ratchet-baseline.json"
+rules    = ["untracked-control", "untracked-sheet", "dynamic-id", "usage-log-wired"]

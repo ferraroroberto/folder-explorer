@@ -1,0 +1,9 @@
+-r requirements.txt
+-r requirements-tray.txt
+httpx>=0.27
+pytest>=8.0
+pytest-playwright>=0.7
+playwright>=1.59
+ruff>=0.15
+mypy>=1.10
+resvg-py>=0.5

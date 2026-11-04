@@ -62,7 +62,7 @@ Scan output (the index, the scan history, logs, the usage log) lives in the runt
 
 ## Configuration
 
-`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`. Secrets live in `.env` (`.env.example`).
+`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`. Secrets live in `.env` (`.env.example`).
 
 ## Verification gate
 

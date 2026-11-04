@@ -11,14 +11,14 @@ folder-explorer/
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
 │   │   └── watchdog.py         # vendored: retry-with-backoff, health watchdog, breadcrumb log
 │   └── webapp/
-│       ├── __main__.py         # `python -m app.webapp`: bind from remote_access, cert renewal, uvicorn
+│       ├── __main__.py         # `python -m app.webapp`: bind from remote_access, cert renewal, serve.run
 │       ├── server.py           # FastAPI app: routers, sign-in gate, gzip, cache-busted static mount
 │       ├── bind.py             # remote_access + certificate -> host, scheme, state
 │       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool and its housekeeping
-│       ├── event_loop.py       # the Windows selector loop every uvicorn start uses
+│       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), scans, settings
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding

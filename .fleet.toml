@@ -41,6 +41,7 @@ runtime_data = { src = "src/runtime_data.py", sha = "c8ec10d6ba57a5790fdaabad66a
 build_info = { src = "src/build_info.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/build_info.py" }
 compression = { src = "src/compression.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/compression.py" }
 no_window = { src = "src/no_window.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/no_window.py" }
+webapp_serve = { src = "app/webapp/serve.py", sha = "41ca8abd5a2755a06bd8a620a72967211161d58e", dest = "app/webapp/serve.py" }
 pooled_http = { src = "src/pooled_http.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/pooled_http.py" }
 single_instance = { src = "app/tray/single_instance.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/tray/single_instance.py" }
 tray_watchdog = { src = "app/tray/watchdog.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/tray/watchdog.py" }

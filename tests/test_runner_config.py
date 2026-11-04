@@ -109,3 +109,13 @@ def test_configured_roots_keep_order_and_get_unique_keys(tmp_path: Path) -> None
     a, b = tmp_path / "x" / "Data", tmp_path / "y" / "Data"
     resolved = roots.resolve_roots([str(a), str(b), str(a)])
     assert [r.key for r in resolved] == ["data", "data-2"]
+
+
+def test_server_defaults_to_hypercorn_and_ignores_unknown_values(isolated: Path) -> None:
+    assert config.load()["server"] == "hypercorn"
+    write_config(isolated, server="uvicorn")
+    assert config.load()["server"] == "uvicorn"
+    write_config(isolated, server="gunicorn")
+    assert config.load()["server"] == "hypercorn"
+    with pytest.raises(ValueError):
+        config.validate_update({"server": "uvicorn"})

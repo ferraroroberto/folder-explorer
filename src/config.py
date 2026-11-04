@@ -19,12 +19,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_ENV = "FOLDER_EXPLORER_CONFIG"
 
 SCHEDULES = ("off", "nightly", "hourly")
+SERVERS = ("hypercorn", "uvicorn")
 
 DEFAULTS: dict[str, Any] = {
     # The one switch for reaching the app from the phone. Off binds loopback
     # only, over plain HTTP, with no certificate and no sign-in.
     "remote_access": True,
     "port": 8453,
+    # hypercorn serves HTTP/2 over the certificate; uvicorn is the HTTP/1.1 fallback.
+    "server": "hypercorn",
     # null = every local fixed drive plus OneDrive; a list names the roots.
     "roots": None,
     # The in-app scan schedule. Off by default: on this PC the nightly
@@ -48,6 +51,8 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     port = raw.get("port")
     if isinstance(port, int) and 1 <= port <= 65535:
         cfg["port"] = port
+    if raw.get("server") in SERVERS:
+        cfg["server"] = raw["server"]
     roots = raw.get("roots")
     if roots is None or (isinstance(roots, list) and all(isinstance(r, str) for r in roots)):
         cfg["roots"] = [r.strip() for r in roots if r.strip()] if roots else None
@@ -75,7 +80,7 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
     """The subset of ``updates`` that is a valid change; raises ``ValueError`` on a bad value."""
     out: dict[str, Any] = {}
     for key, value in updates.items():
-        if key not in DEFAULTS or key == "port":
+        if key not in DEFAULTS or key in ("port", "server"):
             raise ValueError("unknown or read-only setting: " + key)
         if key == "remote_access" and not isinstance(value, bool):
             raise ValueError("remote_access must be true or false")

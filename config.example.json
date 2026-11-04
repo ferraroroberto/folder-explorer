@@ -1,6 +1,7 @@
 {
   "remote_access": true,
   "port": 8453,
+  "server": "hypercorn",
   "roots": null,
   "schedule": "off",
   "schedule_time": "03:00"

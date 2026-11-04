@@ -2,7 +2,9 @@
 
 Remote access on renews the tailnet certificate first when it is close to
 expiry (``scripts/gen_tailscale_cert.py --check``), then binds every
-interface over HTTPS. Off binds loopback over plain HTTP.
+interface over HTTPS, which hypercorn serves as HTTP/2 (``server`` in
+``config.json`` picks the uvicorn HTTP/1.1 fallback). Off binds loopback over
+plain HTTP.
 """
 
 from __future__ import annotations
@@ -13,14 +15,12 @@ import os
 import subprocess
 import sys
 
-import uvicorn
-
 from src import config
 from src.config import PROJECT_ROOT
 from src.no_window import NO_WINDOW
 from app.webapp.bind import resolve_bind
-from app.webapp.event_loop import LOOP_FACTORY
 from app.webapp.routers.settings import EFFECTIVE_BIND_ENV
+from app.webapp.serve import run
 
 logger = logging.getLogger("app.webapp")
 
@@ -63,9 +63,9 @@ def main() -> None:
         logger.warning("⚠️ remote access is on but webapp/certificates/ has no certificate: serving loopback only. "
                        "Run scripts/gen_tailscale_cert.py, then restart.")
     logger.info("ℹ️ folder-explorer on %s (remote access: %s)", bind.local_url, bind.state)
-    uvicorn.run(
-        "app.webapp.server:app", host=bind.host, port=bind.port, loop=LOOP_FACTORY, log_level="warning",
-        ssl_certfile=str(bind.cert) if bind.cert else None, ssl_keyfile=str(bind.key) if bind.key else None,
+    run(
+        bind.host, bind.port, certfile=str(bind.cert) if bind.cert else None, keyfile=str(bind.key) if bind.key else None,
+        server=cfg["server"],
     )
 
 

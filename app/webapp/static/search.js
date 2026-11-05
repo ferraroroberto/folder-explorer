@@ -14,6 +14,7 @@ import {
   withFacet, withoutChip,
 } from './search-side.js';
 import { initPreview, openPreviewSheet, previewAction, renderPreview } from './search-preview.js';
+import { renderOutlookCard } from './archive.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { esc, fmtBytes, glyph, plural } from './fmt.js';
@@ -42,6 +43,7 @@ function renderChrome() {
   box().placeholder = mode === 'folders' ? 'Folder names, e.g. alpha budget' : 'Words, or from: to: subject: has:attachment after:';
   $('resultsTitle').innerHTML = glyph(mode === 'folders' ? 'folder' : 'mail') + (mode === 'folders' ? 'Folders' : 'Emails');
   if (WIDE.matches) { setOpen('filtersCard', true); setOpen('facetsCard', true); }
+  renderOutlookCard(st, mode);
   $('searchOff').hidden = !!mode;
   $('searchOn').hidden = !mode;
   if (!mode) {

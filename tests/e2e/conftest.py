@@ -99,7 +99,7 @@ def app_url(roots_count: int) -> Iterator[str]:
     (work / "config.json").write_text(json.dumps({"remote_access": False, "port": port, "roots": [str(r) for r in roots],
                                                   "email": {"index_path": str(emails), "roots": [str(mail)]}}))
     env = dict(os.environ, FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
-               PYTHONUTF8="1", PYTHONUNBUFFERED="1")
+               FOLDER_EXPLORER_OUTLOOK="off", PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     scan = subprocess.run([sys.executable, "-m", "app.cli", "scan"], cwd=str(ROOT), env=env, capture_output=True, text=True,
                           timeout=60, creationflags=NO_WINDOW)
     if scan.returncode != 0:

@@ -46,6 +46,7 @@
 <link rel="stylesheet" href="/static/_vendored/text-size/text-size.css">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/search.css">
+<link rel="stylesheet" href="/static/archive.css">
 <link rel="stylesheet" href="/static/email-scans.css">
 <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
 </head>
@@ -197,6 +198,18 @@
   <symbol id="i-minus" viewBox="0 0 24 24" fill="none">
     <path d="M5 12h14" />
   </symbol>
+  <symbol id="i-archive" viewBox="0 0 24 24" fill="none">
+    <rect width="20" height="5" x="2" y="3" rx="1" />
+    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+    <path d="M10 12h4" />
+  </symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" />
+  </symbol>
+  <symbol id="i-circle-dot" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="1" />
+  </symbol>
 </svg>
 <nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="search">
   <button id="tabSearch" type="button" class="tab active" data-tab="search" role="tab" aria-selected="true" aria-controls="paneSearch" data-track="tab-search">
@@ -265,6 +278,20 @@
       </div>
 
       <aside class="search-side">
+        <div class="card action-list outlook-card" id="outlookCard" hidden>
+          <ul class="action-rows">
+            <li class="action-row">
+              <button type="button" class="action-row-main" id="openArchive" aria-haspopup="dialog" data-track="archive-open">
+                <span class="action-row-avatar" aria-hidden="true"><svg class="icon"><use href="#i-archive"></use></svg></span>
+                <span class="action-row-text">
+                  <span class="action-row-title">Archive the open mail</span>
+                  <span class="action-row-meta" id="outlookMeta"></span>
+                </span>
+              </button>
+              <svg class="icon action-row-trail row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+            </li>
+          </ul>
+        </div>
         <div class="card card--collapsible side-card" id="filtersCard">
           <button type="button" class="side-toggle" aria-expanded="false" aria-controls="filtersBody" data-track="filters-toggle"><span class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg><span id="filtersTitle">Filters</span></span><span class="summary-meta" id="filtersMeta"></span><svg class="icon summary-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
           <div class="side-body" id="filtersBody" hidden></div>
@@ -496,6 +523,40 @@
   </div>
 </dialog>
 
+<dialog class="detail-dialog wide-dialog" id="archiveDialog" data-track-view="archive-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Archive mail</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="archive-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="arch-body" id="archiveBody"></div>
+    <div class="detail-actions" id="archiveActions" hidden></div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog wide-dialog" id="macroDialog" data-track-view="macro-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Outlook macro</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="macro-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="prose">
+      <p>An <strong>Archive</strong> button on Outlook's ribbon files the selected or open mail. It starts folder-explorer's windowless archive entry with the mail's ID and returns straight away, so Outlook never waits on it.</p>
+      <p>The Archive sheet then opens in the app. If the app isn't open in a browser on this PC, a small window shows the same suggestions instead.</p>
+      <p>Set up once per PC: import the template below, set <code class="code-chip">FOLDER_EXPLORER_HOME</code> to the checkout folder, and add the macro to the ribbon.</p>
+      <p>The new Outlook for Windows runs neither macros nor COM, so archiving needs Outlook (classic).</p>
+    </div>
+    <div class="code-listing">
+      <div class="code-listing-head"><span>VBA · ArchiveCurrentItem</span><button type="button" class="button-surface" id="copyMacro" data-track="macro-copy">Copy</button></div>
+      <pre id="macroText"></pre>
+    </div>
+  </div>
+</dialog>
+
 <dialog class="detail-dialog" id="keysDialog" data-track-view="keys-sheet">
   <div class="detail-card">
     <div class="detail-header">
@@ -583,6 +644,13 @@
       <label class="ff-col"><span class="row-note">Skip these folders, one per line: the disk scan, folder search and the email index all leave them out</span>
         <textarea class="input-native roots-input" id="excludeInput" rows="2" spellcheck="false" aria-label="Folders to skip, one per line" data-track="exclude-input"></textarea>
       </label>
+    </div>
+    <div class="row row-stack">
+      <div class="row-line">
+        <span>Outlook macro</span>
+        <button type="button" class="button-surface" id="showMacro" data-track="show-macro">Show macro</button>
+      </div>
+      <p class="row-note" id="outlookNote"></p>
     </div>
     <div class="row">
       <span>Index size</span>

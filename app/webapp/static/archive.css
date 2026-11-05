@@ -1,0 +1,76 @@
+/* The Search tab's Archive card, the Archive sheet and the Outlook macro sheet. */
+
+/* -------------------------------------------------------------- the card */
+.outlook-card .action-row-avatar .icon { color: var(--accent-text); }
+.row-chevron { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); margin-right: 14px; flex: none; }
+.outlook-card .action-row-main:disabled { cursor: default; }
+.outlook-card .action-row-main:disabled .action-row-title { color: var(--muted); }
+.outlook-card .action-row-main.is-busy { cursor: progress; }
+
+/* ------------------------------------------------------------- the sheet */
+.arch-source { margin: 0 0 12px; font-size: var(--font-body-sm); color: var(--accent-text); display: flex; gap: 6px; align-items: center; }
+.arch-source .icon { width: var(--icon-inline); height: var(--icon-inline); }
+.arch-mail { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); display: grid; gap: 4px; }
+.arch-mail strong { font-size: var(--font-body); overflow-wrap: anywhere; }
+.arch-mail span { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+.arch-filed { margin: 10px 0 0; font-size: var(--font-body-sm); overflow-wrap: anywhere; }
+.arch-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; }
+.arch-head h3 { margin: 0; font-size: var(--font-body); font-weight: 700; }
+.arch-options { list-style: none; margin: 0; padding: 0; }
+.arch-opt {
+  font: inherit;
+  line-height: normal;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  min-height: var(--row-lg);
+  padding: 10px 8px;
+  border: 0;
+  border-top: 1px solid var(--line-muted);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.arch-options li:first-child .arch-opt { border-top: 0; }
+.arch-opt .icon { grid-row: span 2; width: 20px; height: 20px; color: var(--muted); }
+.arch-opt[aria-checked="true"] { background: var(--accent-soft); border-radius: var(--radius-sm); border-top-color: transparent; }
+.arch-opt[aria-checked="true"] .icon { color: var(--accent-text); }
+.arch-options li:has(.arch-opt[aria-checked="true"]) + li .arch-opt { border-top-color: transparent; }
+.ao-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.ao-why { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+.ao-why .chip { margin: 0; }
+.arch-other { display: grid; gap: 6px; margin-top: 10px; }
+.arch-other .search-field { margin: 0; }
+.arch-found { list-style: none; margin: 0; padding: 0; }
+.arch-found button {
+  font: inherit;
+  line-height: normal;
+  width: 100%;
+  min-height: var(--row-sm);
+  padding: 0 8px;
+  border: 0;
+  border-top: 1px solid var(--line-muted);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.arch-found .row-note { padding: 6px 8px; }
+.detail-card .row .row-value.mono { font-size: 13px; overflow-wrap: anywhere; text-align: right; min-width: 0; }
+.arch-foot { display: flex; align-items: center; gap: var(--space-xs); margin-top: 12px; font-size: var(--font-body-sm); color: var(--muted); }
+.arch-foot > .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
+.arch-foot .icon-button { margin-left: auto; }
+.arch-body .pv-error { margin-top: 12px; }
+
+/* -------------------------------------------------------- the macro sheet */
+.code-listing { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); overflow: hidden; }
+.code-listing-head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 0 0 12px; border-bottom: 1px solid var(--line-muted); font-size: var(--font-caption); font-weight: 600; color: var(--muted); }
+.code-listing-head .button-surface { min-height: 44px; margin: 2px; font-size: var(--font-caption); }
+.code-listing pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 1.5; color: var(--ink); }

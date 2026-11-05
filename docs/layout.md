@@ -7,6 +7,9 @@ folder-explorer/
 ├── app/                        # entry points and the web layer
 │   ├── cli/__main__.py         # `python -m app.cli scan|roots|email`: scans and the email index with no app running
 │   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
+│   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
+│   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
+│   ├── archive_window.py       # the macro's fallback Archive window (Tk) when no page is open on this PC
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
 │   │   ├── tray.py             # menu, adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
@@ -20,7 +23,8 @@ folder-explorer/
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool and its housekeeping
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
-│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings
+│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
+│       │                       #   archive (the Archive sheet and the macro's hand-off)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
@@ -31,11 +35,12 @@ folder-explorer/
 │   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),
 │   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths
 │   │   │                       #   (the email-folder guard), archive_settings, mailboxes, repository,
-│   │   │                       #   suggester, renumber
+│   │   │                       #   suggester, renumber, archive_sheet (the Archive sheet's suggest and file)
 │   │   ├── batch/              # the archive verbs: verbs (plan, apply, mailboxes, renumber), revert,
 │   │   │                       #   dismiss, draft, send, find, sync, move, common (the envelope)
 │   │   └── reader.py           # the only module that opens a file (a .msg, for the stage, Show all, renumber)
-│   ├── outlook/                # every COM call: client, drafts, sending (the one Send), syncing, stores, process
+│   ├── outlook/                # every COM call: client, drafts, sending (the one Send), syncing, stores, process,
+│   │                           #   bridge (attach, the mail at hand, a mail by its ids, Display)
 │   ├── scanner.py              # the walk and the index writer
 │   ├── index.py                # every query over an index, and the open-index pool
 │   ├── store.py                # scan history and current index per root (state.sqlite3)
@@ -51,7 +56,8 @@ folder-explorer/
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract)
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
-├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py
+├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
+│                               #   (the Outlook macro template, no paths)
 └── docs/                       # this file, scanning.md, and design/ (the search study and the app mock-up, invented data)
 ```
 

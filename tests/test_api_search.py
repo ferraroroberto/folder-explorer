@@ -105,6 +105,22 @@ def test_pc_only_actions_refuse_other_devices(setup: Path, monkeypatch: pytest.M
     assert len(opened) == 1
 
 
+def test_find_in_mailbox_asks_the_bridge_by_message_id_on_the_pc_only(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FOLDER_EXPLORER_PASSWORD", "invented-password")
+    monkeypatch.setenv("FOLDER_EXPLORER_TOKEN", "invented-token")
+    calls: list[list[str]] = []
+    monkeypatch.setattr(search_routes, "bridge", lambda args, timeout: calls.append(args) or {"ok": True, "folder": "Archive"})
+    auth = {"Authorization": "Bearer invented-token"}
+    with TestClient(app, client=REMOTE) as c:
+        row = c.get("/api/search/emails", headers=auth).json()["hits"][0]["id"]
+        assert c.post("/api/emails/%d/find" % row, headers=auth).status_code == 403
+        assert c.get("/api/search/status", headers=auth).json()["archive"]["ready"] is False
+    with TestClient(app, client=LOCAL) as c:
+        assert c.post("/api/emails/%d/find" % row).json() == {"ok": True, "folder": "Archive"}
+        assert c.post("/api/emails/99999/find").status_code == 404
+    assert len(calls) == 1 and calls[0][0] == "show" and calls[0][1].startswith("--message-id=msg-")
+
+
 def test_saved_searches_round_trip(isolated: Path) -> None:
     with TestClient(app, client=LOCAL) as c:
         saved = c.post("/api/searches", json={"mode": "emails", "name": "Flagged lately", "query": "is:flagged newer_than:6m"}).json()

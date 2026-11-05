@@ -46,6 +46,15 @@ DEFAULTS: dict[str, Any] = {
     # Folder search: how many leading path components a result hides (display
     # only) and whether a folder of per-person subfolders shows as one result.
     "folder_search": {"skip_levels": 0, "prune_people": True},
+    # The archive verbs (python -m app.cli email batch): the file-name form
+    # (date_prefix true, false or "auto" to follow the destination folder),
+    # the longest path the archiver writes, and the folder suggester's limits.
+    "archive": {"date_prefix": False, "max_path_length": 255, "max_suggestions": 3, "min_score": 0.05},
+    # The Outlook side of the archive verbs: the folder a filed mail moves to,
+    # the categories they stamp, and the address a draft blind-copies (null:
+    # the default account's, read from Outlook). Set by editing config.json.
+    "outlook": {"archive_folder": "Archive", "category": "Archived by task-os",
+                "dismiss_category": "Dismissed by task-os", "self_address": None},
 }
 
 # The most leading components folder search may hide.
@@ -53,6 +62,10 @@ MAX_SKIP_LEVELS = 8
 # The largest per-run download budget Settings accepts, in MB.
 MAX_BUDGET_MB = 1024 * 1024
 _EMAIL_KEYS = {"index_path", "roots", "download_budget_mb"}
+# The longest path the archiver may be told to write; Windows' own limit is 260.
+MAX_PATH_LENGTH = 260
+# Settings only config.json sets: no Settings control writes them.
+READ_ONLY = ("port", "server", "archive", "outlook")
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -81,7 +94,41 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["exclude"] = _clean_paths(raw.get("exclude"))
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
+    cfg["archive"] = _clean_archive(raw.get("archive"))
+    cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
+
+
+def _whole(value: Any, low: int, high: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+
+def _clean_archive(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["archive"])
+    if not isinstance(raw, dict):
+        return out
+    prefix = raw.get("date_prefix")
+    if isinstance(prefix, bool) or (isinstance(prefix, str) and prefix.strip().lower() == "auto"):
+        out["date_prefix"] = prefix if isinstance(prefix, bool) else "auto"
+    if _whole(raw.get("max_path_length"), 100, MAX_PATH_LENGTH):
+        out["max_path_length"] = raw["max_path_length"]
+    if _whole(raw.get("max_suggestions"), 1, 50):
+        out["max_suggestions"] = raw["max_suggestions"]
+    floor = raw.get("min_score")
+    if isinstance(floor, (int, float)) and not isinstance(floor, bool) and 0 <= floor <= 1:
+        out["min_score"] = float(floor)
+    return out
+
+
+def _clean_outlook(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["outlook"])
+    if not isinstance(raw, dict):
+        return out
+    for key in ("archive_folder", "category", "dismiss_category", "self_address"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            out[key] = value.strip()
+    return out
 
 
 def _clean_paths(raw: Any) -> list[str]:
@@ -131,7 +178,7 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
     """The subset of ``updates`` that is a valid change; raises ``ValueError`` on a bad value."""
     out: dict[str, Any] = {}
     for key, value in updates.items():
-        if key not in DEFAULTS or key in ("port", "server"):
+        if key not in DEFAULTS or key in READ_ONLY:
             raise ValueError("unknown or read-only setting: " + key)
         if key == "remote_access" and not isinstance(value, bool):
             raise ValueError("remote_access must be true or false")

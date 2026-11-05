@@ -1,0 +1,229 @@
+"""
+Guarded send: read a draft back, and send it only while it is still what was approved.
+
+This is what ``email batch read`` and ``email batch send`` run. Like
+``draft.py`` it is pure orchestration — the COM reads live in
+:class:`~src.outlook.client.OutlookClient` and the one ``Send`` call
+in :mod:`src.outlook.sending` — so a fake client drives it in tests.
+
+Design decisions:
+
+- **Approval is a fingerprint of the stored item, not of what a caller wrote.**
+  ``read`` reports a sha256 per part (``to``, ``cc``, ``bcc``, ``subject``,
+  ``body``, ``attachments``) and one ``hash`` over them. ``body`` is the whole
+  ``HTMLBody``, signature included, and ``attachments`` are their bytes, so an
+  edit anywhere in the item — made in an Outlook window, by hand — changes it.
+- **The comparison runs on the live item immediately before ``Send()``**, on
+  the same reference that is then sent. Nothing is compared to a copy.
+- **A refusal names what differs** (``differs``) when the caller passed the
+  per-part hashes, and sends nothing. There is no partial or forced send.
+- **One item, by EntryID.** No lookup by subject or search, and no recipient
+  is resolved or added; a recipient with no readable address refuses the send
+  rather than being skipped.
+- **``draft`` keeps no send path.** Sending is this separate verb, so a caller
+  has to choose it deliberately.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+from collections.abc import Mapping
+from typing import Any
+
+from src.email.batch.common import header, now_iso
+from src.email.batch.draft import html_to_text
+from src.outlook.drafts import (
+    ATTACHMENT_EMBEDDED,
+    SENDING_ACCOUNT_MISMATCH,
+    DraftAttachment,
+    DraftSnapshot,
+)
+from src.outlook.mapi import html_after_marked_region, strip_word_padding
+from src.outlook.sending import send_if_approved
+
+logger = logging.getLogger(__name__)
+
+READ_VERB = "read"
+SEND_VERB = "send"
+
+PARTS = ("to", "cc", "bcc", "subject", "body", "attachments")
+
+APPROVAL_MISMATCH = "approval_mismatch"
+RECIPIENT_UNREADABLE = "recipient_unreadable"
+
+
+class SendRefused(Exception):
+    """The draft was not sent; ``code`` says why, ``differs`` names the parts."""
+
+    def __init__(self, code: str, message: str, differs: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+        self.differs = differs or []
+
+
+def _addresses(values: list[str]) -> list[str]:
+    """Who receives it: order, case and repeats do not change that."""
+    return sorted({value.strip().casefold() for value in values if value.strip()})
+
+
+def _digest(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _attachment_binding(attachment: DraftAttachment) -> list[Any]:
+    """What binds one attachment: its content hash, with its size for a file.
+
+    An attached mail's ``Attachment.Size`` reads 0 until Outlook saves the
+    draft, which ``send`` does before it compares, so its size is left out and
+    its content hash alone binds it.
+    """
+    if attachment.kind == ATTACHMENT_EMBEDDED:
+        return [attachment.name, attachment.sha256]
+    return [attachment.name, attachment.size_bytes, attachment.sha256]
+
+
+def part_values(snapshot: DraftSnapshot) -> dict[str, Any]:
+    """Each fingerprinted part in the form it is hashed in."""
+    return {
+        "to": _addresses(snapshot.to),
+        "cc": _addresses(snapshot.cc),
+        "bcc": _addresses(snapshot.bcc),
+        "subject": snapshot.subject,
+        "body": snapshot.html_body,
+        "attachments": sorted(_attachment_binding(a) for a in snapshot.attachments),
+    }
+
+
+def fingerprint(snapshot: DraftSnapshot) -> dict[str, Any]:
+    """``{"hash", "parts"}``: a sha256 per part, and one over those."""
+    parts = {name: _digest(value) for name, value in part_values(snapshot).items()}
+    return {"hash": _digest(parts), "parts": parts}
+
+
+def read_document(snapshot: DraftSnapshot) -> dict[str, Any]:
+    """The ``read`` document: the draft as stored, and its fingerprint."""
+    region = snapshot.body_region_html
+    return {
+        **header(READ_VERB),
+        "entry_id": snapshot.entry_id,
+        "subject": snapshot.subject,
+        "to": list(snapshot.to),
+        "cc": list(snapshot.cc),
+        "bcc": list(snapshot.bcc),
+        "unreadable_recipients": snapshot.unreadable_recipients,
+        # The account it would send from; "" when unset or unreadable.
+        "from_address": snapshot.sending_account,
+        "body": {
+            "html": snapshot.html_body,
+            "region_html": region,
+            # Word pads the paragraphs of a reply it re-serialized; that is not
+            # the caller's text, so it is not held against it.
+            "region_text": None if region is None else html_to_text(strip_word_padding(region)),
+            # The signature and, on a reply, the quoted original: what the
+            # caller's text sits above. Outlook drops the region's closing
+            # comment, so a caller cannot find the end of the region in
+            # `html` itself; `None` when the region is not there.
+            "after_region_html": html_after_marked_region(snapshot.html_body),
+        },
+        "attachments": [
+            # kind "embedded": a mail attached as an item, whose sha256 binds
+            # its content rather than bytes Outlook rewrites on every save; its
+            # size_bytes is informational and not part of the fingerprint.
+            {"name": a.name, "kind": a.kind, "size_bytes": a.size_bytes, "sha256": a.sha256}
+            for a in snapshot.attachments
+        ],
+        "fingerprint": fingerprint(snapshot),
+    }
+
+
+def check_approval(
+    snapshot: DraftSnapshot,
+    expect_hash: str,
+    expect_parts: Mapping[str, str],
+    expect_to: list[str] | None,
+) -> None:
+    """Raise :class:`SendRefused` unless ``snapshot`` is the approved item.
+
+    ``expect_parts`` only names the parts in a refusal; the whole ``hash`` is
+    what decides. ``expect_to``, when given, must be exactly the To line.
+    """
+    if snapshot.unreadable_recipients:
+        raise SendRefused(
+            RECIPIENT_UNREADABLE,
+            f"{snapshot.unreadable_recipients} recipient(s) on the draft have no readable "
+            "address; refusing to send to someone the approval cannot name",
+        )
+    live = fingerprint(snapshot)
+    differs = [name for name in PARTS if name in expect_parts and expect_parts[name] != live["parts"][name]]
+    if expect_to is not None and _addresses(expect_to) != _addresses(snapshot.to) and "to" not in differs:
+        differs.append("to")
+        differs.sort(key=PARTS.index)
+    if live["hash"] == expect_hash and not differs:
+        return
+    named = ", ".join(differs) if differs else "a part not named (pass --expect-part to name it)"
+    raise SendRefused(
+        APPROVAL_MISMATCH,
+        f"the draft is not what was approved; it differs in: {named}. Nothing was sent.",
+        differs,
+    )
+
+
+def check_sending_account(snapshot: DraftSnapshot, expect_account: str | None) -> None:
+    """Raise :class:`SendRefused` unless the draft sends as ``expect_account``.
+
+    ``None`` (the mailbox synthesized when there is no registry) checks
+    nothing, as before. A draft whose sending account is unset or unreadable
+    is refused too: which account Outlook would pick is then a guess.
+    """
+    if expect_account is None:
+        return
+    if snapshot.sending_account.casefold() == expect_account.strip().casefold():
+        return
+    raise SendRefused(
+        SENDING_ACCOUNT_MISMATCH,
+        "the draft does not send as this mailbox's account "
+        f"({'its sending account is unset' if not snapshot.sending_account else 'it was changed to another account'}). "
+        "Nothing was sent.",
+    )
+
+
+def send(
+    client: Any,
+    entry_id: str,
+    expect_hash: str,
+    expect_parts: Mapping[str, str],
+    expect_to: list[str] | None,
+    *,
+    expect_account: str | None = None,
+) -> dict[str, Any]:
+    """Send the draft ``entry_id`` if it still matches; the ``send`` document.
+
+    ``expect_account`` is the registry mailbox's address the draft must send
+    from (``None`` checks nothing).
+
+    Raises:
+        SendRefused: the item differs from the approval, or sends as another
+            account; nothing was sent.
+        DraftUpdateError: the item is gone, sent, or not in Drafts.
+    """
+    def _check(live: DraftSnapshot) -> None:
+        check_sending_account(live, expect_account)
+        check_approval(live, expect_hash, expect_parts, expect_to)
+
+    snapshot = send_if_approved(client, entry_id, _check)
+    logger.info("Sent draft %s: its fingerprint matched the approval.", entry_id)
+    return {
+        **header(SEND_VERB),
+        "entry_id": entry_id,
+        "from_address": snapshot.sending_account,
+        "subject": snapshot.subject,
+        "to": list(snapshot.to),
+        "cc": list(snapshot.cc),
+        "bcc": list(snapshot.bcc),
+        "attachments": [a.name for a in snapshot.attachments],
+        "fingerprint": expect_hash,
+        "sent": True,
+        "sent_at": now_iso(),
+    }

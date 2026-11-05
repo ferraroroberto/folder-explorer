@@ -2,7 +2,7 @@
 
 Where the space on your drives goes, and where a folder or an archived mail is. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type, and searches folder paths and an email archive's index. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. A scan never opens a file, so it never downloads one.
 
-FastAPI + a static PWA, a Windows tray, and the fleet design system. Read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search).
+FastAPI + a static PWA, a Windows tray, and the fleet design system. The app itself is read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search). The archive verbs, which another app runs on purpose, file Outlook mail into the email folders (see Archive verbs).
 
 ## Install
 
@@ -11,7 +11,8 @@ Python 3.11+ on Windows.
 ```powershell
 python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-tray.txt
-& .\.venv\Scripts\python.exe -m pip install -r requirements-email.txt   # optional: Show all for mails
+& .\.venv\Scripts\python.exe -m pip install -r requirements-email.txt   # optional: Show all for mails, the archive suggester
+& .\.venv\Scripts\python.exe -m pip install -r requirements-outlook.txt # optional: the Outlook archive verbs
 copy config.example.json config.json   # optional: every key has a default
 ```
 
@@ -73,6 +74,16 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 
 **Reading a mail.** Show all is the one place the app opens a file. It reads a `.msg` only when it sits inside the configured email folders (`email.roots`, each inside a scan root), looks the path up by the mail's row id (never a path from the client), and reads it in a child process with a 30 s timeout. Reading an online-only OneDrive mail downloads it, and the button says so. An HTML body is cleaned and shown in a sandboxed frame that loads nothing remote. Bodies are never stored. It needs `requirements-email.txt`; without it, Search works and Show all says why it is off.
 
+## Archive verbs (Outlook)
+
+`python -m app.cli email batch <verb>` is the headless Outlook archive that task-os and life-os drive: `plan` (Inbox or Sent mail with ranked archive folders), `apply` (save a mail as `NNN - subject.msg` with its attachments into an email folder, move it to the Outlook archive folder and tag it), `revert`, `dismiss` (move without keeping a file), `renumber` (put a folder's sequence back in date order), `draft`, `read` and `send` (an unsent draft, sent only when its fingerprint matches the approved one), `mailboxes`, `find` (live Outlook folders, read-only) and `sync` (Send/Receive). Every verb prints one JSON document on stdout (`schema_version` 1) and logs to stderr and `email-batch.log` in the runtime-data folder; flags, error codes and exit codes are in `app/cli/email_batch.py`. `tests/archive/test_consumer_contract.py` replays every command shape the two apps send.
+
+- The verbs write only inside `email.roots`: a destination, a file to delete or a folder to renumber anywhere else is refused per item. They read and write this app's own `emails.sqlite3`; the email stage still indexes new mail (`email index --root <folder>` after filing).
+- `renumber` reads a `.msg` for its date only when the index has none, through `src/email/reader.py`.
+- Outlook is reached over COM in the verb's own process, which the caller runs with a timeout. A closed Outlook is started visibly (`outlook.exe`), never as a hidden COM instance; Exchange senders resolve through `GetExchangeUser()`.
+- `mailboxes.json` beside `config.json` (gitignored; `mailboxes.sample.json` is the template) lists the mailboxes `--mailbox` picks from; without it the verbs use Outlook's default store.
+- Needs `requirements-outlook.txt` (pywin32); without it every Outlook verb answers `com_unavailable` and `mailboxes` reports each mailbox `unknown`. The suggester needs `rapidfuzz` (`requirements-email.txt`).
+
 ## Features
 
 - **Search:** folders by every word of their path, emails by words and operators, with facets, saved searches and a preview (see Search).
@@ -80,12 +91,13 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 - **Largest:** the 10 largest files under the selected folder, and how much of it the largest 1, 5 or 10 percent of files hold, grouped by subfolder.
 - **Types:** bytes, count and share per extension; tap a type to filter every tab to it.
 - **Scans:** each root's last scan, live progress, and Rescan.
+- **Archive verbs:** the headless Outlook archive another app drives, with a folder suggester that puts a folder already holding the thread first and scores each folder by its best match (see Archive verbs).
 - **Size / On disk** toggle for every total; online-only files carry a cloud mark.
 - Phone and desktop layouts, light and dark, text size, and the fleet's bottom-tab navigation; the build line in the footer.
 
 ## Configuration
 
-`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `exclude` (folders every scan skips), `email` (`roots`: the email folders; `index_path`: `null` for this app's own index, or another app's index to read only; `download_budget_mb`), `folder_search` (`skip_levels`, `prune_people`). The email folders and the download budget are also set on the Scans tab, the folders to skip in Settings. Secrets live in `.env` (`.env.example`).
+`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `exclude` (folders every scan skips), `email` (`roots`: the email folders; `index_path`: `null` for this app's own index, or another app's index to read only; `download_budget_mb`), `folder_search` (`skip_levels`, `prune_people`), `archive` (`date_prefix`: `false`, `true` or `"auto"` to follow the destination folder; `max_path_length`; `max_suggestions`, `min_score`) and `outlook` (`archive_folder`, `category`, `dismiss_category`, `self_address`), which only `config.json` sets. The email folders and the download budget are also set on the Scans tab, the folders to skip in Settings. Secrets live in `.env` (`.env.example`).
 
 ## Verification gate
 

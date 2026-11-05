@@ -1,0 +1,390 @@
+"""
+Outlook vocabulary shared by every COM surface, and the helpers that need no COM.
+
+Constants (folder, class and recipient-type numbers, DASL property names, the
+MAPI error code batch mode retries on), ``OutlookUnavailableError``,
+``MailboxNotInOutlookError``, ``AccountNotInOutlookError``, and the
+pure string/HTML helpers the batch and draft surfaces build on: category
+arithmetic, header parsing, the ``--since`` filter and the marked draft-body
+region. Nothing here imports win32com, so all of it tests without Outlook.
+"""
+from __future__ import annotations
+
+import re
+from datetime import datetime, timezone
+from typing import Any
+
+
+class OutlookUnavailableError(RuntimeError):
+    """Outlook could not be reached — batch mode cannot start.
+
+    Distinct from "there is nothing to do": this means the COM object model
+    never answered, so the caller must exit non-zero rather than report an
+    empty Inbox it never actually read.
+    """
+
+
+class MailboxNotInOutlookError(RuntimeError):
+    """A registry mailbox has no store in the running Outlook profile.
+
+    Distinct from ``OutlookUnavailableError``: Outlook answered, but the
+    mailbox is not in it (or is not in it unambiguously). Never answered by
+    falling back to the default store, which would act on the wrong mailbox.
+    """
+
+
+class AccountNotInOutlookError(RuntimeError):
+    """A registry mailbox's store is present but no Outlook account sends from
+    its address, so a draft cannot be made to send as it.
+
+    Distinct from ``MailboxNotInOutlookError``: the mailbox can be read and
+    filed, only not sent from. Never answered by sending from another account.
+    """
+
+
+def safe_com(read: Any, default: Any) -> Any:
+    """Read one COM property, returning ``default`` if it raises.
+
+    COM properties on a real mailbox fail for reasons that are not this app's
+    business (an item still downloading, a store that denies a property, an
+    add-in that broke one). A single missing field must degrade that field, not
+    abort a batch run over the whole Inbox.
+    """
+    try:
+        return read()
+    except Exception:
+        return default
+
+
+# olFolderInbox. Batch mode files out of the Inbox, and (opt-in)
+# out of Sent Items.
+OL_FOLDER_INBOX = 6
+# olFolderSentMail: where a sent mail's own copy lives, carrying its headers.
+OL_FOLDER_SENT_MAIL = 5
+# olFolderOutbox: the folder `view_away_from_inbox` parks the Explorer in for a
+# moment — almost always empty, so nothing is selected or rendered.
+OL_FOLDER_OUTBOX = 4
+# MailItem. Anything else in the Inbox (meeting requests, reports) is skipped.
+OL_CLASS_MAIL_ITEM = 43
+# DASL name for MAPI PR_INTERNET_MESSAGE_ID (0x1035001F), used both to read the
+# id off a live item and to build the server-side Restrict filter.
+DASL_INTERNET_MESSAGE_ID = (
+    "http://schemas.microsoft.com/mapi/proptag/0x1035001F"
+)
+# DASL name for MAPI PidTagFlagStatus (0x1090), the same property the scanner
+# reads back out of the archived .msg — so a plan and a later scan agree.
+DASL_FLAG_STATUS = "http://schemas.microsoft.com/mapi/proptag/0x10900003"
+
+# olMailItem, for Application.CreateItem. The draft verb creates nothing else.
+OL_MAIL_ITEM = 0
+# olFolderDrafts: the only folder a draft is updated, read or sent from.
+OL_FOLDER_DRAFTS = 16
+# OlMailRecipientType, for reading a draft's recipients back by line.
+OL_TO = 1
+OL_CC = 2
+OL_BCC = 3
+# olSave, for Inspector.Close: keep what the open window holds.
+OL_SAVE = 0
+# olDiscard, for MailItem.Close: drop an item opened only to be replied to.
+OL_DISCARD = 1
+# OlAttachmentType: a file attached by value, and a mail attached as an item.
+# Outlook writes an attached item out afresh on every SaveAsFile, so its bytes
+# never hash the same twice.
+OL_BY_VALUE = 1
+OL_EMBEDDED_ITEM = 5
+# DASL name of an Internet header in the PS_INTERNET_HEADERS property set. A
+# draft stamped with it carries ``X-Archive-Ref: <token>`` into the sent mail, so
+# a caller can recognise its own copy when it lands back in the Inbox.
+DASL_X_ARCHIVE_REF = (
+    "http://schemas.microsoft.com/mapi/string/"
+    "{00020386-0000-0000-C000-000000000046}/X-Archive-Ref"
+)
+ARCHIVE_REF_HEADER = "X-Archive-Ref"
+# DASL name for MAPI PR_TRANSPORT_MESSAGE_HEADERS (0x007D001F): the raw header
+# block of a mail that arrived through a server. It is where the Step 3 probe
+# read X-Archive-Ref back on an IMAP mailbox.
+DASL_TRANSPORT_HEADERS = "http://schemas.microsoft.com/mapi/proptag/0x007D001F"
+# DASL name for MAPI PR_IN_REPLY_TO_ID (0x1042001F): the Message-ID a reply
+# answers, which Outlook sends as the In-Reply-To header.
+DASL_IN_REPLY_TO_ID = "http://schemas.microsoft.com/mapi/proptag/0x1042001F"
+# DASL name for the received time, used by the `plan --since` Restrict filter.
+DASL_DATE_RECEIVED = "urn:schemas:httpmail:datereceived"
+# MAPI PR_CLIENT_SUBMIT_TIME (0x00390040), the time a mail was sent, for the
+# `plan --folder sent --since` Restrict filter. A Sent Items mail has no
+# meaningful received time, so the received-date literal would match nothing.
+DASL_DATE_SENT = "http://schemas.microsoft.com/mapi/proptag/0x00390040"
+
+
+# MAPI_E_OBJECT_CHANGED. Outlook raises it from MailItem.Move (and Delete, and
+# Save) when it considers the in-memory item to have been modified since it was
+# obtained — which SaveAs can leave an item as, on the very reference the
+# archiver just wrote to disk. Batch mode tells this one refusal apart from
+# every other move failure because it is the only one worth retrying.
+MAPI_E_OBJECT_CHANGED = 0x80040109
+
+# What a Send/Receive handle (outlook/syncing.py) reports when polled. A sync
+# whose end cannot be observed is its own state, never folded into "ended".
+SYNC_RUNNING = "running"
+SYNC_ENDED = "ended"
+SYNC_UNOBSERVABLE = "unobservable"
+
+
+def is_message_changed_error(exc: Any) -> bool:
+    """Whether a COM failure is MAPI_E_OBJECT_CHANGED (0x80040109).
+
+    ``pywintypes.com_error`` carries the interesting code in its ``excepinfo``
+    tuple (``args[2][5]``) rather than in the HRESULT, which for a scripted
+    Outlook call is the generic ``DISP_E_EXCEPTION``. So every integer in
+    ``args``, one level of nesting deep, is compared — masked to 32 bits, since
+    the same code is spelled both signed (``-2147221239``) and unsigned
+    depending on where it came from.
+
+    Deliberately keyed on the code and never on the message text: the message
+    is localised, and matching "has been changed" would silently stop matching
+    on a non-English Outlook.
+    """
+    codes: list[int] = []
+    for arg in getattr(exc, "args", ()) or ():
+        if isinstance(arg, int):
+            codes.append(arg)
+        elif isinstance(arg, tuple):
+            codes.extend(inner for inner in arg if isinstance(inner, int))
+    return any(code & 0xFFFFFFFF == MAPI_E_OBJECT_CHANGED for code in codes)
+
+
+def split_categories(raw: str | None) -> list[str]:
+    """Split Outlook's semicolon-separated Categories string into a list."""
+    if not raw:
+        return []
+    return [part.strip() for part in str(raw).split(";") if part.strip()]
+
+
+def join_categories(names: list[str]) -> str:
+    """Join category names back into the form Outlook stores."""
+    return "; ".join(names)
+
+
+def with_category(raw: str | None, name: str) -> str:
+    """Return the Categories string with ``name`` present exactly once.
+
+    Kept pure and separate from the COM call so the add/remove arithmetic — the
+    part that can silently drop a user's own categories — is unit-testable
+    without Outlook. Existing categories are preserved in order.
+    """
+    names = split_categories(raw)
+    if not any(n.casefold() == name.casefold() for n in names):
+        names.append(name)
+    return join_categories(names)
+
+
+def without_category(raw: str | None, name: str) -> str:
+    """Return the Categories string with ``name`` removed, others untouched."""
+    return join_categories(
+        [n for n in split_categories(raw) if n.casefold() != name.casefold()]
+    )
+
+
+def header_value(headers: str | None, name: str) -> str:
+    """The value of the first ``name:`` header in a raw header block, or ``""``.
+
+    Matched case-insensitively, with folded continuation lines (RFC 5322: a
+    line starting with whitespace continues the previous header) joined back.
+    Pure so the parsing tests without Outlook.
+    """
+    prefix = f"{name.casefold()}:"
+    value: str | None = None
+    for line in (headers or "").splitlines():
+        if value is not None:
+            if line[:1] in (" ", "\t"):
+                value += " " + line.strip()
+                continue
+            break
+        if line.casefold().startswith(prefix):
+            value = line[len(prefix):].strip()
+    return value or ""
+
+
+def received_since_filter(since: datetime) -> str:
+    """The ``Items.Restrict`` DASL filter for mail received at/after ``since``.
+
+    ``since`` is naive local time (or aware). DASL compares date literals in
+    **UTC**: a probe against a real Inbox with boundaries placed a minute
+    either side of real mails matched the client-side count exactly with the
+    UTC literal and was off by the whole UTC offset with the local one.
+    """
+    utc = since.astimezone(timezone.utc)
+    return f"@SQL=\"{DASL_DATE_RECEIVED}\" >= '{utc:%Y-%m-%d %H:%M}'"
+
+
+def sent_since_filter(since: datetime) -> str:
+    """The ``Items.Restrict`` DASL filter for mail sent at/after ``since``.
+
+    Same UTC-literal rule as :func:`received_since_filter`.
+    """
+    utc = since.astimezone(timezone.utc)
+    return f"@SQL=\"{DASL_DATE_SENT}\" >= '{utc:%Y-%m-%d %H:%M}'"
+
+
+# What a `find` word is looked for in: subject, sender name and
+# address, the To / CC display lines, and the plain-text body — the same
+# fields the index search covers.
+DASL_FIND_FIELDS = (
+    "urn:schemas:httpmail:subject",
+    "urn:schemas:httpmail:fromname",
+    "urn:schemas:httpmail:fromemail",
+    "urn:schemas:httpmail:displayto",
+    "urn:schemas:httpmail:displaycc",
+    "urn:schemas:httpmail:textdescription",
+)
+
+
+def words_filter(words: list[str], since: datetime | None = None, *, sent: bool = False) -> str:
+    """The ``Items.Restrict`` DASL filter for ``find``: every word must appear
+    (case-insensitively, as DASL ``LIKE`` compares) in at least one of
+    :data:`DASL_FIND_FIELDS`, and the mail must be received — sent, for
+    ``sent`` — at/after ``since`` when given (the same UTC-literal rule as
+    :func:`received_since_filter`).
+
+    A quote in a word is doubled, which is how a DASL string literal holds one.
+    """
+    clauses = []
+    for word in words:
+        literal = word.replace("'", "''")
+        clauses.append(
+            "(" + " OR ".join(f"\"{field}\" LIKE '%{literal}%'" for field in DASL_FIND_FIELDS) + ")"
+        )
+    if since is not None:
+        utc = since.astimezone(timezone.utc)
+        prop = DASL_DATE_SENT if sent else DASL_DATE_RECEIVED
+        clauses.append(f"\"{prop}\" >= '{utc:%Y-%m-%d %H:%M}'")
+    return "@SQL=" + " AND ".join(clauses)
+
+
+_BODY_OPEN_TAG = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+
+
+# The caller's body sits between these two, so `update_draft` can replace
+# exactly what `create_draft` wrote and leave everything after it — the
+# signature Outlook inserted — alone. The closing comment, not the bare
+# `</div>`, is what ends the region: a caller's own HTML may nest divs.
+#
+# Outlook's editor drops that comment: with the compose window open it
+# re-serializes the HTML as it is set, and on a reply (a Word-flavoured quote)
+# the comment never survives (an empty div, span or anchor after
+# the region does not either). What does survive is the opening
+# `<div id=...>` and the div nesting, so a region whose comment is gone ends at
+# the `</div>` that closes its own opening tag.
+DRAFT_BODY_OPEN = '<div id="archive-draft-body">'
+DRAFT_BODY_CLOSE = "</div><!--/archive-draft-body-->"
+_DRAFT_BODY_OPEN_TAG = re.compile(r"""<div\s+id=["']?archive-draft-body["']?\s*>""", re.IGNORECASE)
+_DRAFT_BODY_CLOSE_TAG = re.compile(r"</div>\s*<!--\s*/archive-draft-body\s*-->", re.IGNORECASE)
+_DIV_TAG = re.compile(r"<div\b[^>]*>|</div\s*>", re.IGNORECASE)
+# Word pads a paragraph it re-serialized with an empty `<o:p></o:p>`.
+_WORD_PARAGRAPH_PAD = re.compile(r"<o:p>\s*</o:p>", re.IGNORECASE)
+
+
+def mark_body_html(body_html: str) -> str:
+    """``body_html`` wrapped in the markers ``replace_marked_body_html`` finds."""
+    return f"{DRAFT_BODY_OPEN}{body_html}{DRAFT_BODY_CLOSE}"
+
+
+def strip_word_padding(html_fragment: str) -> str:
+    """``html_fragment`` without the empty ``<o:p></o:p>`` Word adds to paragraphs."""
+    return _WORD_PARAGRAPH_PAD.sub("", html_fragment)
+
+
+def _matching_div_close(existing: str, start: int) -> re.Match | None:
+    """The ``</div>`` closing the div whose opening tag ends at ``start``, or ``None``."""
+    depth = 1
+    for tag in _DIV_TAG.finditer(existing, start):
+        depth += -1 if tag.group(0).startswith("</") else 1
+        if depth == 0:
+            return tag
+    return None
+
+
+def _marked_region_span(existing: str) -> tuple[re.Match, re.Match] | None:
+    """The opening marker and the closing tag of the body region, or ``None``.
+
+    The closing tag is the last closing comment marker when there is one, else
+    the ``</div>`` matching the opening tag (Outlook dropped the comment).
+    """
+    opened = _DRAFT_BODY_OPEN_TAG.search(existing)
+    if opened is None:
+        return None
+    closes = list(_DRAFT_BODY_CLOSE_TAG.finditer(existing, opened.end()))
+    if closes:
+        return opened, closes[-1]
+    closed = _matching_div_close(existing, opened.end())
+    return None if closed is None else (opened, closed)
+
+
+def marked_body_region(existing_html: str | None) -> str | None:
+    """The HTML inside the marked body region, or ``None`` without one —
+    bounded exactly as ``replace_marked_body_html`` bounds what it replaces."""
+    existing = existing_html or ""
+    span = _marked_region_span(existing)
+    return None if span is None else existing[span[0].end():span[1].start()]
+
+
+def html_after_marked_region(existing_html: str | None) -> str | None:
+    """What follows the marked body region — the signature and, on a reply, the
+    quoted original — or ``None`` when the region cannot be found, since what
+    follows an unfound marker is not known."""
+    existing = existing_html or ""
+    span = _marked_region_span(existing)
+    return None if span is None else existing[span[1].end():]
+
+
+def recipient_address(recipient: Any) -> str:
+    """The SMTP address of one draft recipient, or ``""`` when it has none.
+
+    A recipient Outlook has not resolved yet carries the typed address in
+    ``Name`` with an empty ``Address`` (observed live on a fresh draft), so
+    ``Address``, then ``AddressEntry.Address``, then ``Name`` are tried, and
+    the first that holds an ``@`` wins. ``GetExchangeUser`` is never called:
+    it can raise the address-book security modal.
+    """
+    for read in (
+        lambda: recipient.Address,
+        lambda: recipient.AddressEntry.Address,
+        lambda: recipient.Name,
+    ):
+        value = str(safe_com(read, "") or "").strip()
+        if "@" in value:
+            return value
+    return ""
+
+
+def replace_marked_body_html(existing_html: str | None, body_html: str) -> str | None:
+    """``existing_html`` with its marked body region replaced by ``body_html``.
+
+    ``None`` when the region cannot be found — a draft created before the
+    markers existed, or one whose opening marker Outlook rewrote away. The
+    caller refuses then: replacing a guessed region could eat the signature or
+    text the user typed. The last closing marker is used, so a body that itself
+    quotes the marker text still ends where the tool's own region ends; without
+    one (Outlook drops it) the region ends at the div its opening tag opened.
+    Pure, like ``insert_body_html``.
+    """
+    existing = existing_html or ""
+    span = _marked_region_span(existing)
+    if span is None:
+        return None
+    return f"{existing[:span[0].start()]}{mark_body_html(body_html)}{existing[span[1].end():]}"
+
+
+def insert_body_html(existing_html: str | None, body_html: str) -> str:
+    """Return ``existing_html`` with ``body_html`` inserted at the top of its body.
+
+    ``existing_html`` is what Outlook put in a new draft's ``HTMLBody`` when it
+    displayed it, which is where the account's default signature lives. Putting
+    the caller's text straight after the ``<body>`` tag keeps that signature
+    below the message, where the user expects it. With no ``<body>`` tag to
+    anchor on (the draft was never displayed, or the store returned nothing) the
+    body is wrapped in a document of its own. Pure so it tests without Outlook.
+    """
+    match = _BODY_OPEN_TAG.search(existing_html or "")
+    if match is None:
+        return f"<html><body>{body_html}</body></html>"
+    return f"{existing_html[:match.end()]}{body_html}{existing_html[match.end():]}"

@@ -9,6 +9,8 @@ __pycache__/
 .env
 config.json
 config.json.tmp
+# The mailbox registry: personal addresses, machine-local (mailboxes.sample.json is the template)
+mailboxes.json
 # The tailnet certificate and key, issued per machine
 /webapp/
 # Playwright output

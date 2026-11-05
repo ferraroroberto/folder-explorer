@@ -12,6 +12,10 @@
     python -m app.cli email status      the email index's size and its last runs
     python -m app.cli email config --json
                                         {"roots": [...], "db": "<index>", "own": true|false} for consumers
+    python -m app.cli email batch <verb> ...
+                                        the Outlook archive verbs (plan, apply, revert, dismiss, renumber,
+                                        draft, read, send, mailboxes, find, sync): one JSON document on
+                                        stdout; verbs, flags and exit codes in app/cli/email_batch.py
 
 ``scan`` exit codes: 0 every root scanned, 1 a root failed, 2 another scan
 holds the lock (nothing was scanned), 3 an unknown root key. ``email index``:
@@ -123,6 +127,12 @@ def cmd_roots() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:2] == ["email", "batch"]:
+        # Before any logging is set up here: the batch's stdout carries only its JSON document.
+        from app.cli import email_batch
+
+        return email_batch.main(argv[2:])
     for stream in (sys.stdout, sys.stderr):
         if stream is not None and hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
@@ -144,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     email.add_parser("status", help="the email index and its last runs")
     conf = email.add_parser("config", help="the email folders and index, as JSON")
     conf.add_argument("--json", action="store_true", required=True, help="print one JSON document")
+    email.add_parser("batch", help="the Outlook archive verbs, one JSON document on stdout (email batch --help)")
     args = parser.parse_args(argv)
     if args.command == "scan":
         return cmd_scan(args.root, email=not args.no_email)

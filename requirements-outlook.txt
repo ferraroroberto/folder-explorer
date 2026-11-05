@@ -1,0 +1,4 @@
+# Optional: the Outlook archive verbs (python -m app.cli email batch). pywin32
+# is the COM bridge to Outlook; without it every Outlook verb answers
+# com_unavailable (and mailboxes reports each mailbox unknown), never a crash.
+pywin32>=306

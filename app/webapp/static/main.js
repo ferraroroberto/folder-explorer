@@ -49,7 +49,8 @@ function updateHeads() {
   } else {
     const stale = r.failed ? [{ text: 'Last scan failed', tone: 'danger' }] : [];
     const live = r.running ? [{ text: 'Rescanning', tone: 'neutral' }] : [];
-    heads.explore = { exceptions: stale.concat(live), fallback: r.name + ' · scanned ' + fmtAgo(r.current.finished_at) };
+    // The toolbar's Root select already names the root, so the line keeps to when it was scanned and fits a phone.
+    heads.explore = { exceptions: stale.concat(live), fallback: 'Scanned ' + fmtAgo(r.current.finished_at) };
     heads.largest = { exceptions: stale, fallback: 'Biggest files in ' + (state.folderName || r.name) };
     heads.types = { exceptions: stale, fallback: 'Space by type in ' + (state.folderName || r.name) };
   }

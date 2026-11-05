@@ -279,7 +279,7 @@
             <button type="button" class="segmented-item" aria-pressed="false" data-value="folders" data-track="mode-folders"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Folders</button>
             <button type="button" class="segmented-item" aria-pressed="true" data-value="emails" data-track="mode-emails"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</button>
           </span>
-          <button type="button" class="icon-button kbd-only" id="keysInfo" aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-track="keys-info">
+          <button type="button" class="icon-button kbd-only" id="keysInfo" aria-label="Keyboard shortcuts help" title="Keyboard shortcuts help" data-track="keys-info">
             <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
           </button>
         </div>
@@ -455,6 +455,7 @@
           <span id="typesFilterText"></span>
           <button type="button" class="button-ghost" id="clearFilter" data-track="types-clear-filter">Clear filter</button>
         </div>
+        <input type="search" class="input-native types-find" id="typesFind" placeholder="Filter types" aria-label="Filter types" autocomplete="off" spellcheck="false" data-track="types-find">
         <ul class="rows" id="typesList"></ul>
       </div>
     </div>
@@ -478,7 +479,7 @@
     <div class="card action-list">
       <div class="card-head">
         <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>Scan roots</h2>
-        <button type="button" class="icon-button" id="scanInfo" aria-label="How scanning works" title="How scanning works" data-track="scan-info">
+        <button type="button" class="icon-button" id="scanInfo" aria-label="Scanning help" title="Scanning help" data-track="scan-info">
           <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
         </button>
       </div>
@@ -491,7 +492,7 @@
       <div class="card-head">
         <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Email index</h2>
         <span class="card-head-meta" id="emailMeta"></span>
-        <button type="button" class="icon-button" id="emailInfo" aria-label="What the email stage reads" title="What the email stage reads" data-track="email-info">
+        <button type="button" class="icon-button" id="emailInfo" aria-label="Email stage help" title="Email stage help" data-track="email-info">
           <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
         </button>
       </div>

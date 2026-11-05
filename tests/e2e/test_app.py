@@ -8,6 +8,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._shot import settle
 
 TABS = ("search", "explore", "largest", "types", "scans")
 TITLES = {"search": "Search", "explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
@@ -93,6 +94,9 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
     page.locator("#rescanAll").click()
     expect(page.locator(".toast")).to_be_visible()
     expect(page.locator("#rescanAll")).to_be_enabled(timeout=20_000)
+    # A fixture rescan can end inside the nav pill's half-second spring to the Scans tab, whose
+    # overshoot reaches past the bar; the lint measures the layout once that motion has ended.
+    settle(page)
     assert_layout_clean(page)
 
 

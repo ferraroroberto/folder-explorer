@@ -18,10 +18,10 @@ kbd {
   border: 1px solid var(--line);
   border-bottom-width: 2px;
   border-radius: 6px;
-  background: var(--card);
-  color: var(--muted);
+  background: var(--neutral-soft);
+  color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: var(--font-caption);
+  font-size: 0.875em;
   font-weight: 600;
   line-height: 1;
 }
@@ -90,10 +90,12 @@ kbd {
 .qchip { padding-right: 6px; }
 .qchip .q-key { font-weight: 700; }
 .qchip .q-val { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.qchip .icon { width: 14px; height: 14px; color: var(--muted); }
+.qchip .icon { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); }
 .qchip.is-not { text-decoration: line-through; }
 .saved-chip { background: var(--accent-soft); border-color: var(--accent-border-soft); color: var(--accent-text); }
-.saved-chip .icon, .facet .icon { width: 14px; height: 14px; }
+.saved-chip .icon, .facet .icon { width: var(--icon-inline); height: var(--icon-inline); }
+/* The row always holds Save search, so it keeps that height before the saved searches load. */
+.saved-row { min-height: 28px; }
 .saved-row .button-ghost { min-height: 28px; padding: 0 10px; font-size: var(--font-caption); font-weight: 600; position: relative; }
 .saved-row .button-ghost::before { content: ""; position: absolute; inset: -8px -2px; }
 .facet[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-border-soft); color: var(--accent-text); }
@@ -192,7 +194,7 @@ kbd {
 .rr-snip { grid-area: snip; font-size: var(--font-body-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rr-meta { grid-area: meta; display: flex; align-items: center; gap: var(--space-sm); min-width: 0; margin-top: 4px; font-size: var(--font-body-sm); color: var(--muted); }
 .rr-meta .chip { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.rr-meta .icon { width: 14px; height: 14px; flex: none; }
+.rr-meta .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 .rr-meta .is-flag { color: var(--attention-text); }
 .result-row[aria-selected="true"] .rr-when, .result-row[aria-selected="true"] .rr-snip { color: var(--ink); }
 /* Folder results: name, then the trimmed path, then size. */
@@ -234,7 +236,7 @@ kbd {
   font-size: 0.875em;
   line-height: 1.6;
 }
-.file-chip .icon { width: 14px; height: 14px; flex: none; }
+.file-chip .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 .file-chip .fc-size { color: var(--accent-text); opacity: 0.8; font-family: var(--font); }
 .pv-actions { display: grid; gap: var(--space-sm); }
 .pv-actions .button-primary, .pv-actions .button-tint { width: 100%; }
@@ -290,7 +292,7 @@ kbd {
 .search-off .empty-state { padding: var(--space-lg) var(--space-md); }
 .saved-item { display: inline-flex; align-items: center; gap: 2px; }
 .saved-remove { width: 28px; height: 28px; min-height: 28px; }
-.saved-remove .icon { width: 14px; height: 14px; }
+.saved-remove .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .search-note { display: flex; gap: var(--space-sm); align-items: flex-start; padding: 8px; font-size: var(--font-body-sm); color: var(--attention-text); }
 .search-note .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; margin-top: 2px; }
 .results-more { display: flex; justify-content: center; padding: var(--space-sm) 0; border-top: 1px solid var(--line-muted); }

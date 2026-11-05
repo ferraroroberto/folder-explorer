@@ -5,7 +5,7 @@ Shape `webapp-tray` (see `.fleet.toml`).
 ```
 folder-explorer/
 ├── app/                        # entry points and the web layer
-│   ├── cli/__main__.py         # `python -m app.cli scan|roots`: scans with no app running
+│   ├── cli/__main__.py         # `python -m app.cli scan|roots|email`: scans and the email index with no app running
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
 │   │   ├── tray.py             # menu, adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
@@ -19,15 +19,16 @@ folder-explorer/
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool and its housekeeping
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
-│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, scans, settings
+│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
-│   ├── email/                  # email search: settings, the query parser, the index search, sanitize, body
-│   │   └── reader.py           # the only module that opens a file (a .msg, for Show all)
+│   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
+│   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history)
+│   │   └── reader.py           # the only module that opens a file (a .msg, for the stage and Show all)
 │   ├── scanner.py              # the walk and the index writer
 │   ├── index.py                # every query over an index, and the open-index pool
 │   ├── store.py                # scan history and current index per root (state.sqlite3)

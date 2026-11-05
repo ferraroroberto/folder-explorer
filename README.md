@@ -48,7 +48,15 @@ The default roots are every local fixed drive plus each OneDrive folder, dedupli
 - **In-app schedule:** Settings → Scan schedule (`off`, `nightly` at `schedule_time`, `hourly`). Off by default; it runs only while the app runs, so it suits a PC without app-launcher.
 - **CLI:** `& .\.venv\Scripts\python.exe -m app.cli scan` (all roots) or `... scan --root c`; `python -m app.cli roots` lists the roots and their last scan. Exit 0 ok, 1 a root failed, 2 another scan is running, 3 unknown root.
 
-On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-app schedule stays off. How a scan reads sizes without downloading anything, and the index it writes: [docs/scanning.md](docs/scanning.md).
+On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-app schedule stays off. `exclude` (Settings: Skip these folders) lists folders every scan leaves out; the disk index, folder search and the email index all skip them.
+
+**The email index.** With `email.roots` set (the email folders, each inside a scan root) and `email.index_path` left empty, the app keeps its own email index, `emails.sqlite3` in the runtime-data folder, and is its only writer. Every scan ends with the email stage: it compares the scan's list of `.msg` files with the index by path, size and modified time, reads only new or changed mail through `src/email/reader.py`, and removes rows for mail that is gone only after a complete listing of its folder. It is the one place besides Show all that opens a file. Reading an online-only mail downloads it, so each run downloads at most `email.download_budget_mb` (2 GB by default; 0 reads local files only) and leaves the rest for the next run. A file that fails is not read again until it changes. The Scans tab shows each run (new, downloaded, waiting for budget, failed) and runs it now, or for one folder:
+
+- `& .\.venv\Scripts\python.exe -m app.cli email index` (every email folder) or `... email index --root <folder>` (one folder below one, in seconds, under the email lock only, so it never waits behind a disk scan). Exit 0 indexed, 1 failed, 2 busy (another email run held the lock past `--wait S`), 3 not inside an email folder, 4 not set up here.
+- `... email import --from <emails.db>` copies another app's email index in once, keeping its rows; the next run reads each mail once more to fill To, Cc, attachments and size. `... email status` lists the last runs.
+- `... scan --no-email` scans the disks only.
+
+Downloaded mail stays on the disk until OneDrive frees it. The app never sets a file back to online-only, because that is a write. How a scan reads sizes without downloading anything, and the index it writes: [docs/scanning.md](docs/scanning.md).
 
 Scan output (the index, the scan history, logs, the usage log) lives in the runtime-data folder, `C:\sqlite\folder-explorer\` by default (`FLEET_DATA_ROOT` or `FOLDER_EXPLORER_DATA_DIR` move it), never in the repo.
 
@@ -57,7 +65,7 @@ Scan output (the index, the scan history, logs, the usage log) lives in the runt
 The first tab searches **Folders** or **Emails**; the mode and the box live in the URL (`#search?mode=emails&q=...`), so a search can be bookmarked.
 
 - **Folders** searches every root's current index: a folder matches when its full path holds every word (split on spaces or `;`), so `alpha budget` finds `...\Alpha\2025\Budget`. A folder whose subfolders are named like email addresses shows once, with a count, and the display can hide the first N path components. Both are under Display, and saved in `folder_search`. An index from before folder search asks for a rescan.
-- **Emails** searches an email index read-only (`email.index_path`, an SQLite file with the `emails` and `emails_fts` tables). Words and `"phrases"` search subject, sender, recipients and the indexed preview; `-word` excludes and `OR` takes either. Operators: `from:` `to:` `cc:` `with:` `subject:` `filename:` `has:attachment` `larger:5M` `after:` `before:` `newer_than:30d` `in:` `is:flagged` `is:done` `id:`. Every chip, filter and facet writes its operator into the box. An operator the index has no field for yet is listed as left out, never faked.
+- **Emails** searches the email index read-only (this app's own, or another app's named by `email.index_path`: an SQLite file with the `emails` and `emails_fts` tables). Words and `"phrases"` search subject, sender, recipients and the indexed preview; `-word` excludes and `OR` takes either. Operators: `from:` `to:` `cc:` `with:` `subject:` `filename:` `has:attachment` `larger:5M` `after:` `before:` `newer_than:30d` `in:` `is:flagged` `is:done` `id:`. Every chip, filter and facet writes its operator into the box. An operator the index has no field for yet is listed as left out, never faked.
 - **Preview:** the indexed fields with the matches marked, and **Show all**, which reads the full mail. **Open in Outlook** (the archived `.msg`) and **Open in File Explorer** work on this PC only; every device gets Show folder (Explore at that folder) and Copy path.
 - **Saved searches** sit under the box (stored in `state.sqlite3`; relative dates stay relative); the last 10 searches show when the box is empty, per device.
 - **Keyboard:** `/` the box, `↓` or `j`/`k` the results, `Enter` preview, `a` Show all, `o` Outlook, `f` folder, `Esc` back.
@@ -76,7 +84,7 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 
 ## Configuration
 
-`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `email` (`index_path`: the email index, `null` turns email search off; `roots`: the email folders Show all may read), `folder_search` (`skip_levels`, `prune_people`). The email part is set in Settings too. Secrets live in `.env` (`.env.example`).
+`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `exclude` (folders every scan skips), `email` (`roots`: the email folders; `index_path`: `null` for this app's own index, or another app's index to read only; `download_budget_mb`), `folder_search` (`skip_levels`, `prune_people`). The email folders and the download budget are also set on the Scans tab, the folders to skip in Settings. Secrets live in `.env` (`.env.example`).
 
 ## Verification gate
 

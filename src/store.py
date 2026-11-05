@@ -10,6 +10,7 @@ reading the previous index is never pulled out from under.
 
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
@@ -50,6 +51,16 @@ CREATE TABLE IF NOT EXISTS scans (
     message TEXT
 );
 CREATE INDEX IF NOT EXISTS scans_root ON scans(root_key, id);
+CREATE TABLE IF NOT EXISTS email_runs (
+    id INTEGER PRIMARY KEY,
+    trigger TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at REAL NOT NULL,
+    finished_at REAL,
+    counts TEXT,
+    message TEXT
+);
 CREATE TABLE IF NOT EXISTS saved_searches (
     id INTEGER PRIMARY KEY,
     mode TEXT NOT NULL,
@@ -229,3 +240,32 @@ def save_search(mode: str, name: str, query: str) -> dict[str, Any]:
 def delete_search(search_id: int) -> bool:
     with connect() as conn:
         return conn.execute("DELETE FROM saved_searches WHERE id = ?", (search_id,)).rowcount > 0
+
+
+def begin_email_run(trigger: str, scope: str) -> int:
+    with connect() as conn:
+        cur = conn.execute("INSERT INTO email_runs (trigger, scope, status, started_at) VALUES (?, ?, ?, ?)",
+                           (trigger, scope, STATUS_RUNNING, time.time()))
+        return int(cur.lastrowid or 0)
+
+
+def finish_email_run(run_id: int, status: str, counts: dict[str, int], message: str = "") -> None:
+    with connect() as conn:
+        conn.execute("UPDATE email_runs SET status = ?, finished_at = ?, counts = ?, message = ? WHERE id = ?",
+                     (status, time.time(), json.dumps(counts), message, run_id))
+
+
+def settle_email_runs() -> int:
+    """Mark email runs a dead process left ``running`` as interrupted; call only while holding the email lock."""
+    with connect() as conn:
+        return conn.execute("UPDATE email_runs SET status = ?, finished_at = ?, message = ? WHERE status = ?",
+                            (STATUS_INTERRUPTED, time.time(), "the run stopped before it finished", STATUS_RUNNING)).rowcount
+
+
+def email_runs(limit: int = 10) -> list[dict[str, Any]]:
+    """The newest email runs first, each with its counts decoded."""
+    with connect() as conn:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM email_runs ORDER BY id DESC LIMIT ?", (limit,))]
+    for r in rows:
+        r["counts"] = json.loads(r["counts"]) if r["counts"] else {}
+    return rows

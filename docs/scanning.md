@@ -42,6 +42,14 @@ Folder search scans `folder_paths` with `instr`: on 200,000 invented paths that 
 
 The index is built as `<name>.part` and renamed into place only when the walk finishes. `state.sqlite3` records each scan (root, trigger, live counters while it runs, status, index file); a root's current index is its newest scan that finished `ok`. A failed or interrupted scan leaves the previous index in place, and the page flags the root. Replaced index files are deleted once no reader has them open.
 
+## The email stage
+
+Each scan ends with the email stage, `python -m app.cli email index` in its own process. Its manifest of `.msg` files comes from the scan's own index (the `files` rows with extension `msg` under each email folder), so nothing is listed twice; a scoped run (`--root <folder>`) lists only that folder with the same handle listing. The stage diffs the manifest against `emails.sqlite3` by path, size and modified time and reads only what is new, changed, or indexed before To, Cc, attachments and size were stored. An online-only file is read (and so downloaded) only while the run's download budget lasts. A file that fails is recorded in `email_failures` with its size and modified time and skipped until either changes. Rows for files the manifest no longer lists are removed only when the folder's listing had no errors. Excluded folders are skipped by the walk, so they never reach the manifest.
+
+`emails.sqlite3` keeps the layout the consumers read: the `emails` columns, `emails_fts(subject, sender, recipients, body_preview)` in that order, `recipients` still holding the To line, plus `to_addrs`, `cc_addrs`, `attachment_names`, `has_attachments` and `size`. It is a WAL database; the stage is its only writer and every reader opens it read-only.
+
+The disk walk holds `scan.lock`, the email stage `email.lock`, both OS byte-range locks the system drops when the holder exits. A run waiting on the email lock past its `--wait` exits 2 ("busy"), never a plain failure. Each run writes a row to `email_runs` in `state.sqlite3` with its counts.
+
 ## One scan at a time
 
 `scan.lock` in the runtime-data folder is an OS byte-range lock taken without waiting, by the app's Rescan, the in-app schedule, the tray and the CLI alike. The operating system releases it when the holder exits, so a crashed scan never leaves it stuck; the next scan marks the crashed one `interrupted`.

@@ -3,7 +3,7 @@
 import { getJSON, postJSON, authHeaders, ApiError } from './api.js';
 import { readPref, rootInfo, state, writePref, APP } from './state.js';
 import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
-import { initExplore, loadExplore, resetExplore, selectFolder, setMode, toggleFolder } from './explore.js';
+import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
 import { loadLargest } from './largest.js';
 import { loadTypes, typeOptions } from './types.js';
 import { loadRoots, renderRoots, scansStatus } from './scans.js';
@@ -221,6 +221,9 @@ function wireClicks(nav) {
       case 'type':
         state.type = state.type === t.dataset.ext ? null : t.dataset.ext;
         resetKeepFolder();
+        break;
+      case 'hidden':
+        setShowHidden(t.getAttribute('aria-checked') !== 'true').then(resetKeepFolder).catch(fail);
         break;
       case 'rescan': rescan([t.dataset.root]); break;
       case 'open-root':

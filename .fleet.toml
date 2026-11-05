@@ -35,6 +35,7 @@ page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "c8ec10d6ba57
 usage-log = { src = "app/webapp/static/_vendored/usage-log", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/usage-log" }
 sign-in = { src = "app/webapp/static/_vendored/sign-in", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525", dest = "app/webapp/static/_vendored/sign-in" }
 switch = { src = "app/webapp/static/_vendored/switch", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/switch" }
+row-menu = { src = "app/webapp/static/_vendored/row-menu", sha = "39ae7582b35fe8ef05441bb5cba65c38b0dfad3f", dest = "app/webapp/static/_vendored/row-menu" }
 login_lockout = { src = "src/login_lockout.py", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525", dest = "src/login_lockout.py" }
 notify = { src = "src/notify", sha = "93208ab08bdc8591c678a08f55a0f46b3fc8a525", dest = "src/notify" }
 usage_log = { src = "src/usage_log.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/usage_log.py" }

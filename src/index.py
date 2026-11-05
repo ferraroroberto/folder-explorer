@@ -52,6 +52,18 @@ class Index:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self.conn = conn
         self._types: dict[tuple[int, str], dict[str, Any]] = {}
+        self._knows_hidden: Optional[bool] = None
+
+    def knows_hidden(self) -> bool:
+        """Whether this index marks hidden items (one written before the ``hidden`` column does not)."""
+        if self._knows_hidden is None:
+            cols = {r[1] for r in self.conn.execute("PRAGMA table_info(folders)").fetchall()}
+            self._knows_hidden = "hidden" in cols
+        return self._knows_hidden
+
+    def _visible(self, show_hidden: bool, alias: str = "") -> str:
+        """The clause that leaves hidden rows out; empty when they show or the index can't tell."""
+        return "" if show_hidden or not self.knows_hidden() else " AND " + alias + "hidden = 0"
 
     # ------------------------------------------------------------- folders
 
@@ -90,22 +102,27 @@ class Index:
     def node(self, row: sqlite3.Row, ext: Optional[str], extra: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         t = extra if extra is not None else self.totals(int(row["id"]), ext)
         return {"id": row["id"], "name": row["name"], "size": t["size"], "disk": t["alloc"], "files": t["files"],
-                "online_files": t["online_files"], "has_children": bool(t.get("has_children", row["hi"] > row["lo"]))}
+                "online_files": t["online_files"], "has_children": bool(t.get("has_children", row["hi"] > row["lo"])),
+                "hidden": int(row["hidden"]) if "hidden" in row.keys() else 0}
 
-    def children(self, fid: int, basis: str, ext: Optional[str]) -> dict[str, Any]:
-        """Direct subfolders, heaviest first by ``basis``; with ``ext``, only those holding that type."""
+    def children(self, fid: int, basis: str, ext: Optional[str], show_hidden: bool = True) -> dict[str, Any]:
+        """Direct subfolders, heaviest first by ``basis``; with ``ext``, only those holding that type.
+
+        Without ``show_hidden`` a hidden folder is left out, while every total still counts what it holds.
+        """
         col = column(basis)
         if ext is None:
             rows = self.conn.execute(
-                "SELECT * FROM folders WHERE parent = ? ORDER BY " + col + " DESC", (fid,)
+                "SELECT * FROM folders WHERE parent = ?" + self._visible(show_hidden) + " ORDER BY " + col + " DESC", (fid,)
             ).fetchall()
             kids = [self.node(r, None, {**dict(r), "has_children": r["hi"] > r["lo"]}) for r in rows]
         else:
             rows = self.conn.execute(
-                "SELECT f.id, f.name, f.lo, f.hi, SUM(e.size) size, SUM(e.alloc) alloc, SUM(e.files) files, "
+                "SELECT f.id, f.name, f.lo, f.hi, " + ("f.hidden, " if self.knows_hidden() else "")
+                + "SUM(e.size) size, SUM(e.alloc) alloc, SUM(e.files) files, "
                 "SUM(e.online_files) online_files, SUM(CASE WHEN e.folder_id > f.lo THEN e.files ELSE 0 END) below "
                 "FROM folders f JOIN folder_ext e ON e.ext = ? AND e.folder_id BETWEEN f.lo AND f.hi "
-                "WHERE f.parent = ? GROUP BY f.id ORDER BY " + col + " DESC",
+                "WHERE f.parent = ?" + self._visible(show_hidden, "f.") + " GROUP BY f.id ORDER BY " + col + " DESC",
                 (ext, fid),
             ).fetchall()
             kids = [self.node(r, ext, {**dict(r), "has_children": r["below"] > 0}) for r in rows]
@@ -117,8 +134,11 @@ class Index:
         return (" AND ext = ?", (ext,)) if ext is not None else ("", ())
 
     def _file(self, r: sqlite3.Row, path: Optional[list[str]] = None) -> dict[str, Any]:
+        keys = r.keys()
         out = {"name": r["name"], "ext": r["ext"], "size": r["size"], "disk": r["alloc"], "mtime": r["mtime"],
-               "online": bool(r["attrs"] & ONLINE_ONLY_ATTRS)}
+               "online": bool(r["attrs"] & ONLINE_ONLY_ATTRS), "hidden": int(r["hidden"]) if "hidden" in keys else 0}
+        if "id" in keys:
+            out["id"] = r["id"]
         if path is not None:
             out["path"] = path
         return out
@@ -134,34 +154,64 @@ class Index:
         cache[folder_id] = result
         return result
 
-    def largest(self, fid: int, n: int, basis: str, ext: Optional[str]) -> list[dict[str, Any]]:
+    def largest(self, fid: int, n: int, basis: str, ext: Optional[str], show_hidden: bool = True) -> list[dict[str, Any]]:
         """The ``n`` largest files anywhere under the folder, each with its path below it."""
         f = self.folder(fid)
         col = column(basis)
         clause, args = self._ext_clause(ext)
         rows = self.conn.execute(
-            "SELECT * FROM files WHERE folder_id BETWEEN ? AND ?" + clause + " ORDER BY " + col + " DESC LIMIT ?",
+            "SELECT rowid id, * FROM files WHERE folder_id BETWEEN ? AND ?" + clause + self._visible(show_hidden)
+            + " ORDER BY " + col + " DESC LIMIT ?",
             (f["lo"], f["hi"], *args, n),
         ).fetchall()
         cache: dict[int, list[str]] = {}
         return [self._file(r, self._rel_path(int(r["folder_id"]), fid, cache)) for r in rows]
 
-    def contents(self, fid: int, basis: str, ext: Optional[str]) -> dict[str, Any]:
-        """The folder's own subfolders and files together, biggest first."""
+    def contents(self, fid: int, basis: str, ext: Optional[str], show_hidden: bool = True) -> dict[str, Any]:
+        """The folder's own subfolders and files together, biggest first, and how many of them are hidden."""
         col = column(basis)
         clause, args = self._ext_clause(ext)
-        kids = self.children(fid, basis, ext)["children"]
+        shown = clause + self._visible(show_hidden)
+        kids = self.children(fid, basis, ext, show_hidden)["children"]
         files = self.conn.execute(
-            "SELECT * FROM files WHERE folder_id = ?" + clause + " ORDER BY " + col + " DESC LIMIT ?",
+            "SELECT rowid id, * FROM files WHERE folder_id = ?" + shown + " ORDER BY " + col + " DESC LIMIT ?",
             (fid, *args, MAX_CONTENTS),
         ).fetchall()
         items = [{"kind": "folder", **k} for k in kids] + [{"kind": "file", **self._file(r)} for r in files]
         key = "disk" if basis == "disk" else "size"
         items.sort(key=lambda it: it[key], reverse=True)
         direct = self.conn.execute(
-            "SELECT COUNT(*) FROM files WHERE folder_id = ?" + clause, (fid, *args)
+            "SELECT COUNT(*) FROM files WHERE folder_id = ?" + shown, (fid, *args)
         ).fetchone()[0]
-        return {"items": items[:MAX_CONTENTS], "total_items": len(kids) + int(direct)}
+        return {"items": items[:MAX_CONTENTS], "total_items": len(kids) + int(direct),
+                "hidden_items": self._hidden_here(fid, ext)}
+
+    def _hidden_here(self, fid: int, ext: Optional[str]) -> Optional[int]:
+        """How many of the folder's own subfolders and files are hidden; None when the index can't tell."""
+        if not self.knows_hidden():
+            return None
+        clause, args = self._ext_clause(ext)
+        files = self.conn.execute(
+            "SELECT COUNT(*) FROM files WHERE folder_id = ? AND hidden != 0" + clause, (fid, *args)
+        ).fetchone()[0]
+        if ext is None:
+            folders = self.conn.execute(
+                "SELECT COUNT(*) FROM folders WHERE parent = ? AND hidden != 0", (fid,)
+            ).fetchone()[0]
+        else:
+            folders = self.conn.execute(
+                "SELECT COUNT(DISTINCT f.id) FROM folders f JOIN folder_ext e ON e.ext = ? "
+                "AND e.folder_id BETWEEN f.lo AND f.hi WHERE f.parent = ? AND f.hidden != 0",
+                (ext, fid),
+            ).fetchone()[0]
+        return int(files) + int(folders)
+
+    def file_row(self, file_id: int) -> sqlite3.Row:
+        """One file's folder and name by its id, the ``id`` every file record carries."""
+        row = self.conn.execute("SELECT folder_id, name FROM files WHERE rowid = ?", (file_id,)).fetchone()
+        if row is None:
+            raise KeyError("no such file")
+        return row
 
     def percentile(self, fid: int, p: float, basis: str, ext: Optional[str]) -> dict[str, Any]:
         """How much of the folder sits in its largest ``p`` percent of files, and where those files are."""

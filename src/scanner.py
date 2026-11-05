@@ -39,11 +39,13 @@ CREATE TABLE folders (
     id INTEGER PRIMARY KEY, parent INTEGER, name TEXT NOT NULL, depth INTEGER NOT NULL,
     lo INTEGER NOT NULL, hi INTEGER NOT NULL,
     size INTEGER NOT NULL, alloc INTEGER NOT NULL, files INTEGER NOT NULL, folders INTEGER NOT NULL,
-    online_files INTEGER NOT NULL, online_size INTEGER NOT NULL, errors INTEGER NOT NULL
+    online_files INTEGER NOT NULL, online_size INTEGER NOT NULL, errors INTEGER NOT NULL,
+    hidden INTEGER NOT NULL
 );
 CREATE TABLE files (
     folder_id INTEGER NOT NULL, name TEXT NOT NULL, ext TEXT NOT NULL,
-    size INTEGER NOT NULL, alloc INTEGER NOT NULL, attrs INTEGER NOT NULL, mtime INTEGER NOT NULL
+    size INTEGER NOT NULL, alloc INTEGER NOT NULL, attrs INTEGER NOT NULL, mtime INTEGER NOT NULL,
+    hidden INTEGER NOT NULL
 );
 CREATE TABLE folder_ext (
     folder_id INTEGER NOT NULL, ext TEXT NOT NULL,
@@ -58,6 +60,19 @@ CREATE TABLE folder_people (id INTEGER PRIMARY KEY, people INTEGER NOT NULL);
 # holding such folders is a "folder of people", which folder search can show
 # as one result. A dotted top-level domain keeps names like "cl@ve" out.
 PERSON_FOLDER_RE = re.compile(r"^[^@\s\\/]+@[^@\s\\/]+\.[A-Za-z]{2,}$")
+
+# The ``hidden`` column of folders and files. A hidden folder hides what it
+# holds, so an item inside one is left out with it even without the attribute.
+VISIBLE = 0
+HIDDEN_ITSELF = 1
+HIDDEN_INSIDE = 2
+
+
+def hidden_state(attrs: int, parent_hidden: int) -> int:
+    """The ``hidden`` value of an item with ``attrs`` in a folder whose own value is ``parent_hidden``."""
+    if winfs.is_hidden(attrs):
+        return HIDDEN_ITSELF
+    return HIDDEN_INSIDE if parent_hidden != VISIBLE else VISIBLE
 
 
 def exclude_key(path: str) -> str:
@@ -121,13 +136,15 @@ class _Folders:
     online_files: list[int] = field(default_factory=list)
     online_size: list[int] = field(default_factory=list)
     errors: list[int] = field(default_factory=list)
+    hidden: list[int] = field(default_factory=list)
     # Folder id -> how many of its direct subfolders are named like an email address.
     people: dict[int, int] = field(default_factory=dict)
 
-    def add(self, parent: int, name: str, depth: int) -> int:
+    def add(self, parent: int, name: str, depth: int, hidden: int = VISIBLE) -> int:
         self.parent.append(parent)
         self.name.append(name)
         self.depth.append(depth)
+        self.hidden.append(hidden)
         for col in (self.size, self.alloc, self.files, self.online_files, self.online_size, self.errors):
             col.append(0)
         return len(self.parent) - 1
@@ -173,10 +190,11 @@ def _write_folders(conn: sqlite3.Connection, f: _Folders) -> None:
         for k, col in tot.items():
             col[p] += col[i]
     conn.executemany(
-        "INSERT INTO folders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO folders VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             (i, f.parent[i] if i else None, f.name[i], f.depth[i], i, hi[i], tot["size"][i], tot["alloc"][i],
-             tot["files"][i], sub_folders[i], tot["online_files"][i], tot["online_size"][i], tot["errors"][i])
+             tot["files"][i], sub_folders[i], tot["online_files"][i], tot["online_size"][i], tot["errors"][i],
+             f.hidden[i])
             for i in range(n)
         ),
     )
@@ -191,19 +209,20 @@ class _Walk:
         self.exclude = exclude
         self.counters = Counters()
         self.folders = _Folders()
-        self.batch: list[tuple[int, str, str, int, int, int, int]] = []
+        self.batch: list[tuple[int, str, str, int, int, int, int, int]] = []
         self.ext_rows: list[tuple[int, str, int, int, int, int, int]] = []
 
     def flush(self) -> None:
-        self.conn.executemany("INSERT INTO files VALUES (?,?,?,?,?,?,?)", self.batch)
+        self.conn.executemany("INSERT INTO files VALUES (?,?,?,?,?,?,?,?)", self.batch)
         self.conn.executemany("INSERT INTO folder_ext VALUES (?,?,?,?,?,?,?)", self.ext_rows)
         self.batch.clear()
         self.ext_rows.clear()
 
-    def visit(self, path: str, parent: int, name: str, depth: int) -> list[tuple[str, int, str, int]]:
+    def visit(self, path: str, parent: int, name: str, depth: int,
+              hidden: int = VISIBLE) -> list[tuple[str, int, str, int, int]]:
         """List one folder, record its files, and return its subfolders to walk."""
         f, c = self.folders, self.counters
-        fid = f.add(max(parent, 0), name, depth)
+        fid = f.add(max(parent, 0), name, depth, hidden)
         c.folders += 1
         try:
             entries = list(self.lister(path))
@@ -222,10 +241,10 @@ class _Walk:
                 if self.exclude and exclude_key(os.path.join(path, e.name)) in self.exclude:
                     c.excluded += 1
                 else:
-                    subdirs.append(e.name)
+                    subdirs.append((e.name, hidden_state(e.attrs, hidden)))
             else:
                 self._add_file(fid, e, per_ext)
-        people = sum(1 for sub in subdirs if PERSON_FOLDER_RE.match(sub))
+        people = sum(1 for sub, _ in subdirs if PERSON_FOLDER_RE.match(sub))
         if people:
             f.people[fid] = people
         c.files += f.files[fid]
@@ -238,12 +257,12 @@ class _Walk:
             self.flush()
         # Reversed so the first-listed child is walked first; the order only
         # affects ids, never totals.
-        return [(os.path.join(path, sub), fid, sub, depth + 1) for sub in reversed(subdirs)]
+        return [(os.path.join(path, sub), fid, sub, depth + 1, h) for sub, h in reversed(subdirs)]
 
     def _add_file(self, fid: int, e: winfs.Entry, per_ext: dict[str, list[int]]) -> None:
         f = self.folders
         ext = extension(e.name)
-        self.batch.append((fid, e.name, ext, e.size, e.alloc, e.attrs, e.mtime))
+        self.batch.append((fid, e.name, ext, e.size, e.alloc, e.attrs, e.mtime, hidden_state(e.attrs, f.hidden[fid])))
         f.size[fid] += e.size
         f.alloc[fid] += e.alloc
         f.files[fid] += 1
@@ -280,7 +299,7 @@ def scan_to_index(
     conn = _open_index(part)
     walk = _Walk(conn, lister, exclude)
     started = last_report = time.monotonic()
-    stack: list[tuple[str, int, str, int]] = [(root_path, -1, root_name or root_path, 0)]
+    stack: list[tuple[str, int, str, int, int]] = [(root_path, -1, root_name or root_path, 0, VISIBLE)]
     try:
         while stack:
             stack.extend(walk.visit(*stack.pop()))

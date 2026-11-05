@@ -5,7 +5,9 @@ touches the live tray on 8453 or this PC's real index. Without
 ``FOLDER_EXPLORER_E2E_AUTOBOOT=1`` (the gate sets it), the vendored live guard
 refuses to run while 8453 is occupied unless ``FOLDER_EXPLORER_E2E_LIVE=1``
 says to point read-only checks at the live app instead. A boot failure is a
-test failure, never a skip.
+test failure, never a skip. The instance runs with Outlook and every desktop
+launch off (``FOLDER_EXPLORER_OUTLOOK`` / ``FOLDER_EXPLORER_DESKTOP``), so no
+test can start anything on this PC; tests that open things fake the route.
 
 Two projections run each test: Chromium at desktop size and WebKit on an
 iPhone viewport; ``desktop_only`` keeps a test off the phone projection.
@@ -30,7 +32,7 @@ from playwright.sync_api import BrowserContext
 
 from tests.e2e._e2e_live_guard import require_disposable_instance
 from tests.email_fixture import build_email_index
-from tests.fixture_tree import build_tree
+from tests.fixture_tree import add_hidden, build_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 LIVE_PORT = 8453
@@ -92,14 +94,14 @@ def app_url(roots_count: int) -> Iterator[str]:
         yield "http://127.0.0.1:%d" % LIVE_PORT
         return
     work = Path(tempfile.mkdtemp(prefix="folder-explorer-e2e-"))
-    roots = [build_tree(work / "Cloud drive"), build_tree(work / "Media disk")][:roots_count]
+    roots = [add_hidden(build_tree(work / "Cloud drive")), build_tree(work / "Media disk")][:roots_count]
     mail = roots[0] / "Mail"
     emails = build_email_index(work / "emails.db", mail)
     port = _free_port()
     (work / "config.json").write_text(json.dumps({"remote_access": False, "port": port, "roots": [str(r) for r in roots],
                                                   "email": {"index_path": str(emails), "roots": [str(mail)]}}))
     env = dict(os.environ, FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
-               FOLDER_EXPLORER_OUTLOOK="off", PYTHONUTF8="1", PYTHONUNBUFFERED="1")
+               FOLDER_EXPLORER_OUTLOOK="off", FOLDER_EXPLORER_DESKTOP="off", PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     scan = subprocess.run([sys.executable, "-m", "app.cli", "scan"], cwd=str(ROOT), env=env, capture_output=True, text=True,
                           timeout=60, creationflags=NO_WINDOW)
     if scan.returncode != 0:

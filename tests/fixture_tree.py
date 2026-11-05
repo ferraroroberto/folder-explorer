@@ -41,3 +41,32 @@ def build_tree(root: Path) -> Path:
         path.write_bytes(bytes([len(rel) % 251]) * size)
     (root / "Empty folder").mkdir(exist_ok=True)
     return root
+
+
+# Invented hidden items add_hidden writes: a hidden folder holding one file,
+# and one hidden file at the top. Neither is in FILES.
+HIDDEN_FOLDER = "Hidden stash"
+HIDDEN_FOLDER_FILE = "cache-01.bin"
+HIDDEN_FILE = "thumbs-cache.db"
+HIDDEN_BYTES = 3_000 + 1_000
+
+
+def set_hidden(path: Path) -> None:
+    """Give ``path`` the Windows hidden attribute, keeping its others."""
+    import ctypes
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    attrs = k32.GetFileAttributesW(str(path))
+    if attrs == 0xFFFFFFFF or not k32.SetFileAttributesW(str(path), attrs | 0x2):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+def add_hidden(root: Path) -> Path:
+    """Write the invented hidden folder and file under ``root`` and mark both hidden (Windows only)."""
+    folder = root / HIDDEN_FOLDER
+    folder.mkdir(exist_ok=True)
+    (folder / HIDDEN_FOLDER_FILE).write_bytes(b"\1" * 3_000)
+    (root / HIDDEN_FILE).write_bytes(b"\2" * 1_000)
+    set_hidden(folder)
+    set_hidden(root / HIDDEN_FILE)
+    return root

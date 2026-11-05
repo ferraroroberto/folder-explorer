@@ -21,6 +21,8 @@ import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+FILE_ATTRIBUTE_HIDDEN = 0x2
+FILE_ATTRIBUTE_SYSTEM = 0x4
 FILE_ATTRIBUTE_DIRECTORY = 0x10
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_ATTRIBUTE_OFFLINE = 0x1000
@@ -36,6 +38,10 @@ REPARSE_TAG_NAME_SURROGATE = 0x20000000
 # Any of these means the file's data is not on this disk: reading it would
 # make the sync client download it.
 ONLINE_ONLY_ATTRS = FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_RECALL_ON_OPEN | FILE_ATTRIBUTE_OFFLINE
+
+# File Explorer leaves out an item with either attribute by default: hidden
+# until "Hidden items" is on, system until protected files are shown too.
+HIDDEN_ATTRS = FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM
 
 # FILETIME counts 100 ns ticks from 1601-01-01; Unix time starts 1970-01-01.
 _FILETIME_UNIX_EPOCH = 116_444_736_000_000_000
@@ -72,6 +78,11 @@ def is_link(entry: Entry) -> bool:
 def is_online_only(attrs: int) -> bool:
     """True when the file's data lives only in the cloud."""
     return bool(attrs & ONLINE_ONLY_ATTRS)
+
+
+def is_hidden(attrs: int) -> bool:
+    """True for a hidden or system item, the kind File Explorer leaves out by default."""
+    return bool(attrs & HIDDEN_ATTRS)
 
 
 def cloud_state(attrs: int) -> str:

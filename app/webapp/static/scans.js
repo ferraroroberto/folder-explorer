@@ -38,8 +38,8 @@ export function renderRoots() {
       '<span class="action-row-title">' + glyph(r.kind === 'synced' ? 'cloud' : 'folder', 'root-glyph') + esc(r.name) + '<span class="chip">' + esc(r.kind) + '</span></span>' +
       '<span class="action-row-meta' + (m.live ? ' is-live' : '') + (m.warn ? ' is-warn' : '') + '">' + esc(m.text) + '</span>' +
       '</button>' +
-      '<button type="button" class="icon-button action-row-verb" data-act="rescan" data-root="' + esc(r.key) + '" aria-label="Rescan ' + esc(r.name) +
-      '" title="Rescan"' + (state.scanning || !r.exists ? ' disabled' : '') + ' data-track="rescan-root">' + glyph('refresh-cw') + '</button>' +
+      '<button type="button" class="icon-button action-row-verb" data-act="rescan" data-root="' + esc(r.key) + '" aria-label="Refresh the scan of ' + esc(r.name) +
+      '" title="Refresh the scan"' + (state.scanning || !r.exists ? ' disabled' : '') + ' data-track="rescan-root">' + glyph('refresh-cw') + '</button>' +
       progress + '</li>';
   }).join('');
   $('rescanAll').disabled = state.scanning;

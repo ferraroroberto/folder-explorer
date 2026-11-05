@@ -51,11 +51,13 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm) var(--space-md);
+  /* The rows sit a full spacing step apart so the scope pill's expanded hit area stays clear of the select above it. */
+  gap: var(--space-md);
   padding: var(--space-sm) 14px;
 }
 .tb-field, .tb-scope { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; }
-.tb-inline { display: inline-flex; align-items: center; gap: var(--space-xs); }
+/* The info button's hit area reaches 8px past its box, so it sits that far from the segmented control. */
+.tb-inline { display: inline-flex; align-items: center; gap: calc((var(--hit-min) - var(--icon-btn-box, 28px)) / 2); }
 .tb-label { font-size: var(--font-label); font-weight: 600; color: var(--muted); white-space: nowrap; }
 .toolbar .select-native { max-width: 190px; }
 .tb-scope { flex: 1 1 100%; }
@@ -81,6 +83,24 @@ body {
 .reference-pill::before { content: ""; position: absolute; inset: -12px -2px; }
 .reference-pill .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .reference-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* On a fine pointer native selects and inputs reach the 44px floor with real geometry (a coarse pointer
+   already gets a 44px control from select-native): the element box is --hit-min tall, the visible --control-h box is its padding box inside a transparent vertical border, and the
+   1px boundary is an inset shadow, so the control looks the same and a select has no ::before to expand.
+   A textarea grows with its text, so it keeps the plain recipe. */
+@media (pointer: fine) {
+  :is(.input-native, .select-native):not(textarea) {
+    --control-inset: calc((var(--hit-min) - var(--control-h)) / 2);
+    height: var(--hit-min);
+    border-style: solid;
+    border-color: transparent;
+    border-width: var(--control-inset) 0;
+    border-radius: var(--radius-md) / calc(var(--radius-md) + var(--control-inset));
+    background: var(--input-bg) padding-box;
+    box-shadow: inset 0 0 0 1px var(--control-border);
+  }
+  :is(.input-native, .select-native):not(textarea):focus-visible { outline-offset: calc(2px - var(--control-inset)); }
+}
 
 /* ---------------------------------------------------------------- summary */
 .summary {
@@ -122,9 +142,14 @@ body {
 }
 .tree > li:first-child > .tree-row { border-top: 0; }
 .tree-row.is-selected { background: var(--accent-soft); border-radius: var(--radius-sm); }
-.tree-row.is-selected + ul > li:first-child > .tree-row,
+.tree > li:has(> .tree-row.is-selected) + li > .tree-row,
 .tree-row.is-selected { border-top-color: transparent; }
+/* Muted text falls under AA on the selected row's tint, so its meta line takes the ink colour. */
+.tree-row.is-selected .tree-meta { color: var(--ink); }
 .tree-twisty, .tree-spacer { flex: none; width: var(--hit-min); display: inline-flex; justify-content: center; }
+/* The twisty's box is the full hit square and the row button fills the row's height, so the two
+   targets meet edge to edge instead of the twisty's expansion reaching under the row button. */
+.tree-twisty { --icon-btn-box: var(--hit-min); align-self: stretch; height: auto; }
 .tree-twisty .icon { transition: transform 0.15s ease; }
 .tree-twisty[aria-expanded="true"] .icon { transform: rotate(90deg); }
 .tree-main {
@@ -143,6 +168,7 @@ body {
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  align-self: stretch;
 }
 .tree-name { grid-area: name; display: flex; align-items: center; gap: var(--space-sm); min-width: 0; font-weight: 600; }
 .tree-name .icon { flex: none; width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); }
@@ -167,6 +193,8 @@ body {
 .rows > li.row-item:first-child { border-top: 0; }
 .row-item > .list-row { flex: 1; min-width: 0; border-top: 0; }
 .row-item > .row-kebab { flex: none; }
+/* The kebab's box is the full hit square, so its target ends where the row button's begins. */
+.row-item > .row-kebab { --icon-btn-box: var(--hit-min); }
 /* A double-click opens the file, so it must not also select its name. */
 .list-row[data-open="file"] { -webkit-user-select: none; user-select: none; }
 .list-row {
@@ -198,6 +226,11 @@ button.list-row .lr-name { font-weight: 600; }
 .lr-meta { grid-area: meta; font-size: var(--font-body-sm); color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lr-type, .lr-date, .lr-share { display: none; }
 .list-row .share-bar { grid-area: bar; }
+.lr-where { grid-area: meta; display: flex; min-width: 0; font-size: var(--font-body-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The path gives way to the ellipsis; the share beside it never does. */
+.lr-where > .lr-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lr-where > .lr-pct { flex: none; white-space: pre; }
+.rank .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .rank { grid-area: glyph; font-size: var(--font-body-sm); font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
 .rows-note { margin: var(--space-sm) 0 0; font-size: var(--font-body-sm); color: var(--muted); }
 .code-chip {
@@ -225,6 +258,8 @@ button.list-row .lr-name { font-weight: 600; }
 .types-bar > span:nth-child(3n) { opacity: 0.45; }
 .types-filter-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-sm); font-size: var(--font-body-sm); }
 .types-filter-line[hidden] { display: none; }
+.types-find { width: 100%; margin-bottom: var(--space-sm); }
+#typesList > li[hidden] { display: none; }
 .types-filter-line .button-ghost { min-height: var(--control-h); }
 .list-row[aria-pressed="true"] { background: var(--accent-soft); border-radius: var(--radius-sm); border-top-color: transparent; }
 .list-row[aria-pressed="true"] .code-chip { background: transparent; color: var(--accent-text); }
@@ -301,7 +336,8 @@ button.list-row .lr-name { font-weight: 600; }
   .tree-cols { grid-template-columns: minmax(0, 1fr) 44px 44px 72px 76px; padding-left: calc(var(--space-md) + var(--hit-min)); }
   .list-cols { grid-template-columns: var(--icon-inline) minmax(0, 1fr) 64px 92px 48px 80px; padding-right: var(--hit-min); }
 
-  .tree-row { min-height: var(--row-sm); }
+  /* The row's 1px top hairline sits inside its height, so the buttons in it still get the full 44px. */
+  .tree-row { min-height: calc(var(--row-sm) + 1px); }
   .tree-main {
     grid-template-columns: minmax(0, 1fr) 44px 44px 72px 76px;
     grid-template-areas: "name bar share size files";
@@ -365,7 +401,8 @@ button.list-row .lr-name { font-weight: 600; }
 .scans-note:empty { display: none; }
 
 /* --------------------------------------------------------- settings rows */
-.detail-card .row.row-stack { flex-direction: column; align-items: stretch; gap: var(--space-sm); }
+/* A full spacing step, so a switch's 9px hit expansion stays clear of the field under it. */
+.detail-card .row.row-stack { flex-direction: column; align-items: stretch; gap: var(--space-md); }
 .row-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .row-line > span:first-child { color: var(--ink); font-weight: 600; }
 .row-controls { display: inline-flex; align-items: center; gap: var(--space-sm); }

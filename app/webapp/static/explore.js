@@ -113,15 +113,13 @@ export function renderTree() {
     if (!n) return;
     const share = depth === 0 ? 100 : pct(val(n), parentBytes);
     const open = expanded.has(id) && kids.has(id);
-    out.push('<li>' + treeRow(n, depth, share, open, state.folder === id));
+    // One flat list item per folder, its depth drawn by indent, so each row holds only its own controls.
+    out.push('<li>' + treeRow(n, depth, share, open, state.folder === id) + '</li>');
     if (open) {
       const k = kids.get(id);
-      out.push('<ul class="tree">');
       k.ids.forEach((c) => walk(c, depth + 1, val(n)));
       if (k.more) out.push('<li class="tree-more" style="--depth:' + (depth + 1) + '">and ' + fmtNum(k.more) + ' smaller folders</li>');
-      out.push('</ul>');
     }
-    out.push('</li>');
   })(0, 0, 0);
   $('tree').innerHTML = out.join('');
   const root = nodes.get(0);

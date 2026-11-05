@@ -14,6 +14,13 @@ extra_roots = []
 [design]
 wide_views = ["search", "explore"]
 
+# Search and Largest show the owner's own mail text and folder names, which can hold
+# snake_case words (a tracking parameter in a link, a folder someone named that way):
+# the app reports them as they are, so renaming them would misreport the disk.
+[[design.accepted]]
+rule   = "COMP-11"
+reason = "The snake_case text is the owner's own mail snippets and folder names, shown verbatim; the app's own copy carries no raw identifier"
+
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]

@@ -23,7 +23,7 @@ function renderTop(top) {
     const where = f.path.length ? f.path.join(' › ') : top.folder.name;
     return '<li><div class="list-row" title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes"><span class="rank">' + (i + 1) + '</span>' +
       '<span class="lr-name"><span>' + esc(f.name) + '</span>' + cloudMark(f.online) + '</span>' +
-      '<span class="lr-meta">' + esc(where + ' · ' + fmtPct(p)) + '</span>' +
+      '<span class="lr-where"><span class="lr-path">' + esc(where) + '</span><span class="lr-pct"> · ' + fmtPct(p) + '</span></span>' +
       '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div></li>';
   }).join('') || '<li class="rows-note">' + (state.type !== null ? 'No files match the type filter.' : 'No files in this folder.') + '</li>';
 }

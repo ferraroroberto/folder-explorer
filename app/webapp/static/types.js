@@ -13,14 +13,25 @@ export async function loadTypes() {
   $('typesBar').innerHTML = body.types.slice(0, 8).map((t) => '<span style="width:' + t.share.toFixed(2) + '%"></span>').join('');
   $('typesList').innerHTML = body.types.map((t) => {
     const chip = t.ext ? '<span class="code-chip">' + esc(extLabel(t.ext)) + '</span>' : '<span class="lr-plain">' + esc(extLabel('')) + '</span>';
-    return '<li><button type="button" class="list-row" data-act="type" data-ext="' + esc(t.ext) + '" aria-pressed="' + (state.type === t.ext) + '" data-track="types-row">' +
+    return '<li data-label="' + esc(extLabel(t.ext).toLowerCase()) + '"><button type="button" class="list-row" data-act="type" data-ext="' + esc(t.ext) + '" aria-pressed="' + (state.type === t.ext) + '" data-track="types-row">' +
       '<span class="rank">' + glyph('file-text') + '</span><span class="lr-name">' + chip + '</span>' +
       '<span class="lr-meta">' + plural(t.files, 'file') + ' · ' + fmtPct(t.share) + '</span>' +
       '<span class="lr-size">' + fmtBytes(val(t)) + '</span>' + bar(t.share) + '</button></li>';
   }).join('') + (body.count > body.types.length ? '<li class="rows-note">And ' + fmtNum(body.count - body.types.length) + ' smaller types.</li>' : '');
+  applyFind();
   $('typesFilterLine').hidden = state.type === null;
   $('typesFilterText').innerHTML = state.type !== null ? 'Showing only <span class="code-chip">' + esc(extLabel(state.type)) + '</span> in every tab' : '';
 }
+
+/** Hides the type rows whose extension does not contain the find box's text. */
+function applyFind() {
+  const text = $('typesFind').value.trim().toLowerCase().replace(/^\./, '');
+  $('typesList').querySelectorAll(':scope > li[data-label]').forEach((li) => {
+    li.hidden = !!text && !li.dataset.label.replace(/^\./, '').includes(text);
+  });
+}
+
+$('typesFind').addEventListener('input', applyFind);
 
 /** Options for the toolbar's type filter: the root's heaviest types. */
 export async function typeOptions() {

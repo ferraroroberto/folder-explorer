@@ -19,11 +19,15 @@ folder-explorer/
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool and its housekeeping
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
-│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), scans, settings
+│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, scans, settings
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
+│   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
+│   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
+│   ├── email/                  # email search: settings, the query parser, the index search, sanitize, body
+│   │   └── reader.py           # the only module that opens a file (a .msg, for Show all)
 │   ├── scanner.py              # the walk and the index writer
 │   ├── index.py                # every query over an index, and the open-index pool
 │   ├── store.py                # scan history and current index per root (state.sqlite3)
@@ -39,7 +43,7 @@ folder-explorer/
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py
-└── docs/                       # this file and scanning.md
+└── docs/                       # this file, scanning.md, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

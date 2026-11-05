@@ -35,6 +35,10 @@ One SQLite file per finished scan, `index/<root>-<scan id>.sqlite3` in the runti
 | `folders` | id, parent, name, depth, `lo`/`hi`, and subtree totals: size, alloc, files, folders, online-only files and bytes, listing errors |
 | `files` | folder id, name, extension, size, alloc, attributes, modified time |
 | `folder_ext` | per folder and extension, the folder's *own* files: size, alloc, count, online-only count and bytes; a subtree's type totals sum a range of it |
+| `folder_paths` | each folder's full path, case-folded with `/` separators: what folder search matches every word against |
+| `folder_people` | folders holding subfolders named like email addresses, with how many: folder search's "folder of people" |
+
+Folder search scans `folder_paths` with `instr`: on 200,000 invented paths that answers in about 30 ms, where a trigram FTS index would triple the index size for little gain. An index written before these two tables existed answers folder search with "rescan".
 
 The index is built as `<name>.part` and renamed into place only when the walk finishes. `state.sqlite3` records each scan (root, trigger, live counters while it runs, status, index file); a root's current index is its newest scan that finished `ok`. A failed or interrupted scan leaves the previous index in place, and the page flags the root. Replaced index files are deleted once no reader has them open.
 

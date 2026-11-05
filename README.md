@@ -1,8 +1,8 @@
 # folder-explorer
 
-Where the space on your drives goes. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. A scan never opens a file, so it never downloads one.
+Where the space on your drives goes, and where a folder or an archived mail is. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type, and searches folder paths and an email archive's index. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. A scan never opens a file, so it never downloads one.
 
-FastAPI + a static PWA, a Windows tray, and the fleet design system. Read-only: it never moves, deletes or opens your files.
+FastAPI + a static PWA, a Windows tray, and the fleet design system. Read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search).
 
 ## Install
 
@@ -11,6 +11,7 @@ Python 3.11+ on Windows.
 ```powershell
 python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-tray.txt
+& .\.venv\Scripts\python.exe -m pip install -r requirements-email.txt   # optional: Show all for mails
 copy config.example.json config.json   # optional: every key has a default
 ```
 
@@ -51,8 +52,21 @@ On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-
 
 Scan output (the index, the scan history, logs, the usage log) lives in the runtime-data folder, `C:\sqlite\folder-explorer\` by default (`FLEET_DATA_ROOT` or `FOLDER_EXPLORER_DATA_DIR` move it), never in the repo.
 
+## Search
+
+The first tab searches **Folders** or **Emails**; the mode and the box live in the URL (`#search?mode=emails&q=...`), so a search can be bookmarked.
+
+- **Folders** searches every root's current index: a folder matches when its full path holds every word (split on spaces or `;`), so `alpha budget` finds `...\Alpha\2025\Budget`. A folder whose subfolders are named like email addresses shows once, with a count, and the display can hide the first N path components. Both are under Display, and saved in `folder_search`. An index from before folder search asks for a rescan.
+- **Emails** searches an email index read-only (`email.index_path`, an SQLite file with the `emails` and `emails_fts` tables). Words and `"phrases"` search subject, sender, recipients and the indexed preview; `-word` excludes and `OR` takes either. Operators: `from:` `to:` `cc:` `with:` `subject:` `filename:` `has:attachment` `larger:5M` `after:` `before:` `newer_than:30d` `in:` `is:flagged` `is:done` `id:`. Every chip, filter and facet writes its operator into the box. An operator the index has no field for yet is listed as left out, never faked.
+- **Preview:** the indexed fields with the matches marked, and **Show all**, which reads the full mail. **Open in Outlook** (the archived `.msg`) and **Open in File Explorer** work on this PC only; every device gets Show folder (Explore at that folder) and Copy path.
+- **Saved searches** sit under the box (stored in `state.sqlite3`; relative dates stay relative); the last 10 searches show when the box is empty, per device.
+- **Keyboard:** `/` the box, `↓` or `j`/`k` the results, `Enter` preview, `a` Show all, `o` Outlook, `f` folder, `Esc` back.
+
+**Reading a mail.** Show all is the one place the app opens a file. It reads a `.msg` only when it sits inside the configured email folders (`email.roots`, each inside a scan root), looks the path up by the mail's row id (never a path from the client), and reads it in a child process with a 30 s timeout. Reading an online-only OneDrive mail downloads it, and the button says so. An HTML body is cleaned and shown in a sandboxed frame that loads nothing remote. Bodies are never stored. It needs `requirements-email.txt`; without it, Search works and Show all says why it is off.
+
 ## Features
 
+- **Search:** folders by every word of their path, emails by words and operators, with facets, saved searches and a preview (see Search).
 - **Explore:** the root's totals, a folder tree that expands level by level (heaviest first, with share of parent, size and file count), and the selected folder's contents: its own files and folders, or every nested file.
 - **Largest:** the 10 largest files under the selected folder, and how much of it the largest 1, 5 or 10 percent of files hold, grouped by subfolder.
 - **Types:** bytes, count and share per extension; tap a type to filter every tab to it.
@@ -62,7 +76,7 @@ Scan output (the index, the scan history, logs, the usage log) lives in the runt
 
 ## Configuration
 
-`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`. Secrets live in `.env` (`.env.example`).
+`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `email` (`index_path`: the email index, `null` turns email search off; `roots`: the email folders Show all may read), `folder_search` (`skip_levels`, `prune_people`). The email part is set in Settings too. Secrets live in `.env` (`.env.example`).
 
 ## Verification gate
 

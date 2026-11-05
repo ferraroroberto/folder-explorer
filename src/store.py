@@ -50,7 +50,17 @@ CREATE TABLE IF NOT EXISTS scans (
     message TEXT
 );
 CREATE INDEX IF NOT EXISTS scans_root ON scans(root_key, id);
+CREATE TABLE IF NOT EXISTS saved_searches (
+    id INTEGER PRIMARY KEY,
+    mode TEXT NOT NULL,
+    name TEXT NOT NULL,
+    query TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    UNIQUE (mode, query)
+);
 """
+
+SEARCH_MODES = ("emails", "folders")
 
 _COUNTERS = ("folders", "files", "size", "alloc", "online_files", "online_size", "skipped_links", "errors")
 
@@ -191,3 +201,31 @@ def prune_indexes(keep_per_root: int = 1) -> list[str]:
         except OSError as exc:
             logger.info("ℹ️ old index still in use, kept for the next prune: %s (%s)", path.name, exc)
     return removed
+
+
+def saved_searches() -> list[dict[str, Any]]:
+    """Every saved search, oldest first; the query text keeps its relative dates as typed."""
+    with connect() as conn:
+        return [dict(r) for r in conn.execute("SELECT id, mode, name, query FROM saved_searches ORDER BY id")]
+
+
+def save_search(mode: str, name: str, query: str) -> dict[str, Any]:
+    """Save ``query`` under ``name``; saving the same query again renames it."""
+    if mode not in SEARCH_MODES:
+        raise ValueError("mode must be emails or folders")
+    name, query = name.strip(), query.strip()
+    if not query:
+        raise ValueError("a saved search needs a query")
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO saved_searches (mode, name, query, created_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT (mode, query) DO UPDATE SET name = excluded.name",
+            (mode, name or query, query, time.time()),
+        )
+        row = conn.execute("SELECT id, mode, name, query FROM saved_searches WHERE mode = ? AND query = ?", (mode, query)).fetchone()
+    return dict(row)
+
+
+def delete_search(search_id: int) -> bool:
+    with connect() as conn:
+        return conn.execute("DELETE FROM saved_searches WHERE id = ?", (search_id,)).rowcount > 0

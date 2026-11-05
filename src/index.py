@@ -195,6 +195,60 @@ class Index:
         return {"p": p, "files": n, "count": len(rows), "bytes": top_bytes, "whole": whole,
                 "share": share(top_bytes, whole), "threshold": int(rows[-1]["v"]) if rows else 0, "where": where}
 
+    # -------------------------------------------------------- folder search
+
+    def searchable(self) -> bool:
+        """Whether this index carries folder paths (an index from before folder search does not)."""
+        return self.conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'folder_paths'").fetchone() is not None
+
+    def match_folders(self, terms: list[str], cap: int) -> tuple[list[int], bool]:
+        """Ids of folders whose full path holds every term (already search-keyed), and whether ``cap`` cut them."""
+        if not terms:
+            return [], False
+        rows = self.conn.execute(
+            "SELECT id FROM folder_paths WHERE " + " AND ".join(["instr(lpath, ?) > 0"] * len(terms)) + " LIMIT ?",
+            (*terms, cap + 1),
+        ).fetchall()
+        return [int(r[0]) for r in rows[:cap]], len(rows) > cap
+
+    def people_folders(self) -> list[tuple[int, int, int, int]]:
+        """``(lo, hi, id, people)`` of every folder of people that no other one contains, by ``lo``."""
+        rows = self.conn.execute(
+            "SELECT f.lo, f.hi, f.id, p.people FROM folder_people p JOIN folders f ON f.id = p.id ORDER BY f.lo"
+        ).fetchall()
+        top: list[tuple[int, int, int, int]] = []
+        for r in rows:
+            if not top or int(r[0]) > top[-1][1]:
+                top.append((int(r[0]), int(r[1]), int(r[2]), int(r[3])))
+        return top
+
+    def folder_rows(self, ids: list[int]) -> list[sqlite3.Row]:
+        if not ids:
+            return []
+        return self.conn.execute(
+            "SELECT id, name, depth, size, alloc, files, online_files FROM folders WHERE id IN (%s)" % ",".join("?" * len(ids)),
+            ids,
+        ).fetchall()
+
+    def find_folder(self, names: list[str]) -> Optional[int]:
+        """The id of the folder ``names`` leads to from the root, matched case-insensitively."""
+        cur = 0
+        for name in names:
+            row = self.conn.execute(
+                "SELECT id FROM folders WHERE parent = ? AND name = ? COLLATE NOCASE", (cur, name)
+            ).fetchone()
+            if row is None:
+                return None
+            cur = int(row[0])
+        return cur
+
+    def find_file(self, folder_id: int, name: str) -> Optional[dict[str, Any]]:
+        """One file's indexed size and cloud state, by its folder and name."""
+        row = self.conn.execute(
+            "SELECT * FROM files WHERE folder_id = ? AND name = ? COLLATE NOCASE", (folder_id, name)
+        ).fetchone()
+        return self._file(row) if row is not None else None
+
     def types(self, fid: int, basis: str) -> dict[str, Any]:
         """Bytes, file count and share per extension under the folder, heaviest first."""
         key = (fid, basis)

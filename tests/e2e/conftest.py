@@ -29,6 +29,7 @@ import pytest
 from playwright.sync_api import BrowserContext
 
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.email_fixture import build_email_index
 from tests.fixture_tree import build_tree
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -92,8 +93,11 @@ def app_url(roots_count: int) -> Iterator[str]:
         return
     work = Path(tempfile.mkdtemp(prefix="folder-explorer-e2e-"))
     roots = [build_tree(work / "Cloud drive"), build_tree(work / "Media disk")][:roots_count]
+    mail = roots[0] / "Mail"
+    emails = build_email_index(work / "emails.db", mail)
     port = _free_port()
-    (work / "config.json").write_text(json.dumps({"remote_access": False, "port": port, "roots": [str(r) for r in roots]}))
+    (work / "config.json").write_text(json.dumps({"remote_access": False, "port": port, "roots": [str(r) for r in roots],
+                                                  "email": {"index_path": str(emails), "roots": [str(mail)]}}))
     env = dict(os.environ, FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
                PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     scan = subprocess.run([sys.executable, "-m", "app.cli", "scan"], cwd=str(ROOT), env=env, capture_output=True, text=True,

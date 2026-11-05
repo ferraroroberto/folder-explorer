@@ -4,5 +4,13 @@
   "server": "hypercorn",
   "roots": null,
   "schedule": "off",
-  "schedule_time": "03:00"
+  "schedule_time": "03:00",
+  "email": {
+    "index_path": null,
+    "roots": []
+  },
+  "folder_search": {
+    "skip_levels": 0,
+    "prune_people": true
+  }
 }

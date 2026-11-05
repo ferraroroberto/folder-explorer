@@ -1,0 +1,3 @@
+# Optional: the email part. Search over an email index needs nothing extra;
+# "Show all" reads a .msg through src/email/reader.py, which needs extract-msg.
+extract-msg>=0.48.0

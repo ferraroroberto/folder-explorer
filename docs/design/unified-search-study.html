@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unified Search Study</title>
+<style>
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --ink: #1d1d1f; --muted: #5f6368; --line: #e3e3e0;
+  --accent: #2f6fde; --accent-soft: #e8f0fd; --good: #1e7d4f; --good-soft: #e5f4ec;
+  --warn: #9a5b00; --warn-soft: #fdf2e0; --bad: #b3261e; --bad-soft: #fbe9e8;
+  --code-bg: #f1f1ee; --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141416; --surface: #1d1d20; --ink: #ececef; --muted: #a2a2aa; --line: #2e2e33;
+    --accent: #7aa7ff; --accent-soft: #1f2a40; --good: #6fcf9c; --good-soft: #17301f;
+    --warn: #f0b552; --warn-soft: #33270f; --bad: #ff8a80; --bad-soft: #3a1b19; --code-bg: #26262a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141416; --surface: #1d1d20; --ink: #ececef; --muted: #a2a2aa; --line: #2e2e33;
+  --accent: #7aa7ff; --accent-soft: #1f2a40; --good: #6fcf9c; --good-soft: #17301f;
+  --warn: #f0b552; --warn-soft: #33270f; --bad: #ff8a80; --bad-soft: #3a1b19; --code-bg: #26262a;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.35rem; margin: 48px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+h3 { font-size: 1.08rem; margin: 28px 0 8px; }
+p, li { max-width: 72ch; }
+.lede { color: var(--muted); font-size: 1.05rem; margin: 0 0 20px; }
+a { color: var(--accent); }
+code, pre { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .9em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin: 14px 0; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.tag { display: inline-block; font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; margin-right: 6px; vertical-align: 2px; }
+.tag.rec { background: var(--good-soft); color: var(--good); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+.tag.bad { background: var(--bad-soft); color: var(--bad); }
+.tag.info { background: var(--accent-soft); color: var(--accent); }
+.callout { border-left: 4px solid var(--warn); background: var(--warn-soft); padding: 12px 16px; border-radius: 0 10px 10px 0; margin: 16px 0; }
+.callout.good { border-color: var(--good); background: var(--good-soft); }
+.callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+.table-wrap { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); font-size: .93rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--code-bg); }
+tr:last-child td { border-bottom: 0; }
+.toc { columns: 2; column-gap: 32px; padding-left: 20px; }
+@media (max-width: 640px) { .toc { columns: 1; } h1 { font-size: 1.55rem; } }
+.mock { font-family: ui-monospace, Consolas, monospace; font-size: .82rem; white-space: pre; background: var(--code-bg); border-radius: 10px; padding: 14px 16px; overflow-x: auto; line-height: 1.4; }
+.muted { color: var(--muted); }
+.step { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 0 var(--radius) var(--radius) 0; padding: 16px 20px; margin: 16px 0; }
+.step h3 { margin-top: 0; }
+footer { margin-top: 56px; color: var(--muted); font-size: .88rem; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>One app for disk, folders and email archive</h1>
+<p class="lede">The plan for folder-explorer#6: fold email-archiver and the folder searcher into folder-explorer. Updated after the owner's answers of 2026-11-05. This is research only; no code was changed. Every name, address and path below is invented.</p>
+
+<div class="card">
+<strong>The plan.</strong> Folder-explorer becomes the only app (<strong>shape A, full fold</strong>), built in three steps that each ship on their own. Step 1 adds read-only search. Step 2 builds one scan engine that owns the email index. Step 3 adds the Outlook actions and retires email-archiver. One metadata walk feeds the disk sizes, the folder search and a list of <code>.msg</code> files. An opt-in <em>email stage</em> then reads the new and changed <code>.msg</code> files under the configured email folders, and it <strong>may download online-only ones</strong>. That stage, plus the on-demand <strong>"Show all"</strong> in the preview, are the only places the "never open a file" rule makes an exception, and both go through one reader module. <strong>task-os and life-os</strong> both drive email-archiver today, through its index file, its batch CLI, its config loader and its venv. Each step keeps those contracts working, and both are retargeted together in step 3.
+</div>
+
+<ol class="toc">
+  <li><a href="#decisions">Decisions (Q0–Q10)</a></li>
+  <li><a href="#today">What exists today</a></li>
+  <li><a href="#shape">The shape: full fold</a></li>
+  <li><a href="#scan">One scan engine</a></li>
+  <li><a href="#boundary">The .msg reading boundary</a></li>
+  <li><a href="#ux">Email search UX</a></li>
+  <li><a href="#bridge">The Outlook bridge</a></li>
+  <li><a href="#merge">Merge list from the work checkout</a></li>
+  <li><a href="#consumers">Consumers: task-os and life-os</a></li>
+  <li><a href="#steps">Build steps</a></li>
+  <li><a href="#sources">Sources</a></li>
+</ol>
+
+<h2 id="decisions">Decisions (the owner, 2026-11-05)</h2>
+<div class="table-wrap"><table>
+<tr><th>#</th><th>Decided</th><th>vs the study's pick</th></tr>
+<tr><td>Q0</td><td>The scope is searching emails.</td><td>—</td></tr>
+<tr><td>Q1</td><td>Shape A: fold everything in. Read-only search comes first, and email-archiver is retired at the end.</td><td>as recommended</td></tr>
+<tr><td>Q2</td><td><strong>Allow download</strong> for the configured email folders: a scoped exception to "never open a file" (<a href="#boundary">boundary</a>).</td><td><span class="tag warn">differs</span>study proposed local-only</td></tr>
+<tr><td>Q3</td><td>The index moves to folder-explorer's runtime-data folder, with the same schema plus additions. task-os is repointed (and life-os, <a href="#consumers">below</a>).</td><td>as recommended</td></tr>
+<tr><td>Q4</td><td>Retire the folder-searcher tray app. Folder search runs over folder-explorer's index. task-os keeps its vendored core for now.</td><td>as recommended</td></tr>
+<tr><td>Q5</td><td>"Open in Outlook" works on the PC only. The phone gets the preview, Copy path and Show folder.</td><td>as recommended</td></tr>
+<tr><td>Q6</td><td>The preview shows the indexed fields (highlighted) and attachment names, plus <strong>"Show all"</strong>, which loads the full body on demand.</td><td><span class="tag warn">differs</span>study proposed indexed only</td></tr>
+<tr><td>Q7</td><td>Volume-neutral ranking (each folder scores by its best hit), with the weights set by fixture tests.</td><td>as recommended</td></tr>
+<tr><td>Q8</td><td>Add <code>to_addrs</code>, <code>cc_addrs</code>, <code>attachment_names</code>, <code>has_attachments</code> and <code>size</code>, filled by one re-read.</td><td>as recommended</td></tr>
+<tr><td>Q9</td><td>task-os keeps its quick search over the same index and links to folder-explorer for deep search.</td><td>as recommended</td></tr>
+<tr><td>Q10</td><td>Fire and forget: VBA starts <code>pythonw -m app.outlook archive --entry-id --store-id</code> and doesn't wait.</td><td>as recommended</td></tr>
+<tr><td>+</td><td>Map life-os's use of email-archiver and keep its contract alive, the same as task-os.</td><td>new scope</td></tr>
+</table></div>
+
+<h2 id="today">What exists today</h2>
+
+<div class="table-wrap"><table>
+<tr><th></th><th>folder-explorer</th><th>email-archiver</th><th>folder searcher</th></tr>
+<tr><td><strong>Form</strong></td><td>FastAPI + PWA on :8453, Windows tray, fleet design system, remote access over the tailnet</td><td>Tk dialogs (Stream Deck), headless JSON batch CLI (<code>main_batch.py</code>), <code>main_scan.py</code>, ~10k lines</td><td>Tk tray app + headless CLI, ~1.1k lines; GUI-free core vendored into task-os</td></tr>
+<tr><td><strong>Walk</strong></td><td>One handle per folder (<code>FileFullDirectoryInfo</code>), no per-file open or stat; links counted, not followed</td><td><code>os.walk</code> + <code>os.stat</code> per <code>.msg</code>, then opens every new or changed <code>.msg</code> with <code>extract_msg</code> (downloads OneDrive placeholders)</td><td><code>os.walk</code> over folder names only</td></tr>
+<tr><td><strong>Index</strong></td><td>One SQLite file per finished scan + <code>state.sqlite3</code>, in the runtime-data folder</td><td>One incremental <code>emails.db</code> (WAL): <code>emails</code> + FTS5 <code>emails_fts(subject, sender, recipients, body_preview)</code>, triggers, <code>flag_status</code>, <code>message_id</code>. Two writers: the scanner and the <code>renumber</code> tool.</td><td>A text file of absolute paths in <code>Root:</code> sections</td></tr>
+<tr><td><strong>Consumers</strong></td><td>the user</td><td><strong>task-os</strong> (index read-only + batch CLI) and <strong>life-os</strong> (index read-only, batch CLI, scan CLI, config loader, venv)</td><td>task-os (vendored core, own index); <strong>life-os</strong> reads the text index file</td></tr>
+<tr><td><strong>Nightly</strong></td><td>app-launcher Job: <code>python -m app.cli scan</code></td><td>Job chain: life-os email sweep → email-archiver scan → folder-searcher scan</td><td>last in that chain</td></tr>
+</table></div>
+
+<h2 id="shape">The shape: full fold</h2>
+<p>email-archiver's package (scanner, FTS search, suggester, archiver, Outlook COM, batch verbs, mailbox registry, naming rules) and the folder searcher's query logic move into folder-explorer as <code>src/email/</code>, <code>src/outlook/</code> and <code>src/folder_search.py</code>. A web sheet replaces the Tk archive dialog, with a fallback window for when the app isn't running. email-archiver is archived at the end of step 3.</p>
+<ul>
+<li><strong>Indexes:</strong> all in folder-explorer's runtime-data folder. The per-scan disk indexes stay as they are. <code>emails.sqlite3</code> stays one incremental WAL database with today's schema plus additions, because re-reading every <code>.msg</code> takes hours.</li>
+<li><strong>One writer.</strong> Only folder-explorer's email package writes <code>emails.sqlite3</code>: the email stage and the ported <code>renumber</code>. Every other consumer opens it <code>mode=ro</code>.</li>
+<li><strong>Optional parts:</strong> each part has its own requirements file: <code>requirements-email.txt</code> (extract-msg, rapidfuzz, pyyaml while a life-os script needs it) and <code>requirements-outlook.txt</code> (pywin32, psutil). A part turns on when its config is set and its imports resolve. Otherwise it shows "Not set up here: reason", never an empty result.</li>
+<li><strong>Work PC:</strong> one checkout, one venv, one gate, one tray. A plain <code>git pull</code> brings everything, and the local <code>config.json</code> decides which parts run.</li>
+</ul>
+<p class="muted"><strong>Considered and set aside:</strong> B, email-archiver as an imported library (two checkouts that must stay on matching commits at work); C on its own, read-only search with archiving left in email-archiver (kept only as step 1); D, a shared core package (a fourth repo, the opposite of one app).</p>
+
+<h2 id="scan">One scan engine</h2>
+
+<pre><code>walk (metadata only, today's winfs listing)            ── one pass per root, disk-walk lock
+  ├─ disk index      folders / files / folder_ext         (unchanged)
+  ├─ folder search   folders + full-path column, FTS5 trigram for substring match
+  └─ email manifest  every *.msg under an email folder: path, size, mtime, online-only?
+                         │
+                         ▼
+email stage (opt-in, child process, email-index writer lock)
+  diff manifest against emails.sqlite3 by (path, size, mtime)
+  ├─ unchanged            → skip (no file touched)
+  ├─ new/changed, local   → read through src/email/reader.py, upsert, FTS triggers
+  ├─ new/changed, online  → read (downloads it) while the run's download budget lasts,
+  │                         else count "waiting for budget"
+  ├─ failed before        → skip until its (size, mtime) changes, so no re-download
+  └─ gone (only after a COMPLETE walk of that folder) → purge rows</code></pre>
+
+<ul>
+<li><strong>Folder search is a query, not a scanner.</strong> The walk already records every folder's name and parent. Derive the full path per folder, with an FTS5 <code>trigram</code> index for substring match. Port the behaviours, not the code: AND of terms split on whitespace and <code>;</code>, email-branch pruning (a folder with a direct child named like <code>someone@example.com</code> becomes a leaf result), and the display-only skip-N-leading-components setting.</li>
+<li><strong>Two locks, one history.</strong> The disk walk and the email index each have a lock. The nightly run takes them in turn. A scoped <code>email index --root &lt;folder&gt;</code> takes only the email lock and walks only that folder, so the re-index a consumer asks for after filing a mail takes seconds and doesn't wait behind a multi-hour disk walk. Each stage writes its own row in <code>state.sqlite3</code>: "disk ok · emails 37 new (12 downloaded, 48 MB), 3 waiting for budget".</li>
+<li><strong>Busy is its own state.</strong> If the email lock is held past the caller's timeout, the scoped run exits with a distinct "busy" code, never a plain failure.</li>
+<li><strong>Exclusions</strong> (merge item 1) apply at the walk, so disk, folder search and emails all skip the same paths.</li>
+</ul>
+
+<h2 id="boundary">The .msg reading boundary (Q2: allow download)</h2>
+<div class="callout">
+The disk walk, folder search and the Explore, Largest and Types tabs keep the rule absolute: they never open a file. Email indexing, "Show all" and "Open in Outlook" are the only paths that may read a <code>.msg</code>, and reading an online-only one downloads it. The boundary below keeps that exception narrow, visible and testable.
+</div>
+<div class="table-wrap"><table>
+<tr><th>Rule</th><th>How it holds</th></tr>
+<tr><td><strong>Where</strong>: only <code>*.msg</code> under <code>email.roots</code></td><td>A config list. Each folder must sit inside a scan root, and config load refuses any that doesn't. Nothing outside those folders is ever read, whatever its extension.</td></tr>
+<tr><td><strong>Who</strong>: one reader module</td><td><code>src/email/reader.py</code> is the only module that imports <code>extract_msg</code> or opens a scanned file. A unit test (or a conventions-ratchet rule) fails the gate if any other module does. The walk's existing "no per-file handle" tests stay.</td></tr>
+<tr><td><strong>When</strong>: new or changed only</td><td>Decided by the manifest diff on <code>(path, size, mtime)</code>. An unchanged file is never touched. A failed read is logged in <code>email_failures(path, size, mtime, reason)</code> and isn't retried until the file changes, so one bad file never downloads every night.</td></tr>
+<tr><td><strong>How</strong>: read-only</td><td>The file is opened for reading only. Nothing writes to it, and nothing changes its attributes, pin state or timestamps. No <code>attrib</code>, no OneDrive pin or unpin.</td></tr>
+<tr><td><strong>How much</strong>: a download budget</td><td><code>email.download_budget_mb</code> per run (proposed default 2048; 0 means local-only). The first full index then spreads over several nights instead of pulling the whole archive at once. Online-only state comes from the listing's attributes, so the count needs no extra call.</td></tr>
+<tr><td><strong>Where it runs</strong>: a child process</td><td>The email stage runs as <code>python -m app.cli email index</code> with <code>CREATE_NO_WINDOW</code>, and "Show all" uses a child with a timeout. The long-lived web server never blocks on a download.</td></tr>
+<tr><td><strong>Visible</strong>: counted and reported</td><td>The Scans tab shows files downloaded, MB downloaded, waiting for budget and failed, each as its own number. README and <code>CLAUDE.md</code> state the exception in one sentence per part, in the same PR that lands the reader.</td></tr>
+</table></div>
+<p><strong>A side effect to state plainly:</strong> a downloaded file stays on the disk until OneDrive's Storage Sense or "Free up space" removes it, so local disk use grows by the size of the archive's mail. The Explore tab shows that growth like any other folder. Folder-explorer doesn't send files back to online-only, because changing a file's state is a write.</p>
+
+<h2 id="ux">Email search UX</h2>
+
+<h3>What the best tools do</h3>
+<div class="table-wrap"><table>
+<tr><th>Tool</th><th>What's worth copying</th></tr>
+<tr><td>Gmail</td><td>The de facto operator vocabulary: <code>from:</code> <code>to:</code> <code>cc:</code> <code>subject:</code> <code>has:attachment</code> <code>filename:</code> <code>after:</code>/<code>before:</code> <code>newer_than:</code> <code>larger:</code> <code>in:</code>, quotes for phrases, <code>-</code> to exclude, <code>OR</code>.</td></tr>
+<tr><td>Outlook (web / AQS)</td><td>The same idea with <code>HasAttachment:yes</code>. New Outlook drops Advanced Find for a filter pane, which suggests most people use chips rather than syntax.</td></tr>
+<tr><td>Fastmail</td><td>Saved searches pinned in the sidebar, and relative dates that stay current.</td></tr>
+<tr><td>notmuch</td><td>Archive-grade precision: <code>folder:</code>, <code>id:</code> (Message-ID), date ranges.</td></tr>
+<tr><td>MailStore</td><td>The archive-tool baseline: folder scope with subfolders, separate From vs To/Cc fields, date and size filters.</td></tr>
+<tr><td>Superhuman</td><td>Keyboard-first flow; every action has a single key.</td></tr>
+<tr><td>task-os Search</td><td>Already searches the same index: 200 ms debounce, <code>?q=</code> deep link, <kbd>↓</kbd> into results, <kbd>Esc</kbd>/<kbd>/</kbd> back to the box. "Not set up" is a state, never an empty result.</td></tr>
+</table></div>
+
+<h3>What gets built</h3>
+<ol>
+<li><strong>One Search tab with a Folders | Emails segmented control.</strong> The mode lives in the URL (<code>#search?mode=emails&amp;q=…</code>), and the box keeps its text when you switch.</li>
+<li><strong>Gmail-style operators, parsed to SQL + FTS5</strong>, with chips as the main interface and syntax for power use. Every chip writes its operator into the box, so the two always match:
+  <div class="table-wrap"><table>
+  <tr><th>Operator</th><th>Maps to</th><th>Needs</th></tr>
+  <tr><td>free words, <code>"phrase"</code>, <code>-word</code>, <code>OR</code></td><td>FTS5 <code>MATCH</code>, BM25 10/3/3/1</td><td>today</td></tr>
+  <tr><td><code>from:</code> <code>subject:</code></td><td>FTS5 column filter</td><td>today</td></tr>
+  <tr><td><code>to:</code> <code>cc:</code> <code>with:</code></td><td>column filters</td><td>Q8 <code>to_addrs</code> / <code>cc_addrs</code></td></tr>
+  <tr><td><code>after:</code> <code>before:</code> <code>newer_than:30d</code></td><td><code>date_sent</code> range</td><td>today</td></tr>
+  <tr><td><code>in:"Project Alpha"</code></td><td><code>folder_path</code></td><td>today</td></tr>
+  <tr><td><code>has:attachment</code> <code>filename:pdf</code></td><td>attachment columns</td><td>Q8</td></tr>
+  <tr><td><code>larger:5M</code></td><td><code>size</code></td><td>Q8 (free from the walk)</td></tr>
+  <tr><td><code>is:flagged</code> <code>is:done</code></td><td><code>flag_status</code></td><td>today</td></tr>
+  <tr><td><code>id:</code></td><td><code>message_id</code></td><td>today</td></tr>
+  </table></div></li>
+<li><strong>Facets with counts over the current result set:</strong> top senders, top archive folders, a year and month strip, attachments, flagged.</li>
+<li><strong>The preview pane (Q6).</strong> On desktop, the list sits on the left and the reading pane on the right (a declared wide view, like Explore). On the phone, tapping a result opens a full-height sheet. The pane shows:
+  <ul>
+  <li>the header fields and the indexed 500-character preview, with matches marked (FTS5 <code>highlight()</code>), plus the attachment names;</li>
+  <li><strong>Show all</strong> (key <kbd>a</kbd>), which calls <code>GET /api/emails/{row id}/body</code>. The server looks up the path by row id (never a path from the client), checks that it sits under an email folder, and reads it through the reader in a child process with a timeout. It returns the plain-text body. An HTML body is sanitised and shown in a sandboxed frame with scripts and remote loads blocked, so tracking images never fire. Bodies aren't stored in the index or cached on disk.</li>
+  <li>For an online-only file, the button reads "Show all · downloads from OneDrive". A read that fails says why, with a distinct message for each case: download timed out, file no longer there, could not be parsed. A successful read logs one info line, and a failed one logs the reason.</li>
+  <li>Show all works for any signed-in client, phone included, because it is a read behind the app's existing login and the download happens on the PC. Open in Outlook stays PC-only (Q5).</li>
+  <li>Actions: <em>Open in Outlook</em> (PC), <em>Show folder</em>, <em>Copy path</em>, <em>Find in mailbox</em> (the live copy by Message-ID).</li>
+  </ul></li>
+<li><strong>Sort</strong> by relevance (BM25, ties go to the newest) or by newest first.</li>
+<li><strong>Saved and recent searches:</strong> saved queries appear as chips, stored in <code>state.sqlite3</code>, and relative dates stay relative. The last 10 queries show when the box is empty.</li>
+<li><strong>Keyboard:</strong> <kbd>/</kbd> focuses the box, <kbd>↓</kbd> or <kbd>j</kbd>/<kbd>k</kbd> move, <kbd>Enter</kbd> previews, <kbd>a</kbd> shows all, <kbd>o</kbd> opens in Outlook, <kbd>f</kbd> shows the folder and <kbd>Esc</kbd> goes back. The keys match task-os.</li>
+</ol>
+
+<div class="mock">┌ Search ─────────────────────────────── ☾  ⚙ ┐
+│ [ Folders | Emails ]                          │
+│ ┌──────────────────────────────────────────┐  │
+│ │ from:ana budget has:attachment after:2025│  │
+│ └──────────────────────────────────────────┘  │
+│ Sender ▾ ana@example.com 12 · leo@example.org 3│
+│ Folder ▾ Project Alpha 9 · Northwind 6         │
+├──────────────────────┬────────────────────────┤
+│ ▸ Q4 [budget] draft  │ Q4 budget draft        │
+│   ana · 14 Oct · PA  │ From ana@example.com   │
+│   Re: [budget] notes │ To leo@example.org     │
+│   ana · 02 Oct · NW  │ 📎 plan.pdf · sheet.xlsx│
+│   …                  │ …the revised [budget]… │
+│                      │ [Show all]             │
+│                      │ [Open in Outlook] [Show│
+│                      │  folder] [Copy path]   │
+└──────────────────────┴────────────────────────┘</div>
+<p class="muted">Invented content. The full mock-up is issue #7.</p>
+
+<h2 id="bridge">The Outlook bridge</h2>
+
+<h3>The macro (Q10: fire and forget)</h3>
+<pre><code>' Template shipped in the repo (no paths inside); the user imports it once.
+Sub ArchiveCurrentItem()
+    Dim it As Object, home As String, cmd As String
+    If TypeName(Application.ActiveWindow) = "Inspector" Then
+        Set it = Application.ActiveInspector.CurrentItem      ' an opened mail
+    ElseIf Application.ActiveExplorer.Selection.Count > 0 Then
+        Set it = Application.ActiveExplorer.Selection.Item(1)  ' the selected mail
+    Else
+        Exit Sub
+    End If
+    home = Environ$("FOLDER_EXPLORER_HOME")                   ' set once per PC
+    cmd = """" &amp; home &amp; "\.venv\Scripts\pythonw.exe"" -m app.outlook archive" _
+        &amp; " --entry-id " &amp; it.EntryID &amp; " --store-id " &amp; it.Parent.StoreID
+    CreateObject("WScript.Shell").Run cmd, 0, False            ' hidden, do not wait
+End Sub</code></pre>
+<ul>
+<li><strong>The path</strong> comes from one per-PC environment variable, so the macro is the same at home and at work. <code>pythonw.exe</code> has no console. Children the Python side starts get <code>CREATE_NO_WINDOW</code> through <code>src/no_window.py</code>.</li>
+<li><strong>IDs are passed at click time.</strong> Python re-acquires the mail with <code>Session.GetItemFromID(entry, store)</code> after attaching with <code>GetActiveObject</code>. That avoids archiving the wrong mail after a fast click, and it handles an opened mail as well as a selected one.</li>
+<li><strong>No wait</strong> means the macro never blocks Outlook's single-threaded object model while the child makes COM calls into it.</li>
+<li><strong>Feedback comes from the Python side:</strong> the archive sheet or the fallback window, or a toast with failures in their own words ("Outlook not reachable" is a different message from "no archive root mounted").</li>
+<li><strong>COM rules carry over:</strong> attach and never start a hidden Outlook from the bridge; resolve Exchange senders with <code>GetExchangeUser()</code>; run every COM call in a child process with a timeout, never in the web server.</li>
+<li><span class="tag bad">risk</span>New Outlook for Windows supports neither VBA nor COM. If the work PC moves to it, the macro and every COM verb stop working.</li>
+</ul>
+
+<h3>"Open in Outlook" (Q5: PC only)</h3>
+<ul>
+<li><strong>It opens the archived <code>.msg</code>, not the live mail,</strong> because a mail's EntryID changes whenever it moves. The server runs <code>outlook.exe /f "&lt;path&gt;"</code> on the PC with <code>CREATE_NO_WINDOW</code>. The route takes a row id and accepts loopback clients only. An online-only file downloads first, and the button says so.</li>
+<li><strong>Find in mailbox</strong> reuses the <code>find</code> / <code>plan --message-id</code> path, which looks up the live copy by its <code>Message-ID</code> header and calls <code>Display()</code> on it.</li>
+</ul>
+
+<h2 id="merge">Merge list from the work checkout</h2>
+<div class="table-wrap"><table>
+<tr><th>Behaviour</th><th>Decided</th><th>Where it lands</th></tr>
+<tr><td>Scan exclusions</td><td><span class="tag rec">adopt</span></td><td>At the walk (<code>roots[].exclude</code>). Rows are purged only after a complete walk.</td></tr>
+<tr><td>Windows-1252 recovery</td><td><span class="tag rec">adopt</span></td><td>In <code>src/email/reader.py</code>, retried only after <code>UnicodeDecodeError</code>, with one info log line per recovery. Indexing and Show all share it.</td></tr>
+<tr><td>Exact-subject priority</td><td><span class="tag rec">adopt</span></td><td>In the archive suggester.</td></tr>
+<tr><td>Volume-neutral ranking</td><td><span class="tag rec">adopt (Q7)</span></td><td>Each folder scores by its strongest hit. The weights are set by fixture tests on invented folders, not copied constants.</td></tr>
+</table></div>
+<p>Public main also has <code>dismiss</code> and <code>sync</code>, which the work checkout lacks. Both stay, and life-os uses both.</p>
+
+<h2 id="consumers">Consumers: task-os and life-os</h2>
+<p>Two repos drive email-archiver. The fold has to keep every contract below working, or retarget it in the same release. Only code contracts are listed here, no content.</p>
+
+<h3>task-os</h3>
+<ul>
+<li>Opens <code>emails.db</code> read-only for search and flagged-mail capture, through its <code>search.email_db</code> setting.</li>
+<li>Runs <code>main_batch.py</code> verbs as a child process under email-archiver's venv and parses their JSON.</li>
+<li>Has its own vendored copy of the folder-searcher core, with its own index. That copy stays (Q4).</li>
+</ul>
+
+<h3>life-os</h3>
+<p>life-os has one shared email helper (<code>.claude/skills/_shared/email/</code>: <code>email_tool.py</code> plus the <code>mailtool/</code> package). Its skills (the archive skills, the chat skills, writing-style) reach email-archiver only through it, plus one script. It never calls Outlook itself. email-archiver is the only part of the fleet that talks to Outlook.</p>
+<div class="table-wrap"><table>
+<tr><th>Contract</th><th>What life-os depends on today</th><th>Kept by</th></tr>
+<tr><td><strong>Repo discovery</strong></td><td>A sibling folder named <code>email-archiver</code>, overridable with <code>LIFE_OS_EMAIL_ARCHIVER_REPO</code>; errors <code>repo_not_found</code> / <code>venv_not_found</code></td><td>step 3: <code>LIFE_OS_FOLDER_EXPLORER_REPO</code>, sibling <code>folder-explorer</code>; the old variable stays one release as a fallback</td></tr>
+<tr><td><strong>Interpreter</strong></td><td>email-archiver's <code>.venv\Scripts\python.exe</code> runs the batch verbs, the scan, the config probe, the nightly sweep <code>.bat</code> and <code>writing-style/extract_sent.py</code> (which needs <code>extract_msg</code> and <code>pyyaml</code>). The archive skill's reader table names that venv for <code>.msg</code>.</td><td>step 3: folder-explorer's <code>.venv</code> with the email and Outlook extras</td></tr>
+<tr><td><strong>Batch CLI</strong>: <code>main_batch.py &lt;verb&gt;</code>, cwd = repo root, <code>PYTHONUTF8=1</code>, windowless, 600 s timeout</td><td>Verbs and flags:<br><code>mailboxes</code> (never starts Outlook)<br><code>plan --candidates N [--message-id …] [--ref] [--search …] [--since] [--folder sent] [--mailbox]</code><br><code>apply --decisions &lt;json file&gt; --category &lt;name&gt; [--mailbox]</code><br><code>dismiss --message-id … --category &lt;name&gt; [--mailbox]</code><br><code>draft --spec &lt;json file&gt; [--update &lt;entry id&gt;] [--mailbox]</code><br><code>read --entry-id [--mailbox]</code><br><code>send --entry-id --expect-hash --expect-part=name=digest … --expect-to … [--mailbox]</code><br><code>find --query --limit [--since] [--folders] [--mailbox]</code><br><code>sync --timeout S [--mailbox]</code></td><td>step 3: <code>python -m app.cli email batch &lt;verb&gt;</code> with the same flags</td></tr>
+<tr><td><strong>JSON envelope</strong></td><td>One document on stdout. <code>schema_version == 1</code> exactly (otherwise <code>archiver_schema_mismatch</code>). Refusals come as <code>error.code</code> + <code>error.message</code> (+ <code>differs</code>). Codes passed through: <code>draft_not_found</code>, <code>draft_not_editable</code>, <code>draft_body_unmarked</code>, <code>approval_mismatch</code>, <code>recipient_unreadable</code>, <code>reply_source_not_found</code>, <code>reply_unavailable</code>, <code>mailbox_unknown</code>, <code>mailbox_not_in_outlook</code>, <code>mailbox_registry_invalid</code>, <code>account_not_in_outlook</code>, <code>sending_account_mismatch</code>, <code>deferred_no_desktop</code>. Exit 0; <code>dismiss</code> exits 1 for a complete document with a failed mail. Keys read include <code>mailboxes[].alias/aliases/address/display_name/default/outlook_status</code>, <code>mails</code>, <code>hits</code>, <code>results</code>, <code>coverage_note</code>, <code>truncated</code>, <code>entry_id</code>, <code>fingerprint</code>, <code>archive_folder</code>, <code>category</code>, <code>subject/to/cc/bcc/attachments/sent_at</code>.</td><td>step 3: the same envelope byte for byte, held by a contract test (below)</td></tr>
+<tr><td><strong>Re-index after filing</strong></td><td><code>main_scan.py --no-ui</code>, incremental, 900 s timeout, expected to take seconds</td><td>step 2: becomes a shim that runs folder-explorer's scoped <code>email index</code>; step 3: life-os calls <code>python -m app.cli email index --root &lt;dest&gt;</code></td></tr>
+<tr><td><strong>Config loader (Python import)</strong></td><td><code>from email_archiver.config import load_config, get_archive_roots</code>, then <code>{'roots': get_archive_roots(cfg), 'db': cfg['database']['path']}</code>. Errors when there are no roots.</td><td>step 2: email-archiver's <code>database.path</code> is repointed to folder-explorer's index; step 3: <code>python -m app.cli email config --json</code> prints the same <code>{roots, db}</code></td></tr>
+<tr><td><strong>Index schema (read-only)</strong></td><td>Opened <code>file:…?mode=ro</code>. <code>emails(id, file_path, subject, sender, recipients, date_sent, folder_path, message_id)</code>, joined with <code>emails_fts</code> on <code>rowid</code>, <code>bm25(emails_fts, 10, 3, 3, 1)</code> (so the FTS column order is subject, sender, recipients, body_preview), and a mailbox filter by <code>instr</code> on <code>sender</code>/<code>recipients</code>.</td><td>all steps: keep these columns and the FTS column order; <code>recipients</code> stays filled alongside the new <code>to_addrs</code>/<code>cc_addrs</code></td></tr>
+<tr><td><strong>Folder index file</strong></td><td>The helper's <code>folders</code> verb reads <code>&lt;automation&gt;/system/foldersearcher/folder_structure.txt</code> (<code>Root:</code> sections, one path per line) through <code>LIFE_OS_AUTOMATION_REPO</code></td><td>The folder searcher's headless nightly scan keeps running until step 3. Then life-os calls <code>python -m app.cli folders search --query --limit --json</code>, and that scan retires.</td></tr>
+<tr><td><strong>Archiver behaviours</strong></td><td>The <code>NNN - </code> attachment prefix (the archive tooling's rename code keeps it), the file-name sanitiser and dating, archive-root refusal (<code>dest_outside_roots</code>), the draft body marker <code>id="archive-draft-body"</code> (writing-style uses it to skip assisted mail), and Outlook categories named by the caller</td><td>step 3: ported with email-archiver's tests as the spec</td></tr>
+<tr><td><strong>Mailbox registry</strong></td><td>A machine-local registry in email-archiver, read only through <code>mailboxes</code>. <code>--mailbox</code> works on every verb, and a mail is never moved between mailboxes.</td><td>step 3: moves into folder-explorer's machine-local config, same verb</td></tr>
+<tr><td><strong>Nightly chain</strong></td><td>life-os email sweep → email-archiver scan → folder-searcher scan, so each night's filings reach both indexes. The sweep defers with exit 3 in session 0.</td><td>step 2: the email-archiver scan link becomes the folder-explorer scan; step 3: the folder-searcher link goes away</td></tr>
+</table></div>
+<p><strong>Contract test.</strong> Folder-explorer gets a fixture list of every argv shape life-os and task-os send. A test replays each one against a fake Outlook layer and checks the exit code, <code>schema_version</code>, the error codes and the keys above. life-os already has tests that fake a sibling repo (<code>email_test_support.py</code>), and those are retargeted in the same release.</p>
+
+<h2 id="steps">Build steps</h2>
+<p>Each step is its own issue and PR and ships on its own. The mock-up is issue #7.</p>
+
+<div class="step">
+<h3>Step 1. Read-only search, with Show all</h3>
+<ul>
+<li>A Search tab with Folders | Emails, operators, chips, facets, the preview pane, saved and recent searches, and the keyboard flow.</li>
+<li>Email search reads email-archiver's current <code>emails.db</code> with <code>mode=ro</code>, through a new <code>email.index_path</code> setting. Folder search runs over folder-explorer's own index, with pruning and the skip-N display.</li>
+<li><strong>Show all</strong> lands here, so <code>src/email/reader.py</code>, the "only the reader opens a file" test, the <code>email.roots</code> check, the child process with its timeout, and the README and <code>CLAUDE.md</code> wording of the exception all ship in this step. Adds <code>requirements-email.txt</code>.</li>
+<li><strong>Consumers:</strong> nothing changes for task-os or life-os.</li>
+</ul>
+</div>
+
+<div class="step">
+<h3>Step 2. One scan engine; the index moves</h3>
+<ul>
+<li>The walk produces the <code>.msg</code> manifest and applies exclusions. The email stage takes over indexing: Windows-1252 recovery, the Q8 columns with one forced re-read, the download budget, <code>email_failures</code>, the two locks, and a scoped <code>email index --root</code>.</li>
+<li><code>emails.sqlite3</code> now lives in folder-explorer's runtime-data folder, with folder-explorer as its only writer (the scanner and <code>renumber</code> move over). It keeps today's columns and FTS column order.</li>
+<li><strong>Consumers, in the same release:</strong> task-os's <code>search.email_db</code> is repointed. email-archiver's <code>database.path</code> is repointed too, so its <code>plan</code>/<code>find</code>/suggester and life-os's config probe and <code>extract_sent.py</code> read the new file without any change to life-os. email-archiver's <code>main_scan.py</code> becomes a shim that runs folder-explorer's scoped email index, so life-os's re-index after filing keeps working. The nightly chain becomes life-os sweep → folder-explorer scan → folder-searcher headless scan. The folder-searcher tray app retires, but its headless scan stays because life-os's <code>folders</code> verb still reads its file.</li>
+</ul>
+</div>
+
+<div class="step">
+<h3>Step 3. Outlook actions; email-archiver retires</h3>
+<ul>
+<li>The archive suggester (exact-subject priority, Q7 ranking), the archive sheet with its fallback window, the VBA bridge, Open in Outlook, the mailbox registry, and every batch verb under <code>python -m app.cli email batch</code>, with the same JSON, error codes and exit codes. Adds <code>email config --json</code> and <code>folders search --json</code>. The contract test from the consumers section is part of the gate.</li>
+<li><strong>task-os:</strong> retargeted to <code>app.cli email batch</code> under folder-explorer's venv.</li>
+<li><strong>life-os,</strong> in one PR that lands with this release: <code>mailtool/archiver.py</code> (repo variable, venv, batch argv, config probe, re-index), the <code>folders</code> lookup (CLI instead of the text file), the sweep <code>.bat</code> interpreter, <code>extract_sent.py</code>'s interpreter, the archive skill's <code>.msg</code> reader table, and <code>email_test_support.py</code>.</li>
+<li>Then the folder searcher's headless scan job retires. The <code>main_scan.py</code> shim and the old variable fallback stay for one release, and then email-archiver is archived.</li>
+</ul>
+</div>
+
+<h2 id="sources">Sources</h2>
+<ul>
+<li>Gmail: <a href="https://support.google.com/mail/answer/7190">Refine searches in Gmail (search operators)</a></li>
+<li>Outlook on the web: <a href="https://support.office.com/en-us/article/189276e4-3cc6-411f-b49b-b43ffd31fb9f">Find email, contacts and events</a></li>
+<li>Fastmail: <a href="https://www.fastmail.help/hc/en-us/articles/360060591213">Searching your mail</a></li>
+<li>notmuch: <a href="https://git.notmuchmail.org/git/notmuch/tree/doc/man7/notmuch-search-terms.rst">notmuch-search-terms</a></li>
+<li>MailStore: <a href="https://help.mailstore.com/en/server/Template:Advanced_Search">Advanced Search</a></li>
+<li>Superhuman: <a href="https://help.superhuman.com/article/478-superhuman-command">Shortcuts and Cmd+K</a></li>
+<li>SQLite: <a href="https://sqlite.org/fts5.html">FTS5 (bm25, snippet, highlight, trigram)</a></li>
+<li>Windows Script Host: <a href="https://learn.microsoft.com/previous-versions/d5fk67ky(v=vs.85)">WshShell.Run</a></li>
+<li>Outlook object model: <a href="https://learn.microsoft.com/en-us/office/vba/outlook/how-to/items-folders-and-stores/working-with-entryids-and-storeids">Working with EntryIDs and StoreIDs</a>; <a href="https://learn.microsoft.com/en-us/office/vba/api/outlook.namespace.getitemfromid">NameSpace.GetItemFromID</a></li>
+<li>Outlook command line: <a href="https://learn.microsoft.com/en-us/archive/technet-wiki/7271.outlook-2010-executable-switches">Outlook executable switches</a></li>
+<li>New Outlook: <a href="https://learn.microsoft.com/en-us/microsoft-365-apps/outlook/get-started/vba-alternatives">VBA alternatives</a></li>
+<li>Windows consoles: <a href="https://bugs.python.org/issue30082">CPython issue 30082 (CREATE_NO_WINDOW)</a></li>
+</ul>
+
+<footer>folder-explorer#6 · research study · updated 2026-11-05 with the owner's decisions and the life-os contract map · no code changed in any repo. The code facts come from reading the checkouts of folder-explorer, email-archiver, the folder searcher, task-os and life-os. For life-os, only the code contracts were read and none of its content is reproduced.</footer>
+</main>
+</body>
+</html>

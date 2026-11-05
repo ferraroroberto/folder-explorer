@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sqlite3
 import time
 from collections.abc import Callable, Iterator
@@ -49,7 +50,19 @@ CREATE TABLE folder_ext (
     size INTEGER NOT NULL, alloc INTEGER NOT NULL, files INTEGER NOT NULL,
     online_files INTEGER NOT NULL, online_size INTEGER NOT NULL
 );
+CREATE TABLE folder_paths (id INTEGER PRIMARY KEY, lpath TEXT NOT NULL);
+CREATE TABLE folder_people (id INTEGER PRIMARY KEY, people INTEGER NOT NULL);
 """
+
+# A folder named like an email address is one person's folder; a folder
+# holding such folders is a "folder of people", which folder search can show
+# as one result. A dotted top-level domain keeps names like "cl@ve" out.
+PERSON_FOLDER_RE = re.compile(r"^[^@\s\\/]+@[^@\s\\/]+\.[A-Za-z]{2,}$")
+
+
+def search_key(path: str) -> str:
+    """How folder search compares a path: case-folded, with ``/`` as the one separator."""
+    return path.casefold().replace("\\", "/")
 
 INDEX_INDEXES = """
 CREATE INDEX folders_parent ON folders(parent);
@@ -97,6 +110,8 @@ class _Folders:
     online_files: list[int] = field(default_factory=list)
     online_size: list[int] = field(default_factory=list)
     errors: list[int] = field(default_factory=list)
+    # Folder id -> how many of its direct subfolders are named like an email address.
+    people: dict[int, int] = field(default_factory=dict)
 
     def add(self, parent: int, name: str, depth: int) -> int:
         self.parent.append(parent)
@@ -121,6 +136,15 @@ def _open_index(path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=OFF")
     conn.executescript(INDEX_SCHEMA)
     return conn
+
+
+def _write_paths(conn: sqlite3.Connection, f: _Folders, root_path: str) -> None:
+    """Each folder's full path as folder search compares it, plus the folders of people."""
+    keys = [search_key(root_path).rstrip("/")]
+    for i in range(1, len(f.parent)):
+        keys.append(keys[f.parent[i]] + "/" + f.name[i].casefold())
+    conn.executemany("INSERT INTO folder_paths VALUES (?, ?)", enumerate(keys))
+    conn.executemany("INSERT INTO folder_people VALUES (?, ?)", f.people.items())
 
 
 def _write_folders(conn: sqlite3.Connection, f: _Folders) -> None:
@@ -186,6 +210,9 @@ class _Walk:
                 subdirs.append(e.name)
             else:
                 self._add_file(fid, e, per_ext)
+        people = sum(1 for sub in subdirs if PERSON_FOLDER_RE.match(sub))
+        if people:
+            f.people[fid] = people
         c.files += f.files[fid]
         c.size += f.size[fid]
         c.alloc += f.alloc[fid]
@@ -246,6 +273,7 @@ def scan_to_index(
                 on_progress(walk.counters.as_dict())
         walk.flush()
         _write_folders(conn, walk.folders)
+        _write_paths(conn, walk.folders, root_path)
         conn.executescript(INDEX_INDEXES)
         conn.executemany(
             "INSERT INTO meta VALUES (?, ?)",

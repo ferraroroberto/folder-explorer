@@ -1,4 +1,4 @@
-/* Settings: text size, default basis, remote access, the in-app schedule and the scan roots. */
+/* Settings: text size, default basis, remote access, the in-app schedule, the scan roots and the email part. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -42,7 +42,25 @@ function render(body) {
   $('rootsNote').textContent = (auto ? 'Scanning ' : 'One folder per line, saved when you leave the box. Scanning ') +
     state.roots.map((r) => r.name).join(', ') + '.';
   $('indexSize').textContent = fmtBytes(body.index_bytes) + ', kept on this PC';
+  renderEmail(cfg.email);
   setBasis(readPref('basis', 'size'));
+}
+
+async function renderEmail(email) {
+  if (document.activeElement !== $('emailIndexInput')) $('emailIndexInput').value = email.index_path || '';
+  if (document.activeElement !== $('emailRootsInput')) $('emailRootsInput').value = email.roots.join('\n');
+  let st = null;
+  try { st = await getJSON('/api/search/status'); } catch (e) { st = null; }
+  const em = st ? st.emails : null;
+  $('emailState').textContent = !em ? '' : em.ready ? em.count.toLocaleString('en-US') + ' emails' : 'Off';
+  $('emailNote').textContent = !em ? '' : !em.ready ? 'Not set up here: ' + em.reason + '.'
+    : em.reader ? 'Search works. Show all is off: ' + em.reader + '.' : 'Search and Show all are on. Show all reads a mail only from these folders.';
+}
+
+function saveEmail() {
+  const roots = $('emailRootsInput').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  const path = $('emailIndexInput').value.trim();
+  return save({ email: { index_path: path || null, roots } });
 }
 
 function setBasis(value) {
@@ -84,6 +102,8 @@ export function initSettings(opts) {
     if (await save({ roots })) { showToast('Roots saved'); onRootsChanged(); }
   });
   $('scheduleSelect').addEventListener('change', (e) => save({ schedule: e.target.value }));
+  $('emailIndexInput').addEventListener('change', () => saveEmail());
+  $('emailRootsInput').addEventListener('change', () => saveEmail());
   $('scheduleTime').addEventListener('change', (e) => { if (e.target.value) save({ schedule_time: e.target.value }); });
   $('defaultBasisSeg').addEventListener('click', (e) => {
     const b = e.target.closest('.segmented-item');

@@ -45,6 +45,7 @@
 <link rel="stylesheet" href="/static/_vendored/page-foot/page-foot.css">
 <link rel="stylesheet" href="/static/_vendored/text-size/text-size.css">
 <link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/search.css">
 <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
 </head>
 <body>
@@ -126,9 +127,82 @@
     <path d="m21 21-4.34-4.34" />
     <circle cx="11" cy="11" r="8" />
   </symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24" fill="none">
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+    <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+  </symbol>
+  <symbol id="i-paperclip" viewBox="0 0 24 24" fill="none">
+    <path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" />
+  </symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24" fill="none">
+    <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" />
+  </symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none">
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </symbol>
+  <symbol id="i-external-link" viewBox="0 0 24 24" fill="none">
+    <path d="M15 3h6v6" />
+    <path d="M10 14 21 3" />
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24" fill="none">
+    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+  </symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 6v6l4 2" />
+  </symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24" fill="none">
+    <path d="M21 4h-7" />
+    <path d="M10 4H3" />
+    <path d="M21 12h-9" />
+    <path d="M8 12H3" />
+    <path d="M21 20h-5" />
+    <path d="M12 20H3" />
+    <path d="M14 2v4" />
+    <path d="M8 10v4" />
+    <path d="M16 18v4" />
+  </symbol>
+  <symbol id="i-download" viewBox="0 0 24 24" fill="none">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M12 15V3" />
+  </symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none">
+    <path d="M10 8h.01" />
+    <path d="M12 12h.01" />
+    <path d="M14 8h.01" />
+    <path d="M16 12h.01" />
+    <path d="M18 8h.01" />
+    <path d="M6 8h.01" />
+    <path d="M7 16h10" />
+    <path d="M8 12h.01" />
+    <rect width="20" height="16" x="2" y="4" rx="2" />
+  </symbol>
+  <symbol id="i-folder-open" viewBox="0 0 24 24" fill="none">
+    <path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
+  </symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none">
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24" fill="none">
+    <path d="M5 12h14" />
+  </symbol>
 </svg>
-<nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="explore">
-  <button id="tabExplore" type="button" class="tab active" data-tab="explore" role="tab" aria-selected="true" aria-controls="paneExplore" data-track="tab-explore">
+<nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="search">
+  <button id="tabSearch" type="button" class="tab active" data-tab="search" role="tab" aria-selected="true" aria-controls="paneSearch" data-track="tab-search">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
+    <span class="tab-label">Search</span>
+  </button>
+  <button id="tabExplore" type="button" class="tab" data-tab="explore" role="tab" aria-selected="false" aria-controls="paneExplore" tabindex="-1" data-track="tab-explore">
     <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg>
     <span class="tab-label">Explore</span>
   </button>
@@ -147,7 +221,74 @@
 </nav>
 
 <main class="app">
-  <section id="paneExplore" class="pane" role="tabpanel" aria-labelledby="tabExplore" aria-label="Explore">
+  <section id="paneSearch" class="pane" role="tabpanel" aria-labelledby="tabSearch" aria-label="Search">
+    <div class="card home-head">
+      <span class="home-title">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        Search
+      </span>
+      <span class="status head-status" role="status" aria-live="polite"></span>
+      <button type="button" class="icon-button home-toggle theme-toggle" aria-label="Switch to dark theme" title="Switch to dark theme" data-track="theme-toggle">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
+      </button>
+      <button type="button" class="icon-button home-toggle home-settings open-settings" aria-label="Settings" title="Settings" data-track="open-settings">
+        <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
+      </button>
+    </div>
+    <div class="card search-off" id="searchOff" hidden>
+      <div class="empty-state">
+        <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <p class="empty-state-message" id="searchOffText"></p>
+        <button type="button" class="empty-state-action open-settings" data-track="search-off-settings">Open Settings</button>
+      </div>
+    </div>
+    <div class="search-layout" id="searchOn">
+      <div class="card search-card">
+        <div class="search-modes">
+          <span class="segmented" role="group" aria-label="Search in" id="modeSeg">
+            <button type="button" class="segmented-item" aria-pressed="false" data-value="folders" data-track="mode-folders"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Folders</button>
+            <button type="button" class="segmented-item" aria-pressed="true" data-value="emails" data-track="mode-emails"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</button>
+          </span>
+          <button type="button" class="icon-button kbd-only" id="keysInfo" aria-label="Keyboard shortcuts" title="Keyboard shortcuts" data-track="keys-info">
+            <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+          </button>
+        </div>
+        <label class="search-field">
+          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <input type="search" id="q" autocomplete="off" spellcheck="false" aria-label="Search" enterkeyhint="search" data-track="search-input">
+          <kbd class="kbd-only" aria-hidden="true">/</kbd>
+        </label>
+        <div class="query-chips" id="queryChips" aria-label="Active filters"></div>
+        <div class="saved-row" id="savedRow"></div>
+        <ul class="recent-list" id="recentList" hidden></ul>
+      </div>
+
+      <aside class="search-side">
+        <div class="card card--collapsible side-card" id="filtersCard">
+          <button type="button" class="side-toggle" aria-expanded="false" aria-controls="filtersBody" data-track="filters-toggle"><span class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-sliders"></use></svg><span id="filtersTitle">Filters</span></span><span class="summary-meta" id="filtersMeta"></span><svg class="icon summary-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+          <div class="side-body" id="filtersBody" hidden></div>
+        </div>
+        <div class="card card--collapsible side-card" id="facetsCard">
+          <button type="button" class="side-toggle" aria-expanded="false" aria-controls="facetsBody" data-track="facets-toggle"><span class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Refine</span><span class="summary-meta" id="facetsMeta"></span><svg class="icon summary-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
+          <div class="side-body" id="facetsBody" hidden></div>
+        </div>
+      </aside>
+
+      <div class="card results-card">
+        <div class="card-head">
+          <h2 class="card-title" id="resultsTitle"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</h2>
+          <span class="card-head-meta num" id="resultsMeta"></span>
+        </div>
+        <div class="results-tools" id="resultsTools"></div>
+        <ul class="rows results" id="results" role="listbox" aria-label="Results"></ul>
+        <p class="keys-line kbd-only" id="keysLine"></p>
+      </div>
+
+      <div class="card preview-card" id="previewDock" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="paneExplore" class="pane" role="tabpanel" aria-labelledby="tabExplore" aria-label="Explore" hidden>
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>
@@ -310,6 +451,39 @@
   </footer>
 </main>
 
+<dialog class="detail-dialog wide-dialog" id="previewDialog" data-track-view="preview-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1" id="previewDialogTitle">Email</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="preview-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div id="previewSheetBody"></div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog" id="keysDialog" data-track-view="keys-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Keyboard</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="keys-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="keys-grid">
+      <span class="k"><kbd>/</kbd></span><span>Go to the search box</span>
+      <span class="k"><kbd>&darr;</kbd></span><span>From the box into the results</span>
+      <span class="k"><kbd>j</kbd><kbd>k</kbd></span><span>Next and previous result</span>
+      <span class="k"><kbd>Enter</kbd></span><span>Preview the result</span>
+      <span class="k"><kbd>a</kbd></span><span>Show all (full message)</span>
+      <span class="k"><kbd>o</kbd></span><span>Open in Outlook (this PC)</span>
+      <span class="k"><kbd>f</kbd></span><span>Show the folder</span>
+      <span class="k"><kbd>Esc</kbd></span><span>Back to the search box</span>
+    </div>
+  </div>
+</dialog>
+
 <dialog class="detail-dialog contents-dialog" id="contentsDialog" data-track-view="contents-sheet">
   <div class="detail-card">
     <div class="detail-header">
@@ -373,6 +547,19 @@
       </div>
       <textarea class="input-native roots-input" id="rootsInput" rows="3" spellcheck="false" aria-label="Scan roots, one folder per line" data-track="roots-input" hidden></textarea>
       <p class="row-note" id="rootsNote"></p>
+    </div>
+    <div class="row row-stack">
+      <div class="row-line">
+        <span>Email search</span>
+        <span class="row-value" id="emailState"></span>
+      </div>
+      <label class="ff-col"><span class="row-note">Email index file</span>
+        <input class="input-native" type="text" id="emailIndexInput" spellcheck="false" autocomplete="off" placeholder="the email index, e.g. emails.db" aria-label="Email index file" data-track="email-index-input">
+      </label>
+      <label class="ff-col"><span class="row-note">Email folders "Show all" may read, one per line, each inside a scan root</span>
+        <textarea class="input-native roots-input" id="emailRootsInput" rows="2" spellcheck="false" aria-label="Email folders, one per line" data-track="email-roots-input"></textarea>
+      </label>
+      <p class="row-note" id="emailNote"></p>
     </div>
     <div class="row">
       <span>Index size</span>

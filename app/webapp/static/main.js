@@ -1,4 +1,4 @@
-/* Folder explorer: boot, tabs, toolbar, header lines, scan polling and the shared click handling. */
+/* Folder explorer: boot, tabs, toolbar, header lines, scan polling, the jump from Search into Explore and the shared click handling. */
 
 import { getJSON, postJSON, authHeaders, ApiError } from './api.js';
 import { readPref, rootInfo, state, writePref, APP } from './state.js';
@@ -8,6 +8,7 @@ import { loadLargest } from './largest.js';
 import { loadTypes, typeOptions } from './types.js';
 import { loadRoots, renderRoots, scansStatus } from './scans.js';
 import { initSettings, openSettings } from './settings.js';
+import { initSearch, leaveSearch, loadSearch } from './search.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -19,7 +20,7 @@ import { initUsageLog } from './_vendored/usage-log/usage-log.js';
 const $ = (id) => document.getElementById(id);
 // The key the pre-paint boot script in index.html reads.
 const THEME_KEY = 'folder-explorer.theme';
-const PANES = { explore: 'paneExplore', largest: 'paneLargest', types: 'paneTypes', scans: 'paneScans' };
+const PANES = { search: 'paneSearch', explore: 'paneExplore', largest: 'paneLargest', types: 'paneTypes', scans: 'paneScans' };
 const LOADERS = { explore: loadExplore, largest: loadLargest, types: loadTypes };
 // How often the page re-reads scan progress while a scan runs.
 const POLL_MS = 2000;
@@ -110,6 +111,7 @@ function emptyFor(r) {
 async function renderActive() {
   if (!booted) return;
   const tab = state.tab;
+  if (tab === 'search') { await loadSearch(); return; }
   if (tab === 'scans') { renderRoots(); updateHeads(); return; }
   if (!dirty.has(tab)) return;
   const r = rootInfo();
@@ -137,6 +139,25 @@ async function resetRoot() {
   ['explore', 'largest', 'types'].forEach((t) => dirty.add(t));
   try { await renderToolbar(); } catch (e) { fail(e); }
   await renderActive();
+}
+
+/** Open Explore at one folder of one root: Search's "Show folder" and "Show in Explore". */
+async function showInExplore(nav, rootKey, folderId) {
+  const r = state.roots.find((x) => x.key === rootKey);
+  if (!r || !r.current) { showToast('That root has no finished scan yet'); return; }
+  state.root = rootKey;
+  writePref('root', rootKey);
+  resetExplore();
+  state.type = null;
+  state.scanId = r.current.id;
+  state.folder = folderId;
+  state.path = [];
+  state.folderName = '';
+  ['explore', 'largest', 'types'].forEach((t) => dirty.add(t));
+  try { await renderToolbar(); } catch (e) { fail(e); }
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  if (state.tab === 'explore') renderActive();
+  else nav.setTab('explore');
 }
 
 async function refreshRoots() {
@@ -284,14 +305,18 @@ async function showBuild() {
 async function boot() {
   const usage = initUsageLog({ headers: authHeaders });
   const onTab = (tab) => {
+    if (state.tab === 'search' && tab !== 'search') leaveSearch();
     state.tab = tab;
     placeToolbar(tab);
     renderActive();
   };
   // The usage log records each tab as a view: its trackView goes in by reference.
-  const nav = initNavTabs({ storageKey: APP + '.tab', onChange: both(usage.trackView, onTab) });
-  state.tab = document.querySelector('.tab.active') ? document.querySelector('.tab.active').dataset.tab : 'explore';
+  const nav = initNavTabs({ storageKey: APP + '.tab', defaultTab: 'search', onChange: both(usage.trackView, onTab) });
+  // A #search?mode=...&q=... link opens Search whatever tab was last open.
+  if (location.hash.startsWith('#search')) nav.setTab('search');
+  state.tab = document.querySelector('.tab.active') ? document.querySelector('.tab.active').dataset.tab : 'search';
   placeToolbar(state.tab);
+  initSearch({ nav, showInExplore: (root, folder) => showInExplore(nav, root, folder) });
   initExplore({ onSelect: onFolderSelected });
   initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
   bindTextSize($('textSizeControl'), APP);

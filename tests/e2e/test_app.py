@@ -9,8 +9,8 @@ from playwright.sync_api import Page, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 
-TABS = ("explore", "largest", "types", "scans")
-TITLES = {"explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
+TABS = ("search", "explore", "largest", "types", "scans")
+TITLES = {"search": "Search", "explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
 
 
 def _open(page: Page, app_url: str) -> list[str]:
@@ -18,6 +18,7 @@ def _open(page: Page, app_url: str) -> list[str]:
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.goto(app_url + "/")
+    page.locator('.tab[data-tab="explore"]').click()
     expect(page.locator("#tree .tree-row").first).to_be_visible()
     return errors
 
@@ -98,7 +99,7 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
 @pytest.mark.desktop_only
 def test_settings_show_remote_access_and_the_schedule(page: Page, app_url: str) -> None:
     _open(page, app_url)
-    page.locator(".open-settings").first.click()
+    page.locator("#paneExplore .open-settings").click()
     sheet = page.locator("#settingsDialog")
     expect(sheet).to_be_visible()
     expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")

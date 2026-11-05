@@ -4,14 +4,15 @@
 layer       = "working-web"
 icon        = "🗂️"
 port        = ":8453"
-description = "Disk-space explorer: folder tree, largest files and file types, cloud files by size or on disk."
+description = "Disk-space explorer and search: folder tree, largest files, file types, folder and email-archive search."
 depends_on  = ["project-scaffolding"]
 shape       = "webapp-tray"
 extra_roots = []
 
-# Explore is a tree with attribute columns, so it spans the window on desktop.
+# Explore is a tree with attribute columns and Search a list beside its preview,
+# so both span the window on desktop.
 [design]
-wide_views = ["explore"]
+wide_views = ["search", "explore"]
 
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
@@ -71,6 +72,9 @@ box_lock_gate = { src = "scripts/box_lock_gate.ps1", sha = "c8ec10d6ba57a5790fda
 [structure_ratchet]
 enabled  = true
 baseline = ".structure-ratchet-baseline.json"
+# docs/design holds self-contained reference pages (the search study and the
+# app mock-up, vendored CSS inlined), read in a browser, never run as code.
+exclude  = ["docs/design/**"]
 
 # [instruction_ratchet] -- the prompt-audit lint rules and size caps over CLAUDE.md,
 # AGENTS.md and any skill. Exit 3 fails the gate.
@@ -98,7 +102,7 @@ baseline = ".dead-code-ratchet-baseline.json"
 [static_ratchet]
 enabled  = true
 baseline = ".static-ratchet-baseline.json"
-exclude  = ["**/_vendored/**"]
+exclude  = ["**/_vendored/**", "docs/design/**"]
 
 # [docs_ratchet] -- the root README.md size budget and history markers (issue
 # references, dated or changelog headings) in README.md and docs/.

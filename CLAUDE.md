@@ -7,6 +7,7 @@ folder-explorer: a public, read-only disk-space explorer. FastAPI + a static PWA
 **Hard rules for the scan (do not relax):**
 
 - Metadata only. Never open, read or stat a file one by one; the directory-handle listing in `src/winfs.py` is the only reader.
+- The one scoped exception: "Show all" reads a `.msg` through `src/email/reader.py` (the only module that imports `extract_msg`; a test holds it), only inside `email.roots`, by row id, in a child process with a timeout. Nothing else opens a file.
 - Never hydrate a OneDrive placeholder: no call that reads file data, no `GetCompressedFileSizeW` per file, no thumbnail or content sniffing.
 - Junctions, symlinks and mount points are counted, never followed.
 - Scan output lives in the runtime-data folder (`src/runtime_data.py`), never in the repo.
@@ -40,9 +41,9 @@ No `.github/workflows/`: the local gate is the contract. Report CI as **unknown*
   - app/webapp/static/**/*.css
   - app/webapp/static/**/*.{js,html}
 - key views:
-  - /          (Explore, Largest, Types and Scans tabs, the bottom nav, the Settings sheet)
+  - /          (Search, Explore, Largest, Types and Scans tabs, the bottom nav, the Settings sheet)
 
-Each tab leads with its own vendored `home-head` (tab title + context line + theme toggle + Settings gear); the shared toolbar moves into the active tab after its header and is absent on Scans. Explore is a declared wide view (`.fleet.toml` `[design] wide_views`). Tokens in `app/webapp/static/tokens.css` follow `~/.claude/design.md` + `design.dark.md`; `/design-sync` reports drift. Every control carries a constant `data-track`, every `<dialog>` a `data-track-view`.
+Each tab leads with its own vendored `home-head` (tab title + context line + theme toggle + Settings gear); the shared toolbar moves into the active tab after its header and is absent on Search and Scans. Search and Explore are declared wide views (`.fleet.toml` `[design] wide_views`). Tokens in `app/webapp/static/tokens.css` follow `~/.claude/design.md` + `design.dark.md`; `/design-sync` reports drift. Every control carries a constant `data-track`, every `<dialog>` a `data-track-view`.
 
 ## Vendored components
 

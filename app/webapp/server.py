@@ -1,7 +1,8 @@
-"""The FastAPI app: the browse, scan and settings API, sign-in, and the static PWA.
+"""The FastAPI app: the browse, search, scan and settings API, sign-in, and the static PWA.
 
 Read-only over the disk: it lists folders through ``src/scanner.py`` and
-never moves, deletes or opens a file. Start it with ``python -m app.webapp``
+never moves or deletes a file. The one file it reads is a mail's ``.msg`` for
+"Show all", through ``src/email/reader.py`` in a child process. Start it with ``python -m app.webapp``
 (which picks the bind from the ``remote_access`` setting) or from the tray.
 """
 
@@ -26,8 +27,8 @@ from src.roots import resolve_roots
 from src.usage_log import usage_router
 from app.webapp import auth
 from app.webapp.build import BUILD_INFO, STATIC_DIR
-from app.webapp.routers import browse, scans, settings
-from app.webapp.state import POOL, refresh_pool
+from app.webapp.routers import browse, scans, search, settings
+from app.webapp.state import EMAILS, POOL, refresh_pool
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     scheduler.stop()
     POOL.close_all()
+    EMAILS.close()
 
 
 def create_app() -> FastAPI:
@@ -81,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router)
     app.include_router(browse.router)
     app.include_router(scans.router)
+    app.include_router(search.router)
     # Local-only view/tap log, under the same sign-in rule as every other route.
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
 

@@ -1,16 +1,18 @@
-"""Process-wide webapp state: the open-index pool and its housekeeping."""
+"""Process-wide webapp state: the open-index pool, the open email index, and their housekeeping."""
 
 from __future__ import annotations
 
 import logging
 
 from src import store
+from src.email.search import EmailIndexHolder
 from src.index import IndexPool
 from src.roots import Root
 
 logger = logging.getLogger(__name__)
 
 POOL = IndexPool()
+EMAILS = EmailIndexHolder()
 
 
 def current_files(roots: list[Root]) -> set[str]:

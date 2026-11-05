@@ -401,8 +401,9 @@ button.list-row .lr-name { font-weight: 600; }
 .scans-note:empty { display: none; }
 
 /* --------------------------------------------------------- settings rows */
-/* A full spacing step, so a switch's 9px hit expansion stays clear of the field under it. */
-.detail-card .row.row-stack { flex-direction: column; align-items: stretch; gap: var(--space-md); }
+.detail-card .row.row-stack { flex-direction: column; align-items: stretch; gap: var(--space-sm); }
+/* A switch's hit area reaches 9px past its track, so a field under it sits a little further down. */
+.detail-card .row-line:has(.switch-slot) + .input-native { margin-top: var(--space-xs); }
 .row-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .row-line > span:first-child { color: var(--ink); font-weight: 600; }
 .row-controls { display: inline-flex; align-items: center; gap: var(--space-sm); }

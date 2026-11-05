@@ -10,6 +10,7 @@ import { loadRoots, renderRoots, scansStatus } from './scans.js';
 import { initEmailScans, loadEmailScans } from './email-scans.js';
 import { initSettings, openSettings } from './settings.js';
 import { initSearch, leaveSearch, loadSearch } from './search.js';
+import { initArchive, startArchivePoll } from './archive.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -320,6 +321,7 @@ async function boot() {
   initSearch({ nav, showInExplore: (root, folder) => showInExplore(nav, root, folder) });
   initExplore({ onSelect: onFolderSelected });
   initEmailScans();
+  initArchive();
   initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
   bindTextSize($('textSizeControl'), APP);
   wireTheme();
@@ -334,6 +336,7 @@ async function boot() {
   } catch (e) {
     fail(e);
   }
+  startArchivePoll();
   window.addEventListener('pageshow', (e) => { if (e.persisted) refreshRoots().catch(fail); });
 }
 

@@ -42,6 +42,9 @@ function render(body) {
   $('rootsNote').textContent = (auto ? 'Scanning ' : 'One folder per line, saved when you leave the box. Scanning ') +
     state.roots.map((r) => r.name).join(', ') + '.';
   $('indexSize').textContent = fmtBytes(body.index_bytes) + ', kept on this PC';
+  $('outlookNote').textContent = body.archive.ready
+    ? 'Ready: the Archive button in Outlook files the open mail through this app.'
+    : body.archive.reason + '. The macro text is still here to copy.';
   if (document.activeElement !== $('excludeInput')) $('excludeInput').value = cfg.exclude.join('\n');
   setBasis(readPref('basis', 'size'));
 }

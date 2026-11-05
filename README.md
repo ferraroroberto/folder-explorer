@@ -2,7 +2,7 @@
 
 Where the space on your drives goes, and where a folder or an archived mail is. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type, and searches folder paths and an email archive's index. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. A scan never opens a file, so it never downloads one.
 
-FastAPI + a static PWA, a Windows tray, and the fleet design system. The app itself is read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search). The archive verbs, which another app runs on purpose, file Outlook mail into the email folders (see Archive verbs).
+FastAPI + a static PWA, a Windows tray, and the fleet design system. The app itself is read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search). Two things file Outlook mail into the email folders, both only on request: the Archive sheet and the Outlook macro on this PC (see Archive sheet), and the archive verbs another app runs (see Archive verbs).
 
 ## Install
 
@@ -12,7 +12,7 @@ Python 3.11+ on Windows.
 python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-tray.txt
 & .\.venv\Scripts\python.exe -m pip install -r requirements-email.txt   # optional: Show all for mails, the archive suggester
-& .\.venv\Scripts\python.exe -m pip install -r requirements-outlook.txt # optional: the Outlook archive verbs
+& .\.venv\Scripts\python.exe -m pip install -r requirements-outlook.txt # optional: the Archive sheet, the macro, the archive verbs
 copy config.example.json config.json   # optional: every key has a default
 ```
 
@@ -68,11 +68,28 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 
 - **Folders** searches every root's current index: a folder matches when its full path holds every word (split on spaces or `;`), so `alpha budget` finds `...\Alpha\2025\Budget`. A folder whose subfolders are named like email addresses shows once, with a count, and the display can hide the first N path components. Both are under Display, and saved in `folder_search`. An index from before folder search asks for a rescan.
 - **Emails** searches the email index read-only (this app's own, or another app's named by `email.index_path`: an SQLite file with the `emails` and `emails_fts` tables). Words and `"phrases"` search subject, sender, recipients and the indexed preview; `-word` excludes and `OR` takes either. Operators: `from:` `to:` `cc:` `with:` `subject:` `filename:` `has:attachment` `larger:5M` `after:` `before:` `newer_than:30d` `in:` `is:flagged` `is:done` `id:`. Every chip, filter and facet writes its operator into the box. An operator the index has no field for yet is listed as left out, never faked.
-- **Preview:** the indexed fields with the matches marked, and **Show all**, which reads the full mail. **Open in Outlook** (the archived `.msg`) and **Open in File Explorer** work on this PC only; every device gets Show folder (Explore at that folder) and Copy path.
+- **Preview:** the indexed fields with the matches marked, and **Show all**, which reads the full mail. **Open in Outlook** (the archived `.msg`), **Find in mailbox** (the live copy, looked up by Message-ID in the Inbox, the archive folder and Sent Items, and opened in its own window) and **Open in File Explorer** work on this PC only; every device gets Show folder (Explore at that folder) and Copy path.
 - **Saved searches** sit under the box (stored in `state.sqlite3`; relative dates stay relative); the last 10 searches show when the box is empty, per device.
 - **Keyboard:** `/` the box, `↓` or `j`/`k` the results, `Enter` preview, `a` Show all, `o` Outlook, `f` folder, `Esc` back.
 
 **Reading a mail.** Show all is the one place the app opens a file. It reads a `.msg` only when it sits inside the configured email folders (`email.roots`, each inside a scan root), looks the path up by the mail's row id (never a path from the client), and reads it in a child process with a 30 s timeout. Reading an online-only OneDrive mail downloads it, and the button says so. An HTML body is cleaned and shown in a sandboxed frame that loads nothing remote. Bodies are never stored. It needs `requirements-email.txt`; without it, Search works and Show all says why it is off.
+
+## Archive sheet and the Outlook macro (this PC)
+
+**Archive the open mail**, the first card on Search in email mode, opens the Archive sheet for the mail open or selected in Outlook (classic): its suggested folders with why (same subject, sender, topic), another email folder found by name, the Outlook category (or none) and the file name it will get. **Archive** saves the `.msg` and its attachments into that folder, tags the mail, and indexes the folder; it never moves the mail in Outlook (that is the `apply` verb's job). A mail already in the index is not filed twice.
+
+The **Outlook macro** puts the same flow on Outlook's ribbon. It starts `pythonw -m app.outlook archive --entry-id <id> --store-id <id>` hidden and returns at once, so Outlook never waits. The entry fetches the mail again by those ids, then hands it to the Archive sheet of a page open on this PC; with no page open, a small window shows the same suggestions. Failures say which case they are: Outlook not reachable, no mail selected, the mail moved, no email folder mounted, pywin32 not installed.
+
+- Every Outlook step runs `python -m app.outlook` in its own process with a timeout (the web server makes no COM call), attaches to the running Outlook and never starts one. Filing writes only inside `email.roots`. The verbs log to `outlook.log` in the runtime-data folder.
+- Needs `requirements-outlook.txt` (pywin32) and Outlook (classic); otherwise the card says why it is off. The new Outlook for Windows runs neither macros nor COM.
+- `FOLDER_EXPLORER_OUTLOOK=off` keeps a process from starting the bridge at all (the e2e suite's disposable instance sets it).
+
+Set the macro up once per PC:
+
+1. Set the user environment variable `FOLDER_EXPLORER_HOME` to this checkout's folder (System Properties → Environment Variables), then restart Outlook so it sees it.
+2. In Outlook (classic), press Alt+F11, then **File → Import File…** and pick `assets/ArchiveMacro.bas` (or paste the text from Settings → Outlook macro → Copy into a new module).
+3. **File → Options → Customize Ribbon**: add a custom group, choose **Macros** in "Choose commands from", add `ArchiveCurrentItem` and rename it **Archive**.
+4. If macros are blocked, allow them for this project in **Trust Center → Macro Settings** (or sign it with a self-made certificate from `SelfCert.exe`).
 
 ## Archive verbs (Outlook)
 
@@ -91,6 +108,7 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 - **Largest:** the 10 largest files under the selected folder, and how much of it the largest 1, 5 or 10 percent of files hold, grouped by subfolder.
 - **Types:** bytes, count and share per extension; tap a type to filter every tab to it.
 - **Scans:** each root's last scan, live progress, and Rescan.
+- **Archive sheet and the Outlook macro:** file the open mail from Search or from Outlook's ribbon, with the folder suggestions and why (see Archive sheet).
 - **Archive verbs:** the headless Outlook archive another app drives, with a folder suggester that puts a folder already holding the thread first and scores each folder by its best match (see Archive verbs).
 - **Size / On disk** toggle for every total; online-only files carry a cloud mark.
 - Phone and desktop layouts, light and dark, text size, and the fleet's bottom-tab navigation; the build line in the footer.

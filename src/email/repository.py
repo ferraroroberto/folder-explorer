@@ -161,6 +161,14 @@ class EmailRepository:
                 out.append(FolderSuggestion(folder, score, counts[folder], self.sample_subjects(folder)))
         return out[:max_results]
 
+    def count_from_sender(self, folder_path: str, sender: str) -> int:
+        """How many of the folder's mails came from ``sender``, case-blind; 0 for a blank sender."""
+        if not sender:
+            return 0
+        row = self._conn.execute("SELECT COUNT(*) FROM emails WHERE folder_path = ? AND sender = ? COLLATE NOCASE",
+                                 (folder_path, sender)).fetchone()
+        return int(row[0])
+
     def sample_subjects(self, folder_path: str) -> list[str]:
         """The folder's five newest distinct subjects."""
         rows = self._conn.execute(

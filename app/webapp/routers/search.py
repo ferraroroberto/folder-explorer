@@ -1,9 +1,10 @@
 """Search: folders over every root's index, emails over the email index, and one mail's preview.
 
-Reads only, with two narrow exceptions behind their own checks: "Show all"
+Reads only, with narrow exceptions behind their own checks: "Show all"
 reads a mail's ``.msg`` (looked up by row id, never a client path, and only
 inside the email folders) in a child process, and the PC-only actions open a
-mail in Outlook or a folder in File Explorer for loopback callers.
+mail in Outlook, its live copy (Find in mailbox, through the Outlook bridge's
+child) or a folder in File Explorer for loopback callers.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from src.email.search import PAGE, SORTS, EmailIndex
 from src.email.settings import EmailPart, email_part, is_under, under_any
 from src.roots import Root, resolve_roots
 from app.webapp.auth import is_pc_itself
+from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.state import EMAILS, POOL
 
 router = APIRouter(prefix="/api")
@@ -81,6 +83,7 @@ def status(request: Request) -> dict[str, Any]:
         "folders": {"ready": bool(scanned), "reason": None if scanned else "no root has a finished scan yet"},
         "emails": emails,
         "outlook": {"ready": pc and outlook, "reason": None if outlook else "Outlook (classic) isn't installed on this PC"},
+        "archive": archive_status(cfg, pc),
         "folder_search": cfg["folder_search"],
     }
 
@@ -184,6 +187,21 @@ def open_email(row_id: int, request: Request) -> dict[str, str]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"status": "opened"}
+
+
+@router.post("/emails/{row_id}/find")
+def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
+    """Find in mailbox: open the live copy of an archived mail in Outlook, looked up by its Message-ID."""
+    _pc_only(request)
+    index = _emails()
+    try:
+        with index.lock:
+            message_id = index.email(row_id)["message_id"]
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="no such email in the index") from exc
+    if not message_id:
+        raise HTTPException(status_code=422, detail="this mail has no Message-ID to look it up by")
+    return bridge(["show", "--message-id=" + message_id], SHOW_TIMEOUT_S)
 
 
 @router.post("/folders/open")

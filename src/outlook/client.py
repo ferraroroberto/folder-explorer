@@ -506,6 +506,20 @@ class OutlookClient(DraftSurface):
             return None
         return self._find_in_folder(self._sent_items(), message_id)
 
+    def find_live_copy(self, message_id: str, archive_folder: str) -> Any | None:
+        """The mail with this Message-ID in the Inbox, the archive folder or Sent Items, or ``None``.
+
+        For Find in mailbox: an archived mail's live copy is wherever ``apply``
+        left it. The archive folder is looked up, never created.
+        """
+        if not message_id:
+            return None
+        for folder in (self._inbox(), self._named_folder(archive_folder, create=False), self._sent_items()):
+            found = self._find_in_folder(folder, message_id)
+            if found is not None:
+                return found
+        return None
+
     def _find_in_folder(self, folder: Any, message_id: str) -> Any | None:
         if folder is None:
             return None

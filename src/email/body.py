@@ -58,7 +58,8 @@ class Body:
 Runner = Callable[[list[str], float], "subprocess.CompletedProcess[str]"]
 
 
-def _run(cmd: list[str], timeout: float) -> "subprocess.CompletedProcess[str]":
+def run_child(cmd: list[str], timeout: float) -> "subprocess.CompletedProcess[str]":
+    """Run one of this app's own modules as a windowless child from the repo root, its stdout captured as UTF-8."""
     env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     return subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True, encoding="utf-8",
                           timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL)
@@ -68,7 +69,7 @@ def failed(code: str, detail: str = "") -> Body:
     return Body(False, error=code, message=MESSAGES.get(code, detail or "The mail couldn't be read."))
 
 
-def fetch_body(path: str, timeout: float = READ_TIMEOUT_S, run: Runner = _run) -> Body:
+def fetch_body(path: str, timeout: float = READ_TIMEOUT_S, run: Runner = run_child) -> Body:
     """Read ``path`` through the reader child; every failure comes back as its own code."""
     name = os.path.basename(path)
     try:

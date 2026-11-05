@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
 from src import config, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
+from app.webapp.auth import is_pc_itself
 from app.webapp.bind import resolve_bind
+from app.webapp.routers.archive import archive_status
 from app.webapp.build import BUILD_INFO
 
 router = APIRouter()
@@ -35,7 +37,7 @@ def _index_bytes() -> int:
     return total
 
 
-def settings_body() -> dict[str, Any]:
+def settings_body(pc: bool) -> dict[str, Any]:
     cfg = config.load()
     wanted = resolve_bind(cfg)
     running = effective_state()
@@ -49,6 +51,7 @@ def settings_body() -> dict[str, Any]:
             "password_set": bool(get_secret(PASSWORD_VAR) and get_secret(TOKEN_VAR)),
         },
         "index_bytes": _index_bytes(),
+        "archive": archive_status(cfg, pc),
     }
 
 
@@ -63,16 +66,16 @@ def version() -> dict[str, str]:
 
 
 @router.get("/api/config")
-def get_config() -> dict[str, Any]:
-    return settings_body()
+def get_config(request: Request) -> dict[str, Any]:
+    return settings_body(is_pc_itself(request))
 
 
 @router.post("/api/config")
-def post_config(updates: dict[str, Any] = Body(...)) -> JSONResponse:
+def post_config(request: Request, updates: dict[str, Any] = Body(...)) -> JSONResponse:
     try:
         config.save(updates)
     except ValueError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
-    return JSONResponse(settings_body())
+    return JSONResponse(settings_body(is_pc_itself(request)))
 
 

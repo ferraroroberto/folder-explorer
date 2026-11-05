@@ -1,6 +1,7 @@
 # BEGIN vendored-copies (generated from .fleet.toml [vendored]; edit the manifest, not this block)
 /app/tray/single_instance.py
 /app/tray/watchdog.py
+/app/webapp/serve.py
 /app/webapp/static/_vendored/action-row
 /app/webapp/static/_vendored/base
 /app/webapp/static/_vendored/button
@@ -8,10 +9,11 @@
 /app/webapp/static/_vendored/empty-state
 /app/webapp/static/_vendored/home-head
 /app/webapp/static/_vendored/icon-button
-/app/webapp/static/_vendored/icons/icons.js
+/app/webapp/static/_vendored/icons
 /app/webapp/static/_vendored/modal
 /app/webapp/static/_vendored/nav
 /app/webapp/static/_vendored/page-foot
+/app/webapp/static/_vendored/row-menu
 /app/webapp/static/_vendored/segmented
 /app/webapp/static/_vendored/select-native
 /app/webapp/static/_vendored/sign-in
@@ -36,7 +38,9 @@
 /scripts/usage_track_scan.py
 /src/build_info.py
 /src/compression.py
+/src/login_lockout.py
 /src/no_window.py
+/src/notify
 /src/pooled_http.py
 /src/runtime_data.py
 /src/usage_log.py

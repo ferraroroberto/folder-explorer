@@ -99,7 +99,7 @@ function treeRow(n, depth, share, open, sel) {
       ? '<button type="button" class="icon-button tree-twisty" data-act="toggle" data-id="' + n.id + '" aria-expanded="' + open +
         '" aria-label="' + (open ? 'Collapse ' : 'Expand ') + esc(n.name) + '" data-track="tree-expand">' + glyph('chevron-right') + '</button>'
       : '<span class="tree-spacer" aria-hidden="true"></span>') +
-    '<button type="button" class="tree-main" data-act="select" data-open="folder" data-id="' + n.id + '"' + (sel ? ' aria-current="true"' : '') + ' data-track="tree-select">' +
+    '<button type="button" class="tree-main" data-act="select" data-open="folder" data-id="' + n.id + '" title="' + esc(n.name) + '"' + (sel ? ' aria-current="true"' : '') + ' data-track="tree-select">' +
     '<span class="tree-name">' + glyph('folder') + '<span class="tree-label">' + esc(n.name) + '</span>' + hiddenMark(n.hidden) + '</span>' +
     '<span class="tree-size">' + fmtBytes(val(n)) + '</span>' +
     '<span class="tree-meta"><span class="tree-files">' + fmtNum(n.files) + '<span class="tree-unit">' + (n.files === 1 ? ' file' : ' files') + '</span></span><span class="sep"> · </span><span class="tree-share">' + fmtPct(share) + '</span></span>' +

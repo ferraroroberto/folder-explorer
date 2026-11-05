@@ -160,6 +160,15 @@ body {
   overflow-wrap: anywhere;
 }
 .contents-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs); }
+.hidden-toggle { display: inline-flex; align-items: center; gap: var(--space-sm); margin-left: auto; font-size: var(--font-body-sm); color: var(--muted); }
+.contents-note { margin: 0 0 var(--space-xs); font-size: var(--font-body-sm); color: var(--muted); }
+/* A contents row is the row itself plus its trailing kebab, under one hairline. */
+.rows > li.row-item { display: flex; align-items: center; border-top: 1px solid var(--line-muted); }
+.rows > li.row-item:first-child { border-top: 0; }
+.row-item > .list-row { flex: 1; min-width: 0; border-top: 0; }
+.row-item > .row-kebab { flex: none; }
+/* A double-click opens the file, so it must not also select its name. */
+.list-row[data-open="file"] { -webkit-user-select: none; user-select: none; }
 .list-row {
   font: inherit;
   line-height: normal;
@@ -290,7 +299,7 @@ button.list-row .lr-name { font-weight: 600; }
   .col-head > span { text-align: right; }
   .tree-cols > span:first-child, .list-cols > span:nth-child(-n+2) { text-align: left; }
   .tree-cols { grid-template-columns: minmax(0, 1fr) 44px 44px 72px 76px; padding-left: calc(var(--space-md) + var(--hit-min)); }
-  .list-cols { grid-template-columns: var(--icon-inline) minmax(0, 1fr) 64px 92px 48px 80px; }
+  .list-cols { grid-template-columns: var(--icon-inline) minmax(0, 1fr) 64px 92px 48px 80px; padding-right: var(--hit-min); }
 
   .tree-row { min-height: var(--row-sm); }
   .tree-main {

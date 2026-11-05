@@ -46,6 +46,9 @@ DEFAULTS: dict[str, Any] = {
     # Folder search: how many leading path components a result hides (display
     # only) and whether a folder of per-person subfolders shows as one result.
     "folder_search": {"skip_levels": 0, "prune_people": True},
+    # Explore: whether hidden and system items are listed. Off by default, as
+    # in File Explorer; the totals count them either way.
+    "explore": {"show_hidden": False},
     # The archive verbs (python -m app.cli email batch): the file-name form
     # (date_prefix true, false or "auto" to follow the destination folder),
     # the longest path the archiver writes, and the folder suggester's limits.
@@ -94,6 +97,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["exclude"] = _clean_paths(raw.get("exclude"))
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
+    cfg["explore"] = _clean_explore(raw.get("explore"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
@@ -161,6 +165,13 @@ def _clean_folder_search(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_explore(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["explore"])
+    if isinstance(raw, dict) and isinstance(raw.get("show_hidden"), bool):
+        out["show_hidden"] = raw["show_hidden"]
+    return out
+
+
 def load() -> dict[str, Any]:
     """The effective settings: the file's valid keys over the defaults."""
     path = config_path()
@@ -198,6 +209,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             value = _validate_email(value)
         if key == "folder_search":
             value = _validate_folder_search(value)
+        if key == "explore":
+            if not (isinstance(value, dict) and set(value) == {"show_hidden"} and isinstance(value["show_hidden"], bool)):
+                raise ValueError("explore takes show_hidden, true or false")
         out[key] = value
     return out
 

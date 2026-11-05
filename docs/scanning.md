@@ -32,13 +32,15 @@ One SQLite file per finished scan, `index/<root>-<scan id>.sqlite3` in the runti
 
 | Table | Rows |
 | --- | --- |
-| `folders` | id, parent, name, depth, `lo`/`hi`, and subtree totals: size, alloc, files, folders, online-only files and bytes, listing errors |
-| `files` | folder id, name, extension, size, alloc, attributes, modified time |
+| `folders` | id, parent, name, depth, `lo`/`hi`, subtree totals (size, alloc, files, folders, online-only files and bytes, listing errors), and `hidden` |
+| `files` | folder id, name, extension, size, alloc, attributes, modified time, and `hidden` |
 | `folder_ext` | per folder and extension, the folder's *own* files: size, alloc, count, online-only count and bytes; a subtree's type totals sum a range of it |
 | `folder_paths` | each folder's full path, case-folded with `/` separators: what folder search matches every word against |
 | `folder_people` | folders holding subfolders named like email addresses, with how many: folder search's "folder of people" |
 
 Folder search scans `folder_paths` with `instr`: on 200,000 invented paths that answers in about 30 ms, where a trigram FTS index would triple the index size for little gain. An index written before these two tables existed answers folder search with "rescan".
+
+`hidden` is 0 for a visible item, 1 for one with the hidden or system attribute (both come with the listing, so nothing extra is read), and 2 for anything inside a hidden folder. Explore leaves out every nonzero row unless its Hidden items switch is on. The totals count every row either way. An index from before the column lists everything, and Explore says a rescan would tell hidden items apart.
 
 The index is built as `<name>.part` and renamed into place only when the walk finishes. `state.sqlite3` records each scan (root, trigger, live counters while it runs, status, index file); a root's current index is its newest scan that finished `ok`. A failed or interrupted scan leaves the previous index in place, and the page flags the root. Replaced index files are deleted once no reader has them open.
 

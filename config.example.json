@@ -15,6 +15,9 @@
     "skip_levels": 0,
     "prune_people": true
   },
+  "explore": {
+    "show_hidden": false
+  },
   "archive": {
     "date_prefix": false,
     "max_path_length": 255,

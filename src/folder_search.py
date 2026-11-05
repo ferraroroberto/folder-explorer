@@ -60,6 +60,20 @@ def full_path(root: Root, names: list[str]) -> str:
     return os.path.join(root.path, *names) if names else root.path
 
 
+def item_path(root: Root, index: Index, kind: str, item_id: int) -> str:
+    """A folder's or a file's path on disk, from its id in the root's index; ``KeyError`` when there is none.
+
+    The path is built from the root's own path and the names the scan
+    recorded below it, so it never leaves the root.
+    """
+    if kind == "folder":
+        index.folder(item_id)
+        return full_path(root, [p["name"] for p in index.path(item_id)][1:])
+    row = index.file_row(item_id)
+    folder = int(row["folder_id"])
+    return os.path.join(full_path(root, [p["name"] for p in index.path(folder)][1:]), row["name"])
+
+
 def search_root(root: Root, index: Index, terms: list[str], prune: bool, skip: int) -> dict[str, Any]:
     """One root's matching folders, ranked, plus whether the candidate cap cut the list."""
     if not index.searchable():

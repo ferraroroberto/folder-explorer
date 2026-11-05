@@ -5,8 +5,9 @@ Shape `webapp-tray` (see `.fleet.toml`).
 ```
 folder-explorer/
 ├── app/                        # entry points and the web layer
-│   ├── cli/__main__.py         # `python -m app.cli scan|roots|email`: scans and the email index with no app running
+│   ├── cli/__main__.py         # `python -m app.cli scan|roots|email|folders`: scans and the email index with no app running
 │   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
+│   ├── cli/folders.py          # `folders search --json`: folder search for another app, one JSON document
 │   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
 │   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
 │   ├── archive_window.py       # the macro's fallback Archive window (Tk) when no page is open on this PC

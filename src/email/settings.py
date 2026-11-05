@@ -1,9 +1,12 @@
-"""The email part's settings: where the index is, which folders may be read, and whether it can run here.
+"""The email part's settings: which index, which folders, and whether each piece can run here.
 
-Email search turns on when ``email.index_path`` names an existing index.
-"Show all" also needs the email folders (``email.roots``), each inside a scan
-root, and the reader's ``extract-msg`` package (``requirements-email.txt``).
-A part that cannot run says why in its own words, never with an empty result.
+``email.roots`` are the email folders, each inside a scan root. With
+``email.index_path`` null (the default) the app keeps its own index in the
+runtime-data folder: the email stage fills it from those folders and search
+reads it. A path instead names another app's index, which search reads and
+nothing here writes. "Show all" and the stage need the reader's
+``extract-msg`` (``requirements-email.txt``). A piece that cannot run says why
+in its own words, never with an empty result.
 """
 
 from __future__ import annotations
@@ -14,7 +17,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from src.email.schema import own_index_path
 from src.roots import Root, normalize
+
+MB = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -27,6 +33,11 @@ class EmailPart:
     problem: Optional[str] = None
     # Why "Show all" is off, or None when it can read a mail.
     reader_problem: Optional[str] = None
+    # True when the index is this app's own, which the email stage writes.
+    own: bool = True
+    budget_bytes: int = 0
+    # Why the email stage cannot run, or None when it can.
+    stage_problem: Optional[str] = None
 
     @property
     def ready(self) -> bool:
@@ -53,17 +64,18 @@ def email_part(cfg: dict[str, Any], scan_roots: list[Root]) -> EmailPart:
     email = cfg.get("email") or {}
     raw_path = email.get("index_path")
     roots = list(email.get("roots") or [])
-    if not raw_path:
-        return EmailPart(None, roots, "no email index is set (email.index_path)", "email search is off")
-    path = Path(os.path.expandvars(os.path.expanduser(raw_path)))
-    problem = None if path.is_file() else "the email index was not found: " + path.name
     outside = [r for r in roots if not under_any(r, [s.path for s in scan_roots])]
-    if not roots:
-        reader = "no email folders are set (email.roots)"
-    elif outside:
-        reader = "an email folder is outside every scan root: " + outside[0]
-    elif not reader_installed():
-        reader = "extract-msg isn't installed (requirements-email.txt)"
+    folders_problem = ("no email folders are set (email.roots)" if not roots
+                       else "an email folder is outside every scan root: " + outside[0] if outside else None)
+    reader = folders_problem or (None if reader_installed() else "extract-msg isn't installed (requirements-email.txt)")
+    own = not raw_path
+    path = own_index_path() if own else Path(os.path.expandvars(os.path.expanduser(str(raw_path))))
+    if path.is_file():
+        problem = None
+    elif own:
+        problem = folders_problem or "the email index isn't built yet: Index emails now in Scans, or import one"
     else:
-        reader = None
-    return EmailPart(path, roots if not outside else [], problem, reader)
+        problem = "the email index was not found: " + path.name
+    stage = ("email.index_path names another app's index, which this app never writes" if not own else reader)
+    return EmailPart(path, roots if not outside else [], problem, reader, own,
+                     int(email.get("download_budget_mb") or 0) * MB, stage)

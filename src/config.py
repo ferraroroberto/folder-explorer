@@ -34,11 +34,15 @@ DEFAULTS: dict[str, Any] = {
     # app-launcher job runs the CLI, and the two must never double-run.
     "schedule": "off",
     "schedule_time": "03:00",
-    # Email search reads an email index (an SQLite file with the emails and
-    # emails_fts tables) read-only. index_path null turns email search off;
-    # roots are the email folders "Show all" may read a .msg from, each
-    # inside a scan root.
-    "email": {"index_path": None, "roots": []},
+    # Folders the walk skips, whatever root they sit in: the disk index,
+    # folder search and the email stage all leave them out.
+    "exclude": [],
+    # The email part. roots are the email folders, each inside a scan root:
+    # the email stage indexes their .msg files and "Show all" reads one.
+    # index_path null means this app's own index in the runtime-data folder;
+    # a path names another app's index, read-only, and the stage stays off.
+    # download_budget_mb caps what one run downloads from OneDrive (0: never).
+    "email": {"index_path": None, "roots": [], "download_budget_mb": 2048},
     # Folder search: how many leading path components a result hides (display
     # only) and whether a folder of per-person subfolders shows as one result.
     "folder_search": {"skip_levels": 0, "prune_people": True},
@@ -46,6 +50,9 @@ DEFAULTS: dict[str, Any] = {
 
 # The most leading components folder search may hide.
 MAX_SKIP_LEVELS = 8
+# The largest per-run download budget Settings accepts, in MB.
+MAX_BUDGET_MB = 1024 * 1024
+_EMAIL_KEYS = {"index_path", "roots", "download_budget_mb"}
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -71,21 +78,27 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
         cfg["schedule"] = raw["schedule"]
     if isinstance(raw.get("schedule_time"), str) and _TIME_RE.match(raw["schedule_time"]):
         cfg["schedule_time"] = raw["schedule_time"]
+    cfg["exclude"] = _clean_paths(raw.get("exclude"))
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
     return cfg
 
 
+def _clean_paths(raw: Any) -> list[str]:
+    return [r.strip() for r in raw if isinstance(r, str) and r.strip()] if isinstance(raw, list) else []
+
+
 def _clean_email(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = {"index_path": None, "roots": []}
+    out: dict[str, Any] = dict(DEFAULTS["email"])
     if not isinstance(raw, dict):
         return out
     path = raw.get("index_path")
     if isinstance(path, str) and path.strip():
         out["index_path"] = path.strip()
-    roots = raw.get("roots")
-    if isinstance(roots, list):
-        out["roots"] = [r.strip() for r in roots if isinstance(r, str) and r.strip()]
+    out["roots"] = _clean_paths(raw.get("roots"))
+    budget = raw.get("download_budget_mb")
+    if isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB:
+        out["download_budget_mb"] = budget
     return out
 
 
@@ -130,6 +143,10 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             if value is not None and not (isinstance(value, list) and all(isinstance(r, str) and r.strip() for r in value)):
                 raise ValueError("roots must be null or a list of folder paths")
             value = [r.strip() for r in value] if value else None
+        if key == "exclude":
+            if not (isinstance(value, list) and all(isinstance(r, str) for r in value)):
+                raise ValueError("exclude must be a list of folder paths")
+            value = _clean_paths(value)
         if key == "email":
             value = _validate_email(value)
         if key == "folder_search":
@@ -139,14 +156,17 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_email(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) - {"index_path", "roots"}:
-        raise ValueError("email takes index_path and roots")
+    if not isinstance(value, dict) or set(value) - _EMAIL_KEYS:
+        raise ValueError("email takes index_path, roots and download_budget_mb")
     path = value.get("index_path")
     if path is not None and not isinstance(path, str):
         raise ValueError("email.index_path must be a file path or null")
     roots = value.get("roots", [])
     if not (isinstance(roots, list) and all(isinstance(r, str) for r in roots)):
         raise ValueError("email.roots must be a list of folder paths")
+    budget = value.get("download_budget_mb", DEFAULTS["email"]["download_budget_mb"])
+    if not (isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB):
+        raise ValueError("email.download_budget_mb must be a whole number of MB, 0 or more")
     return _clean_email(value)
 
 

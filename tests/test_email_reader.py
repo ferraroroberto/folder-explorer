@@ -77,8 +77,9 @@ def test_email_folders_must_sit_inside_a_scan_root(tmp_path: Path) -> None:
     inside = email_part({"email": {"index_path": str(index), "roots": [str(tmp_path / "Drive" / "Mail")]}}, roots)
     outside = email_part({"email": {"index_path": str(index), "roots": [str(tmp_path / "Elsewhere")]}}, roots)
     off = email_part({"email": {"index_path": None, "roots": []}}, roots)
-    assert inside.ready and inside.roots
+    assert inside.ready and inside.roots and not inside.own
     assert outside.roots == [] and "outside every scan root" in str(outside.reader_problem)
-    assert not off.ready and "email.index_path" in str(off.problem)
+    assert not off.ready and "email.roots" in str(off.problem) and off.own
+    assert "never writes" in str(inside.stage_problem)
     assert is_under(str(tmp_path / "Drive" / "Mail" / "a.msg"), str(tmp_path / "drive"))
     assert not is_under(str(tmp_path / "Drive2"), str(tmp_path / "Drive"))

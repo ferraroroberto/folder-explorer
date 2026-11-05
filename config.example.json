@@ -5,9 +5,11 @@
   "roots": null,
   "schedule": "off",
   "schedule_time": "03:00",
+  "exclude": [],
   "email": {
     "index_path": null,
-    "roots": []
+    "roots": [],
+    "download_budget_mb": 2048
   },
   "folder_search": {
     "skip_levels": 0,

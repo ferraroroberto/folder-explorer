@@ -28,7 +28,6 @@ def setup(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     mail = drive / "Mail"
     index = build_email_index(isolated / "emails.db", mail)
     write_config(isolated, roots=[str(drive)], email={"index_path": str(index), "roots": [str(mail)]})
-    monkeypatch.setattr("src.email.settings.reader_installed", lambda: True)
     EMAILS.close()
     with TestClient(app, client=LOCAL) as c:
         assert c.post("/api/scan", json={}).status_code == 202
@@ -36,6 +35,7 @@ def setup(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             if not c.get("/api/scan").json()["scanning"]:
                 break
             time.sleep(0.05)
+    monkeypatch.setattr("src.email.settings.reader_installed", lambda: True)
     yield isolated
     EMAILS.close()
 
@@ -44,7 +44,7 @@ def test_status_says_why_a_part_is_off(isolated: Path) -> None:
     EMAILS.close()
     with TestClient(app, client=LOCAL) as c:
         body = c.get("/api/search/status").json()
-        assert body["emails"]["ready"] is False and "email.index_path" in body["emails"]["reason"]
+        assert body["emails"]["ready"] is False and "email.roots" in body["emails"]["reason"]
         assert body["folders"]["ready"] is False and body["pc"] is True
         assert c.get("/api/search/emails", params={"q": "x"}).status_code == 503
 

@@ -13,9 +13,11 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from src import config, store
+from src.email import indexer
+from src.email.settings import email_part
 from src.roots import Root, resolve_roots
 from src.scan_lock import ScanBusy, ScanLock
-from src.scanner import scan_to_index
+from src.scanner import exclude_keys, scan_to_index
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ def lock() -> ScanLock:
     return ScanLock(store.data_dir() / "scan.lock")
 
 
-def _scan_root(root: Root, trigger: str) -> dict[str, Any]:
+def _scan_root(root: Root, trigger: str, exclude: frozenset[str] = frozenset()) -> dict[str, Any]:
     scan_id = store.begin_scan(root.key, root.path, trigger)
     index_name = store.index_name(root.key, scan_id)
     last = [0.0]
@@ -42,7 +44,8 @@ def _scan_root(root: Root, trigger: str) -> dict[str, Any]:
     logger.info("ℹ️ scan %d started: root %s", scan_id, root.key)
     t0 = time.monotonic()
     try:
-        counters = scan_to_index(root.path, store.index_dir() / index_name, root_name=root.name, on_progress=progress)
+        counters = scan_to_index(root.path, store.index_dir() / index_name, root_name=root.name, on_progress=progress,
+                                 exclude=exclude)
     except Exception as exc:  # noqa: BLE001 -- a failed root must not stop the others
         logger.warning("⚠️ scan %d of root %s failed: %s", scan_id, root.key, exc)
         store.finish_scan(scan_id, store.STATUS_FAILED, {}, None, str(exc))
@@ -50,8 +53,8 @@ def _scan_root(root: Root, trigger: str) -> dict[str, Any]:
     store.finish_scan(scan_id, store.STATUS_OK, counters.as_dict(), index_name)
     elapsed = time.monotonic() - t0
     logger.info(
-        "✅ scan %d of root %s: %d folders, %d files, %d errors, %d links skipped in %.1f s",
-        scan_id, root.key, counters.folders, counters.files, counters.errors, counters.skipped_links, elapsed,
+        "✅ scan %d of root %s: %d folders, %d files, %d errors, %d links skipped, %d excluded in %.1f s",
+        scan_id, root.key, counters.folders, counters.files, counters.errors, counters.skipped_links, counters.excluded, elapsed,
     )
     return {"root": root.key, "status": store.STATUS_OK, "files": counters.files, "seconds": round(elapsed, 1)}
 
@@ -63,7 +66,9 @@ def run_scans(root_keys: Optional[list[str]] = None, trigger: str = "cli", held:
     caller already took the lock (the app takes it before answering the
     request, so a second click gets its 409 straight away).
     """
-    roots = resolve_roots(config.load()["roots"])
+    cfg = config.load()
+    roots = resolve_roots(cfg["roots"])
+    exclude = exclude_keys(cfg["exclude"])
     if root_keys:
         wanted = set(root_keys)
         unknown = wanted - {r.key for r in roots}
@@ -79,11 +84,24 @@ def run_scans(root_keys: Optional[list[str]] = None, trigger: str = "cli", held:
             logger.info("ℹ️ marked %d scan(s) left running by a stopped process as interrupted", settled)
         for stale in store.index_dir().glob("*.part"):
             stale.unlink(missing_ok=True)
-        results = [_scan_root(r, trigger) for r in roots]
+        results = [_scan_root(r, trigger, exclude) for r in roots]
         store.prune_indexes()
         return results
     finally:
         guard.release()
+
+
+def index_emails_after(trigger: str) -> None:
+    """Run the email stage in its own process once the disk walk let go of its lock, and wait for it."""
+    cfg = config.load()
+    if email_part(cfg, resolve_roots(cfg["roots"])).stage_problem is not None:
+        return
+    try:
+        code = indexer.spawn(trigger).wait()
+    except OSError as exc:
+        logger.warning("⚠️ the email stage could not start: %s", exc)
+        return
+    logger.info("ℹ️ email stage after the %s scan exited %d", trigger, code)
 
 
 def settle_if_idle() -> bool:
@@ -116,8 +134,9 @@ def start_background(root_keys: Optional[list[str]], trigger: str, on_done: Opti
         finally:
             if guard.held:
                 guard.release()
-            if on_done is not None:
-                on_done()
+        index_emails_after(trigger)
+        if on_done is not None:
+            on_done()
 
     thread = threading.Thread(target=work, name="folder-explorer-scan", daemon=True)
     thread.start()

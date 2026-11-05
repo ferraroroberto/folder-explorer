@@ -46,6 +46,7 @@
 <link rel="stylesheet" href="/static/_vendored/text-size/text-size.css">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/search.css">
+<link rel="stylesheet" href="/static/email-scans.css">
 <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
 </head>
 <body>
@@ -443,6 +444,35 @@
         <button type="button" class="button-tint" id="rescanAll" data-track="rescan-all">Rescan all roots</button>
       </div>
     </div>
+    <div class="card" id="emailCard" hidden>
+      <div class="card-head">
+        <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Email index</h2>
+        <span class="card-head-meta" id="emailMeta"></span>
+        <button type="button" class="icon-button" id="emailInfo" aria-label="What the email stage reads" title="What the email stage reads" data-track="email-info">
+          <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+        </button>
+      </div>
+      <div class="email-stats" id="emailStats"></div>
+      <div class="email-budget">
+        <span>OneDrive downloads per run</span>
+        <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
+          <option value="0">None (local only)</option>
+          <option value="512">512 MB</option>
+          <option value="2048">2 GB</option>
+          <option value="5120">5 GB</option>
+        </select>
+      </div>
+      <p class="row-note email-note" id="emailNote"></p>
+      <div class="scoped">
+        <select class="select-native" id="emailScope" aria-label="Email folder to index" data-track="email-scope"></select>
+        <button type="button" class="button-surface" id="indexOne" data-track="email-index-one">Index this folder</button>
+      </div>
+      <div class="scans-actions">
+        <button type="button" class="button-tint" id="indexEmails" data-track="email-index-now">Index emails now</button>
+      </div>
+      <p class="sub-head">Recent runs</p>
+      <ul class="rows email-runs" id="emailRuns"></ul>
+    </div>
     <p class="scans-note" id="scansNote"></p>
   </section>
 
@@ -547,16 +577,16 @@
       </div>
       <textarea class="input-native roots-input" id="rootsInput" rows="3" spellcheck="false" aria-label="Scan roots, one folder per line" data-track="roots-input" hidden></textarea>
       <p class="row-note" id="rootsNote"></p>
+      <label class="ff-col"><span class="row-note">Skip these folders, one per line: the disk scan, folder search and the email index all leave them out</span>
+        <textarea class="input-native roots-input" id="excludeInput" rows="2" spellcheck="false" aria-label="Folders to skip, one per line" data-track="exclude-input"></textarea>
+      </label>
     </div>
     <div class="row row-stack">
       <div class="row-line">
         <span>Email search</span>
         <span class="row-value" id="emailState"></span>
       </div>
-      <label class="ff-col"><span class="row-note">Email index file</span>
-        <input class="input-native" type="text" id="emailIndexInput" spellcheck="false" autocomplete="off" placeholder="the email index, e.g. emails.db" aria-label="Email index file" data-track="email-index-input">
-      </label>
-      <label class="ff-col"><span class="row-note">Email folders "Show all" may read, one per line, each inside a scan root</span>
+      <label class="ff-col"><span class="row-note">Email folders, one per line, each inside a scan root</span>
         <textarea class="input-native roots-input" id="emailRootsInput" rows="2" spellcheck="false" aria-label="Email folders, one per line" data-track="email-roots-input"></textarea>
       </label>
       <p class="row-note" id="emailNote"></p>
@@ -565,6 +595,35 @@
       <span>Index size</span>
       <span class="row-value" id="indexSize"></span>
     </div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog" id="emailInfoDialog" data-track-view="email-info-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">What the email stage reads</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="email-info-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="prose">
+      <p>Only <code class="code-chip">.msg</code> files inside the email folders, and only the ones that are new or changed since the last run. An unchanged file is never touched.</p>
+      <p>Reading an online-only file downloads it from OneDrive. Each run stops downloading at its budget and picks up the rest next run. Downloaded files stay on disk until OneDrive frees them.</p>
+      <p>Files are opened read-only. Nothing changes a file, its attributes or its pin state. A file that fails isn't read again until it changes.</p>
+      <p>The disk scan and the email index each have their own lock, so indexing one folder takes seconds even while a disk scan runs.</p>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog wide-dialog" id="failuresDialog" data-track-view="failures-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Failed reads</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="failures-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div id="failuresBody"></div>
   </div>
 </dialog>
 

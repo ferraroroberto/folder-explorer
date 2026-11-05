@@ -7,7 +7,7 @@ folder-explorer: a public, read-only disk-space explorer. FastAPI + a static PWA
 **Hard rules for the scan (do not relax):**
 
 - Metadata only. Never open, read or stat a file one by one; the directory-handle listing in `src/winfs.py` is the only reader.
-- The one scoped exception: "Show all" reads a `.msg` through `src/email/reader.py` (the only module that imports `extract_msg`; a test holds it), only inside `email.roots`, by row id, in a child process with a timeout. Nothing else opens a file.
+- The one scoped exception, and only through `src/email/reader.py` (the only module that imports `extract_msg`; a test holds it), only for a `.msg` inside `email.roots`: the email stage reads new or changed mail (a child process, a per-run download budget, a failed file not retried until it changes), and "Show all" reads one mail by row id in a child process with a timeout. Nothing else opens a file.
 - Never hydrate a OneDrive placeholder: no call that reads file data, no `GetCompressedFileSizeW` per file, no thumbnail or content sniffing.
 - Junctions, symlinks and mount points are counted, never followed.
 - Scan output lives in the runtime-data folder (`src/runtime_data.py`), never in the repo.
@@ -17,7 +17,7 @@ folder-explorer: a public, read-only disk-space explorer. FastAPI + a static PWA
 
 - **Restart recipe:** `tray.bat --restart` (the shared `tray_lifecycle.ps1`: kills this repo's tray subtree, reclaims port 8453 by command line, starts the tray, and checks the served `git_sha` against `HEAD`). Run it fire-and-forget through a real Windows shell, then poll `GET http://127.0.0.1:8453/api/version` (or `https://` with remote access on) until `git_sha` matches `git rev-parse --short HEAD`, with a hard timeout. A `/healthz` 200 alone proves nothing about the build. Agents may run this recipe without asking; it touches only this app.
 - **Console:** `start.bat` / `python -m app.webapp` (no tray).
-- **Scans:** `python -m app.cli scan`; the nightly app-launcher Job runs exactly that, so the in-app schedule stays `off` on this PC.
+- **Scans:** `python -m app.cli scan` (disk walk, then the email stage); the nightly app-launcher Job runs exactly that, so the in-app schedule stays `off` on this PC. `python -m app.cli email index [--root FOLDER]` runs the email stage alone under its own lock.
 - The live signal is the Explore tree rendering the root's folders with sizes, not a health check.
 
 **Not covered by the restart:** a scan the tray or the app-launcher Job started keeps running in its own process and finishes on the code it started with. The served build identity is in `/api/version` and the page footer.

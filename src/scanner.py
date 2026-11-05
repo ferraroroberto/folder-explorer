@@ -60,6 +60,15 @@ CREATE TABLE folder_people (id INTEGER PRIMARY KEY, people INTEGER NOT NULL);
 PERSON_FOLDER_RE = re.compile(r"^[^@\s\\/]+@[^@\s\\/]+\.[A-Za-z]{2,}$")
 
 
+def exclude_key(path: str) -> str:
+    """How an excluded folder is compared: absolute, case-folded, no trailing separator."""
+    return os.path.normcase(os.path.abspath(path)).rstrip("\\/")
+
+
+def exclude_keys(paths: list[str]) -> frozenset[str]:
+    return frozenset(exclude_key(os.path.expandvars(os.path.expanduser(p))) for p in paths)
+
+
 def search_key(path: str) -> str:
     """How folder search compares a path: case-folded, with ``/`` as the one separator."""
     return path.casefold().replace("\\", "/")
@@ -92,6 +101,8 @@ class Counters:
     online_size: int = 0
     skipped_links: int = 0
     errors: int = 0
+    # Folders left out because the settings exclude them.
+    excluded: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return dict(self.__dict__)
@@ -174,9 +185,10 @@ def _write_folders(conn: sqlite3.Connection, f: _Folders) -> None:
 class _Walk:
     """One walk's state: the folder columns, the pending rows and the counters."""
 
-    def __init__(self, conn: sqlite3.Connection, lister: Lister) -> None:
+    def __init__(self, conn: sqlite3.Connection, lister: Lister, exclude: frozenset[str] = frozenset()) -> None:
         self.conn = conn
         self.lister = lister
+        self.exclude = exclude
         self.counters = Counters()
         self.folders = _Folders()
         self.batch: list[tuple[int, str, str, int, int, int, int]] = []
@@ -207,7 +219,10 @@ class _Walk:
             if winfs.is_link(e):
                 c.skipped_links += 1
             elif e.is_dir:
-                subdirs.append(e.name)
+                if self.exclude and exclude_key(os.path.join(path, e.name)) in self.exclude:
+                    c.excluded += 1
+                else:
+                    subdirs.append(e.name)
             else:
                 self._add_file(fid, e, per_ext)
         people = sum(1 for sub in subdirs if PERSON_FOLDER_RE.match(sub))
@@ -249,6 +264,7 @@ def scan_to_index(
     *,
     root_name: str = "",
     lister: Lister = winfs.list_dir,
+    exclude: frozenset[str] = frozenset(),
     on_progress: Optional[Callable[[dict[str, int]], None]] = None,
 ) -> Counters:
     """Walk ``root_path`` and write its complete index to ``index_path``.
@@ -256,12 +272,13 @@ def scan_to_index(
     Raises ``FileNotFoundError`` when the root itself cannot be listed; a
     folder below it that cannot be listed (access denied, vanished mid-walk)
     is counted in ``errors`` and the walk goes on. Junctions, symlinks and
-    mount points are counted in ``skipped_links`` and never followed.
+    mount points are counted in ``skipped_links`` and never followed. A folder
+    whose ``exclude_key`` is in ``exclude`` is counted in ``excluded`` and not walked.
     ``root_name`` labels the top folder (the root's display name).
     """
     part = index_path.with_name(index_path.name + ".part")
     conn = _open_index(part)
-    walk = _Walk(conn, lister)
+    walk = _Walk(conn, lister, exclude)
     started = last_report = time.monotonic()
     stack: list[tuple[str, int, str, int]] = [(root_path, -1, root_name or root_path, 0)]
     try:

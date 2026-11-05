@@ -17,8 +17,12 @@ const REMOTE_TEXT = {
   'no-cert': 'On, but there is no certificate yet, so only this PC can reach it. Run scripts/gen_tailscale_cert.py, then restart.',
 };
 
+// The last settings read, so a change to one email key keeps the others.
+let current = null;
+
 function render(body) {
   const cfg = body.config;
+  current = cfg;
   const remote = body.remote;
   setSwitch(remoteSwitch, cfg.remote_access);
   remoteSwitch.setAttribute('aria-label', 'Remote access');
@@ -42,12 +46,12 @@ function render(body) {
   $('rootsNote').textContent = (auto ? 'Scanning ' : 'One folder per line, saved when you leave the box. Scanning ') +
     state.roots.map((r) => r.name).join(', ') + '.';
   $('indexSize').textContent = fmtBytes(body.index_bytes) + ', kept on this PC';
+  if (document.activeElement !== $('excludeInput')) $('excludeInput').value = cfg.exclude.join('\n');
   renderEmail(cfg.email);
   setBasis(readPref('basis', 'size'));
 }
 
 async function renderEmail(email) {
-  if (document.activeElement !== $('emailIndexInput')) $('emailIndexInput').value = email.index_path || '';
   if (document.activeElement !== $('emailRootsInput')) $('emailRootsInput').value = email.roots.join('\n');
   let st = null;
   try { st = await getJSON('/api/search/status'); } catch (e) { st = null; }
@@ -57,10 +61,9 @@ async function renderEmail(email) {
     : em.reader ? 'Search works. Show all is off: ' + em.reader + '.' : 'Search and Show all are on. Show all reads a mail only from these folders.';
 }
 
-function saveEmail() {
+function saveEmail(email) {
   const roots = $('emailRootsInput').value.split('\n').map((x) => x.trim()).filter(Boolean);
-  const path = $('emailIndexInput').value.trim();
-  return save({ email: { index_path: path || null, roots } });
+  return save({ email: { ...email, roots } });
 }
 
 function setBasis(value) {
@@ -102,8 +105,11 @@ export function initSettings(opts) {
     if (await save({ roots })) { showToast('Roots saved'); onRootsChanged(); }
   });
   $('scheduleSelect').addEventListener('change', (e) => save({ schedule: e.target.value }));
-  $('emailIndexInput').addEventListener('change', () => saveEmail());
-  $('emailRootsInput').addEventListener('change', () => saveEmail());
+  $('emailRootsInput').addEventListener('change', () => saveEmail(current.email));
+  $('excludeInput').addEventListener('change', async () => {
+    const exclude = $('excludeInput').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    if (await save({ exclude })) showToast('Saved: the next scan leaves them out');
+  });
   $('scheduleTime').addEventListener('change', (e) => { if (e.target.value) save({ schedule_time: e.target.value }); });
   $('defaultBasisSeg').addEventListener('click', (e) => {
     const b = e.target.closest('.segmented-item');

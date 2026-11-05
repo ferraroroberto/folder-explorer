@@ -7,6 +7,7 @@ import { initExplore, loadExplore, resetExplore, selectFolder, setMode, toggleFo
 import { loadLargest } from './largest.js';
 import { loadTypes, typeOptions } from './types.js';
 import { loadRoots, renderRoots, scansStatus } from './scans.js';
+import { initEmailScans, loadEmailScans } from './email-scans.js';
 import { initSettings, openSettings } from './settings.js';
 import { initSearch, leaveSearch, loadSearch } from './search.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
@@ -112,7 +113,7 @@ async function renderActive() {
   if (!booted) return;
   const tab = state.tab;
   if (tab === 'search') { await loadSearch(); return; }
-  if (tab === 'scans') { renderRoots(); updateHeads(); return; }
+  if (tab === 'scans') { renderRoots(); loadEmailScans(); updateHeads(); return; }
   if (!dirty.has(tab)) return;
   const r = rootInfo();
   if (!r || !r.current) { showEmpty(emptyFor(r)); updateHeads(); return; }
@@ -318,6 +319,7 @@ async function boot() {
   placeToolbar(state.tab);
   initSearch({ nav, showInExplore: (root, folder) => showInExplore(nav, root, folder) });
   initExplore({ onSelect: onFolderSelected });
+  initEmailScans();
   initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
   bindTextSize($('textSizeControl'), APP);
   wireTheme();

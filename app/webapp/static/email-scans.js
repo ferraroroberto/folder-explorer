@@ -33,8 +33,8 @@ function runRow(r) {
 
 function render() {
   const card = $('emailCard');
-  card.hidden = !body || (!body.ready && body.stage_problem && !body.roots.length);
-  if (card.hidden) return;
+  card.hidden = !body;
+  if (!body) return;
   const last = body.runs.find((r) => r.status === 'ok');
   const c = last ? last.counts : {};
   $('emailMeta').textContent = body.ready ? fmtNum(body.indexed) + ' emails' : 'Not built yet';
@@ -51,7 +51,8 @@ function render() {
   $('indexEmails').disabled = !!off || body.running;
   $('indexOne').disabled = !!off || body.running || !body.roots.length;
   $('indexEmails').textContent = body.running ? 'Indexing…' : 'Index emails now';
-  $('emailNote').textContent = off ? 'Indexing is off here: ' + off + '.'
+  if (document.activeElement !== $('emailRootsInput')) $('emailRootsInput').value = body.folders.join('\n');
+  $('emailNote').textContent = !body.ready ? 'Not set up here: ' + body.problem + '.' : off ? 'Indexing is off here: ' + off + '.'
     : body.budget_mb ? 'Each run downloads up to this much online-only mail; the rest waits for the next run.' : 'Online-only mail is left in the cloud.';
   $('emailRuns').innerHTML = body.runs.length ? body.runs.map(runRow).join('') : '<li class="rows-note">No runs yet.</li>';
 }
@@ -93,11 +94,12 @@ async function showFailures() {
   d.showModal();
 }
 
-async function setBudget(mb) {
+/** Change some of the email settings, keeping the rest as saved. */
+async function saveEmail(update, okText) {
   try {
     const cfg = (await getJSON('/api/config')).config;
-    await postJSON('/api/config', { email: { ...cfg.email, download_budget_mb: mb } });
-    showToast('Saved: the next run uses it');
+    await postJSON('/api/config', { email: { ...cfg.email, ...update } });
+    showToast(okText);
   } catch (e) {
     showToast('Could not save: ' + e.message, 'error');
   }
@@ -105,7 +107,8 @@ async function setBudget(mb) {
 }
 
 export function initEmailScans() {
-  $('emailBudget').addEventListener('change', (e) => setBudget(Number(e.target.value)));
+  $('emailBudget').addEventListener('change', (e) => saveEmail({ download_budget_mb: Number(e.target.value) }, 'Saved: the next run uses it'));
+  $('emailRootsInput').addEventListener('change', (e) => saveEmail({ roots: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) }, 'Email folders saved'));
   $('indexEmails').addEventListener('click', () => start(null));
   $('indexOne').addEventListener('click', () => start($('emailScope').value));
   $('emailInfo').addEventListener('click', () => $('emailInfoDialog').showModal());

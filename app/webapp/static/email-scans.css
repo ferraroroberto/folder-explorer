@@ -21,3 +21,6 @@ button.stat { font: inherit; line-height: normal; text-align: left; color: var(-
 .rows > li:first-child.fail-row { border-top: 0; }
 .fail-row .mono { font-size: 13px; overflow-wrap: anywhere; }
 .fail-row .why { font-size: var(--font-body-sm); color: var(--danger-text); }
+.email-folders { display: grid; gap: 6px; padding: var(--space-sm) 0; border-top: 1px solid var(--line-muted); }
+.email-folders > span { font-size: var(--font-label); font-weight: 600; }
+.email-folders textarea { width: 100%; box-sizing: border-box; }

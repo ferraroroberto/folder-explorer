@@ -463,6 +463,9 @@
         </select>
       </div>
       <p class="row-note email-note" id="emailNote"></p>
+      <label class="email-folders"><span>Email folders, one per line, each inside a scan root</span>
+        <textarea class="input-native roots-input" id="emailRootsInput" rows="2" spellcheck="false" aria-label="Email folders, one per line" data-track="email-roots-input"></textarea>
+      </label>
       <div class="scoped">
         <select class="select-native" id="emailScope" aria-label="Email folder to index" data-track="email-scope"></select>
         <button type="button" class="button-surface" id="indexOne" data-track="email-index-one">Index this folder</button>
@@ -580,16 +583,6 @@
       <label class="ff-col"><span class="row-note">Skip these folders, one per line: the disk scan, folder search and the email index all leave them out</span>
         <textarea class="input-native roots-input" id="excludeInput" rows="2" spellcheck="false" aria-label="Folders to skip, one per line" data-track="exclude-input"></textarea>
       </label>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Email search</span>
-        <span class="row-value" id="emailState"></span>
-      </div>
-      <label class="ff-col"><span class="row-note">Email folders, one per line, each inside a scan root</span>
-        <textarea class="input-native roots-input" id="emailRootsInput" rows="2" spellcheck="false" aria-label="Email folders, one per line" data-track="email-roots-input"></textarea>
-      </label>
-      <p class="row-note" id="emailNote"></p>
     </div>
     <div class="row">
       <span>Index size</span>

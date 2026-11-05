@@ -45,7 +45,8 @@ def _failures(part: EmailPart, limit: int) -> tuple[int, list[dict[str, Any]]]:
 
 @router.get("/status")
 def status() -> dict[str, Any]:
-    part = _part()
+    cfg = config.load()
+    part = email_part(cfg, resolve_roots(cfg["roots"]))
     indexed = 0
     if part.ready and part.index_path is not None:
         index = EMAILS.get(part.index_path)
@@ -54,7 +55,7 @@ def status() -> dict[str, Any]:
     failed, _ = _failures(part, 0)
     return {
         "ready": part.ready, "problem": part.problem, "own": part.own, "stage_problem": part.stage_problem,
-        "roots": part.roots, "budget_mb": part.budget_bytes // MB, "running": indexer.is_running(),
+        "roots": part.roots, "folders": cfg["email"]["roots"], "budget_mb": part.budget_bytes // MB, "running": indexer.is_running(),
         "indexed": indexed, "failed": failed, "runs": store.email_runs(10),
     }
 

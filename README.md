@@ -84,7 +84,7 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 
 ## Configuration
 
-`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `exclude` (folders every scan skips), `email` (`roots`: the email folders; `index_path`: `null` for this app's own index, or another app's index to read only; `download_budget_mb`), `folder_search` (`skip_levels`, `prune_people`). The email part is set in Settings too. Secrets live in `.env` (`.env.example`).
+`config.json` (gitignored; `config.example.json` lists every key): `remote_access`, `port` (8453), `server` (`hypercorn` serves HTTP/2 over the certificate; `uvicorn` is the HTTP/1.1 fallback), `roots` (`null` = every drive + OneDrive), `schedule`, `schedule_time`, `exclude` (folders every scan skips), `email` (`roots`: the email folders; `index_path`: `null` for this app's own index, or another app's index to read only; `download_budget_mb`), `folder_search` (`skip_levels`, `prune_people`). The email folders and the download budget are also set on the Scans tab, the folders to skip in Settings. Secrets live in `.env` (`.env.example`).
 
 ## Verification gate
 

@@ -1,0 +1,797 @@
+"""
+Outlook COM integration layer.
+
+Design decisions:
+- COM calls live in src/outlook/: the batch layer receives InboxMail
+  dataclasses and opaque item handles, never a COM object it must read.
+- SMTP address resolution handles Exchange (on-prem / O365) where
+  SenderEmailAddress may return a cryptic X.500/EX address instead of SMTP.
+- Split by concern: this module is the read path and the batch
+  surface. The Outlook process lifecycle is in outlook/process.py, the draft
+  surface in outlook/drafts.py (a mixin OutlookClient inherits), and the
+  vocabulary and COM-free helpers they share in outlook/mapi.py.
+- The batch surface (ensure_running / iter_inbox / iter_inbox_received_since /
+  find_by_message_id / archive_ref / item_ids / refetch / is_same_object /
+  move_to / set_category / clear_category / is_open_in_inspector /
+  view_away_from_inbox) lives here too, so batch.py stays pure orchestration
+  and can be driven by a fake client in tests.
+- Every folder (Inbox, Sent, the archive folder, Drafts) comes from
+  ``store()``: the store of the mailbox the client was built for, resolved by
+  address in outlook/stores.py — never from the namespace's default folders.
+- The draft surface (default_account_smtp / create_draft / update_draft /
+  open_draft / read_draft / snapshot_draft / close_inspectors_of) is inherited
+  from outlook/drafts.py, for src/email/batch/draft.py and send.py.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from itertools import islice
+from typing import Any
+
+from src.email.mailboxes import Mailbox
+from src.outlook import process, syncing
+from src.outlook.drafts import DraftSurface
+from src.outlook.mapi import (
+    ARCHIVE_REF_HEADER,
+    DASL_FLAG_STATUS,
+    DASL_INTERNET_MESSAGE_ID,
+    DASL_TRANSPORT_HEADERS,
+    DASL_X_ARCHIVE_REF,
+    OL_CLASS_MAIL_ITEM,
+    OL_FOLDER_DRAFTS,
+    OL_FOLDER_INBOX,
+    OL_FOLDER_OUTBOX,
+    OL_FOLDER_SENT_MAIL,
+    OutlookUnavailableError,
+    header_value,
+    received_since_filter,
+    safe_com,
+    sent_since_filter,
+    with_category,
+    without_category,
+)
+from src.outlook.process import DEFAULT_START_TIMEOUT_SECONDS
+from src.outlook.stores import resolve_store
+from src.email.naming import clean_subject as _clean_subject
+from src.email.naming import normalize_message_id
+
+logger = logging.getLogger(__name__)
+
+# How long the Explorer sits on the other folder before the move is retried
+# there, so Outlook has let go of the reading-pane item. Unmeasured: the manual
+# workaround this automates takes seconds, half a second never freed a real
+# selection, and the wait is only paid on a refused move.
+EXPLORER_SETTLE_SECONDS = 1.5
+
+
+# ----------------------------------------------------------------- types ----
+
+@dataclass
+class InboxMail:
+    """One live Outlook mail, as batch mode sees it.
+
+    Everything the batch verbs need is read off the COM item once, here, so the
+    orchestration layer never touches COM. ``item`` is the only COM reference
+    that escapes, and only because the archiver needs the real MailItem to call
+    ``SaveAs``.
+    """
+
+    message_id: str = ""           # normalised; "" when the mail carries none
+    entry_id: str = ""
+    subject: str = ""              # cleaned (Re:/Fwd: stripped)
+    sender: str = ""
+    recipients: str = ""
+    date_sent: datetime | None = None
+    # ReceivedTime, naive local like date_sent. Not reported in a plan; it is
+    # what `plan --since` compares against.
+    date_received: datetime | None = None
+    body_preview: str = ""
+    attachment_count: int = 0
+    flag_status: int = 0
+    item: Any = None
+
+
+# The folders `find` searches, and how each one was searched.
+FIND_INBOX = "inbox"
+FIND_ARCHIVE = "archive"
+FIND_SENT = "sent"
+FIND_VIA_RESTRICT = "restrict"   # narrowed server-side
+FIND_VIA_WALK = "walk"           # the store rejected the filter; matched per mail
+FIND_VIA_ABSENT = "absent"       # the mailbox has no such folder; nothing searched
+
+
+@dataclass
+class FolderHits:
+    """What ``search_folder`` found in one folder: how many matched, and the
+    newest ``limit`` of them read into :class:`InboxMail`."""
+
+    folder: str                    # FIND_INBOX / FIND_ARCHIVE / FIND_SENT
+    name: str                      # the Outlook folder's own name
+    via: str
+    matched: int = 0
+    mails: list[InboxMail] = field(default_factory=list)
+
+
+# -------------------------------------------------------------- helpers -----
+
+
+def sent_datetime(mail_item: Any) -> datetime | None:
+    """The mail's sent time as a stdlib datetime, or ``None``.
+
+    Tries ``SentOn`` (when it was actually sent) before ``ReceivedTime``.
+    ``archiver._get_sent_date_prefix`` formats this same value for its
+    ``YYYY-MM-DD -`` filename prefix, so the date a plan reports and the date
+    a prefix carries cannot disagree. pywintypes datetimes are rebuilt field
+    by field rather than passed through, which is what the caller sees as a
+    plain ``datetime``.
+    """
+    for attr in ("SentOn", "ReceivedTime"):
+        value = _com_datetime(mail_item, attr)
+        if value is not None:
+            return value
+    return None
+
+
+def _com_datetime(mail_item: Any, attr: str) -> datetime | None:
+    """One COM date property as a naive stdlib datetime, or ``None``."""
+    value = safe_com(lambda: getattr(mail_item, attr), None)
+    if value is None:
+        return None
+    try:
+        return datetime(
+            value.year, value.month, value.day,
+            value.hour, value.minute, value.second,
+        )
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _resolve_smtp(address_entry: Any) -> str:
+    """
+    Attempt to resolve an AddressEntry to its primary SMTP address.
+    Falls back to the raw Address string if Exchange resolution fails.
+    """
+    try:
+        ex_user = address_entry.GetExchangeUser()
+        if ex_user is not None:
+            smtp = ex_user.PrimarySmtpAddress
+            if smtp:
+                return smtp
+    except Exception:
+        pass
+
+    try:
+        return address_entry.Address or ""
+    except Exception:
+        return ""
+
+
+def _get_sender_smtp(mail_item: Any) -> str:
+    """Return the sender's SMTP address, resolving Exchange entries."""
+    try:
+        addr_type = mail_item.SenderEmailType
+        if addr_type == "EX":
+            smtp = _resolve_smtp(mail_item.Sender)
+            if smtp:
+                return smtp
+    except Exception:
+        pass
+    try:
+        return mail_item.SenderEmailAddress or ""
+    except Exception:
+        return ""
+
+
+def _get_recipients_smtp(mail_item: Any) -> str:
+    """Return semicolon-separated SMTP addresses for all recipients."""
+    addresses: list[str] = []
+    try:
+        for recipient in mail_item.Recipients:
+            try:
+                addr_type = recipient.AddressEntry.AddressEntryUserType
+                # 0 = Exchange user, resolve via GetExchangeUser
+                if addr_type == 0:
+                    smtp = _resolve_smtp(recipient.AddressEntry)
+                    addresses.append(smtp or recipient.Address)
+                else:
+                    addresses.append(recipient.Address or "")
+            except Exception:
+                try:
+                    addresses.append(recipient.Address or "")
+                except Exception:
+                    pass
+    except Exception as exc:
+        logger.warning("Error reading recipients: %s", exc)
+    return "; ".join(a for a in addresses if a)
+
+
+# ------------------------------------------------------------- client ------
+
+
+class OutlookClient(DraftSurface):
+    """
+    Wraps Outlook COM automation.
+
+    Lazy-initialised: COM objects are created only when needed, so importing
+    this module is free (important for the fast-startup requirement).
+
+    ``mailbox`` is the registry mailbox every folder lookup is taken from;
+    ``None`` falls back to the profile's default store. Its store is
+    resolved once, on first use.
+    """
+
+    def __init__(self, mailbox: Mailbox | None = None) -> None:
+        self.mailbox = mailbox
+        self._resolved_store: Any = None
+
+    # ------------------------------------------------------ batch surface ---
+    #
+    # Used only by src/email/batch/. Everything below keeps COM inside
+    # this class: the batch layer receives InboxMail dataclasses and opaque
+    # item handles, so it can be driven end to end by a fake client.
+
+    def ensure_running(
+        self, timeout: float = DEFAULT_START_TIMEOUT_SECONDS
+    ) -> Any:
+        """Return the Outlook Application object, starting Outlook if needed.
+
+        See :func:`src.outlook.process.ensure_running`, which owns
+        the start, the poll and the teardown of what it started.
+        """
+        return process.ensure_running(timeout)
+
+    def _namespace(self) -> Any:
+        """Return the MAPI namespace of the running Outlook."""
+        app = process.get_active_application()
+        if app is None:
+            raise OutlookUnavailableError(
+                "Outlook is no longer reachable over COM."
+            )
+        return app.GetNamespace("MAPI")
+
+    def store(self) -> Any:
+        """The ``Store`` of this client's mailbox, resolved once.
+
+        Raises:
+            MailboxNotInOutlookError: a registry mailbox with no store in the
+                running profile — never answered with the default store.
+        """
+        if self._resolved_store is None:
+            self._resolved_store = resolve_store(self._namespace(), self.mailbox)
+        return self._resolved_store
+
+    def start_sync(self) -> syncing.SyncHandle:
+        """Start a profile-wide Send/Receive; Outlook has no per-account trigger."""
+        return syncing.start(self._namespace())
+
+    def _inbox(self) -> Any:
+        return self.store().GetDefaultFolder(OL_FOLDER_INBOX)
+
+    def _sent_items(self) -> Any:
+        return self.store().GetDefaultFolder(OL_FOLDER_SENT_MAIL)
+
+    def _named_folder(self, name: str, *, create: bool = True) -> Any:
+        """Return the folder ``name`` directly under the mailbox root.
+
+        Matched case-insensitively so a mailbox whose Archive folder is spelled
+        differently is still found rather than duplicated. Created when absent
+        and ``create`` is set, because ``apply`` must have somewhere to move a
+        mail it has already written to disk.
+        """
+        root = self.store().GetRootFolder()
+        folders = root.Folders
+        for i in range(1, folders.Count + 1):
+            folder = folders.Item(i)
+            if str(folder.Name).casefold() == name.casefold():
+                return folder
+        if not create:
+            return None
+        logger.info("Creating Outlook folder %r under %s", name, root.Name)
+        return folders.Add(name)
+
+    def _resolve_folder(self, folder_name: str | None) -> Any:
+        """Inbox for ``None``, else the named folder under the mailbox root."""
+        return self._inbox() if folder_name is None else self._named_folder(folder_name)
+
+    def iter_inbox(self, preview_len: int = 500) -> Iterator[InboxMail]:
+        """Yield every MailItem in the Inbox as an :class:`InboxMail`.
+
+        ``preview_len`` is the scanner's ``scanning.body_preview_length`` so the
+        preview a plan shows and the preview the index stores are the same
+        string. Non-mail items (meeting requests, delivery reports) are skipped:
+        they have no ``SaveAs``-able shape this app archives.
+        """
+        yield from self._iter_items(self._inbox().Items, preview_len)
+
+    def iter_inbox_received_since(
+        self, since: datetime, preview_len: int = 500
+    ) -> Iterator[InboxMail]:
+        """Yield the Inbox mails received at or after ``since``.
+
+        Narrowed server-side with ``Items.Restrict`` so a large Inbox is not
+        walked. The literal is minute-precise, so the result can be a little
+        wider than ``since`` — never narrower — and ``batch.plan`` applies the
+        exact check to every mail either way. A store that rejects the filter
+        falls back to the whole Inbox for that same check; which path ran is
+        logged.
+        """
+        yield from self._iter_restricted(
+            self._inbox().Items, received_since_filter(since), "received",
+            "the whole Inbox", preview_len,
+        )
+
+    def iter_sent(self, preview_len: int = 500) -> Iterator[InboxMail]:
+        """Yield every MailItem in Sent Items."""
+        yield from self._iter_items(self._sent_items().Items, preview_len)
+
+    def iter_sent_since(
+        self, since: datetime, preview_len: int = 500
+    ) -> Iterator[InboxMail]:
+        """Yield the Sent Items mails sent at or after ``since``.
+
+        The same server-side narrowing and whole-folder fallback as
+        :meth:`iter_inbox_received_since`, on the sent time; ``batch.plan``
+        still applies the exact check to every mail.
+        """
+        yield from self._iter_restricted(
+            self._sent_items().Items, sent_since_filter(since), "sent",
+            "all of Sent Items", preview_len,
+        )
+
+    def _iter_restricted(
+        self, items: Any, flt: str, kind: str, walk_desc: str, preview_len: int
+    ) -> Iterator[InboxMail]:
+        """Yield ``items`` narrowed by ``Items.Restrict(flt)``; a store that
+        rejects the filter is walked whole instead, for the caller's exact
+        per-mail check. ``kind`` (``received``/``sent``) and ``walk_desc`` only
+        word the log lines saying which path ran."""
+        try:
+            restricted = items.Restrict(flt)
+        except Exception as exc:
+            logger.warning(
+                "The store rejected the %s-date filter (%s: %s); walking "
+                "%s and checking each mail's date instead.",
+                kind, type(exc).__name__, exc, walk_desc,
+            )
+            yield from self._iter_items(items, preview_len)
+            return
+        logger.info("%s-date filter applied server-side: %s", kind.capitalize(), flt)
+        yield from self._iter_items(restricted, preview_len)
+
+    def search_folder(
+        self,
+        folder: str,
+        archive_folder: str,
+        dasl: str,
+        matches: Callable[[InboxMail], bool],
+        *,
+        preview_len: int,
+        limit: int,
+    ) -> FolderHits:
+        """Search one of this mailbox's folders for ``find``; read-only.
+
+        ``folder`` is ``inbox``, ``sent`` or ``archive`` (``archive_folder``
+        under the mailbox root, looked up and **never created**: a missing one
+        is reported ``absent``). Narrowed server-side with ``Items.Restrict``
+        on ``dasl`` and sorted newest first, so the ``limit`` kept are the most
+        recent. A store that rejects the filter is walked instead, keeping the
+        mails ``matches`` accepts; which path ran is logged and reported.
+        Nothing here moves, saves or deletes an item.
+        """
+        if folder == FIND_ARCHIVE:
+            target = self._named_folder(archive_folder, create=False)
+        else:
+            target = self._sent_items() if folder == FIND_SENT else self._inbox()
+        name = archive_folder if folder == FIND_ARCHIVE else folder
+        if target is None:
+            logger.info("find: no %r folder in this mailbox; nothing searched there.", name)
+            return FolderHits(folder=folder, name=name, via=FIND_VIA_ABSENT)
+        name = safe_com(lambda: str(target.Name), name)
+        items = target.Items
+        try:
+            restricted = items.Restrict(dasl)
+            matched = int(restricted.Count)
+        except Exception as exc:
+            logger.warning(
+                "find: the store rejected the search filter on %r (%s: %s); walking "
+                "the folder and matching each mail's preview instead.",
+                name, type(exc).__name__, exc,
+            )
+            hits = [mail for mail in self._iter_items(items, preview_len) if matches(mail)]
+            hits.sort(key=lambda m: m.date_sent or datetime.min, reverse=True)
+            return FolderHits(folder=folder, name=name, via=FIND_VIA_WALK,
+                              matched=len(hits), mails=hits[:limit])
+        try:
+            restricted.Sort("[SentOn]", True)
+        except Exception as exc:  # unsorted still answers; only "newest" is lost
+            logger.warning("find: could not sort the hits in %r newest first: %s", name, exc)
+        mails = list(islice(self._iter_items(restricted, preview_len), limit))
+        logger.info("find: %d match(es) in %r, %d read.", matched, name, len(mails))
+        return FolderHits(folder=folder, name=name, via=FIND_VIA_RESTRICT,
+                          matched=matched, mails=mails)
+
+    def _iter_items(self, items: Any, preview_len: int) -> Iterator[InboxMail]:
+        import win32com.client  # noqa: PLC0415
+
+        # Index rather than `for item in items`: the collection is live, and a
+        # positional walk keeps the enumeration stable while the mails sit
+        # still (batch mode never moves anything during a plan).
+        for i in range(1, items.Count + 1):
+            try:
+                raw = items.Item(i)
+                if raw.Class != OL_CLASS_MAIL_ITEM:
+                    continue
+                # Dispatch forces full interface resolution → a MailItem with
+                # SaveAs, which the archiver calls.
+                yield self._read_mail(win32com.client.Dispatch(raw), preview_len)
+            except Exception as exc:
+                logger.warning("Skipping unreadable item %d in folder: %s", i, exc)
+
+    def read_mail(self, item: Any, preview_len: int = 0) -> InboxMail:
+        """Read one already-obtained MailItem into an :class:`InboxMail`.
+
+        ``apply`` needs the mail's cleaned subject for the filename after it has
+        found the item by Message-ID; ``preview_len`` defaults to 0 because that
+        path has no use for the body.
+        """
+        return self._read_mail(item, preview_len)
+
+    def _read_mail(self, item: Any, preview_len: int) -> InboxMail:
+        """Read every field batch mode needs off one COM MailItem."""
+        return InboxMail(
+            message_id=self._message_id(item),
+            entry_id=safe_com(lambda: str(item.EntryID), ""),
+            subject=_clean_subject(safe_com(lambda: item.Subject, "")),
+            sender=_get_sender_smtp(item),
+            recipients=_get_recipients_smtp(item),
+            date_sent=sent_datetime(item),
+            date_received=_com_datetime(item, "ReceivedTime"),
+            body_preview=safe_com(lambda: (item.Body or "")[:preview_len], ""),
+            attachment_count=safe_com(lambda: int(item.Attachments.Count), 0),
+            flag_status=self._flag_status(item),
+            item=item,
+        )
+
+    @staticmethod
+    def _message_id(item: Any) -> str:
+        """The mail's normalised Internet Message-ID, or ``""`` when it has none."""
+        return normalize_message_id(
+            safe_com(
+                lambda: item.PropertyAccessor.GetProperty(DASL_INTERNET_MESSAGE_ID),
+                None,
+            )
+        )
+
+    @staticmethod
+    def _flag_status(item: Any) -> int:
+        """Outlook's follow-up flag, read from the same MAPI property the
+        scanner reads back out of the archived .msg (0x1090). Absent means
+        unflagged, so 0 is a real answer, not a swallowed error."""
+        value = safe_com(
+            lambda: item.PropertyAccessor.GetProperty(DASL_FLAG_STATUS), None
+        )
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def find_by_message_id(
+        self, message_id: str, folder_name: str | None = None
+    ) -> Any | None:
+        """Return the MailItem with this Message-ID in a folder, or ``None``.
+
+        ``folder_name`` is ``None`` for the Inbox, else a folder under the
+        mailbox root. An empty ``message_id`` never matches — a mail with no
+        Message-ID has no identity to search by, and matching every such mail
+        against each other would file the wrong one.
+
+        Tries a server-side ``Restrict`` first (an Archive folder holds
+        thousands of mails), falling back to a linear walk when the filter
+        cannot be built or the store rejects it.
+        """
+        if not message_id:
+            return None
+        return self._find_in_folder(self._resolve_folder(folder_name), message_id)
+
+    def find_sent_by_message_id(self, message_id: str) -> Any | None:
+        """Return the Sent Items MailItem with this Message-ID, or ``None``.
+        Same lookup, same empty-id rule, as
+        :meth:`find_by_message_id`."""
+        if not message_id:
+            return None
+        return self._find_in_folder(self._sent_items(), message_id)
+
+    def _find_in_folder(self, folder: Any, message_id: str) -> Any | None:
+        if folder is None:
+            return None
+
+        import win32com.client  # noqa: PLC0415
+
+        # A quote inside the id would break out of the DASL string literal;
+        # such ids are vanishingly rare and the linear walk handles them.
+        if "'" not in message_id and '"' not in message_id:
+            for candidate in (f"<{message_id}>", message_id):
+                try:
+                    found = folder.Items.Find(
+                        f"@SQL=\"{DASL_INTERNET_MESSAGE_ID}\" = '{candidate}'"
+                    )
+                except Exception as exc:
+                    logger.debug("Restrict lookup unavailable (%s); walking.", exc)
+                    break
+                if found is not None:
+                    return win32com.client.Dispatch(found)
+
+        # Read *only* the Message-ID while walking. Going through _read_mail
+        # here would resolve every sender and recipient through
+        # GetExchangeUser, which is the one call that can raise Outlook's
+        # address-book security modal — turning a lookup that failed to use the
+        # fast path into a hung process.
+        items = folder.Items
+        for i in range(1, items.Count + 1):
+            try:
+                raw = items.Item(i)
+                if raw.Class != OL_CLASS_MAIL_ITEM:
+                    continue
+                if self._message_id(raw) == message_id:
+                    return win32com.client.Dispatch(raw)
+            except Exception as exc:
+                logger.warning("Skipping unreadable item %d during lookup: %s", i, exc)
+        return None
+
+    def archive_ref(self, item: Any) -> str:
+        """The mail's ``X-Archive-Ref`` header value, or ``""`` when absent.
+
+        Read from the transport headers first — where the header survives on a
+        mail that came back through a server — then from the named Internet
+        header property ``create_draft`` stamps, which some stores promote the
+        header into. Only ``PropertyAccessor`` reads: no address is resolved,
+        so no ``GetExchangeUser`` security modal. Whether the header survives
+        sending depends on the account; a caller keeps a fallback match.
+        """
+        accessor = safe_com(lambda: item.PropertyAccessor, None)
+        if accessor is None:
+            return ""
+        headers = safe_com(lambda: accessor.GetProperty(DASL_TRANSPORT_HEADERS), "")
+        value = header_value(headers, ARCHIVE_REF_HEADER)
+        if value:
+            return value
+        return str(safe_com(lambda: accessor.GetProperty(DASL_X_ARCHIVE_REF), "") or "").strip()
+
+    def item_ids(self, item: Any) -> tuple[str, str]:
+        """The mail's ``EntryID`` and its store's ``StoreID``, as plain strings.
+
+        Read once while the reference is alive, so the reference can then be
+        let go and the mail fetched again later from nothing but strings.
+        Either is ``""`` when it cannot be read.
+        """
+        entry_id = safe_com(lambda: str(item.EntryID), "")
+        store_id = safe_com(lambda: str(item.Parent.StoreID), "")
+        return entry_id, store_id
+
+    def refetch(self, entry_id: str, store_id: str) -> Any | None:
+        """Fetch a mail from its store by ``EntryID``, or ``None``.
+
+        ``MailItem.SaveAs`` can leave the in-memory item flagged as modified,
+        and a later ``Move`` on *that* reference is then refused with
+        MAPI_E_OBJECT_CHANGED — the mail stays in the Inbox with its files
+        already on disk. A reference read back through
+        ``Session.GetItemFromID`` is a new COM object, so it is what batch mode
+        moves. The ``StoreID`` is passed whenever there is one: it names the
+        store to open instead of leaving Outlook to search every store it has.
+
+        ``None`` (never an exception) when there is no EntryID or the store
+        cannot hand the mail back.
+        """
+        if not entry_id:
+            logger.warning("Cannot re-acquire a mail with no readable EntryID.")
+            return None
+        try:
+            import win32com.client  # noqa: PLC0415
+
+            namespace = self._namespace()
+            fresh = (
+                namespace.GetItemFromID(entry_id, store_id) if store_id
+                else namespace.GetItemFromID(entry_id)
+            )
+        except Exception as exc:
+            logger.warning("GetItemFromID failed: %s: %s", type(exc).__name__, exc)
+            return None
+        if fresh is None:
+            return None
+        return win32com.client.Dispatch(fresh)
+
+    def is_same_object(self, first: Any, second: Any) -> bool | None:
+        """Whether two references are one COM object (COM identity), or
+        ``None`` when that cannot be asked.
+
+        Only a log breadcrumb: it says whether a re-fetch handed
+        back the very object already held. Outlook can still share the mail's
+        underlying MAPI message between two distinct objects, which no call
+        here can see.
+        """
+        try:
+            import pythoncom  # noqa: PLC0415
+
+            return bool(
+                first._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
+                == second._oleobj_.QueryInterface(pythoncom.IID_IUnknown)
+            )
+        except Exception:
+            return None
+
+    def move_to(self, item: Any, folder_name: str | None) -> Any:
+        """Move a mail to a folder and return the moved item.
+
+        ``folder_name`` is ``None`` for the Inbox. The returned object is the
+        item *in its new home* — Outlook rewrites ``EntryID`` on a move, so the
+        caller must read the new id off this object and never off the original
+        reference, which now points at nothing.
+        """
+        target = self._resolve_folder(folder_name)
+        if target is None:
+            raise OutlookUnavailableError(
+                f"Outlook folder {folder_name!r} could not be resolved."
+            )
+        import win32com.client  # noqa: PLC0415
+
+        return win32com.client.Dispatch(item.Move(target))
+
+    def set_category(self, item: Any, name: str) -> None:
+        """Add a category to a mail, preserving any it already carries."""
+        item.Categories = with_category(safe_com(lambda: item.Categories, ""), name)
+        item.Save()
+
+    def clear_category(self, item: Any, name: str) -> None:
+        """Remove one category from a mail, leaving the others alone."""
+        item.Categories = without_category(safe_com(lambda: item.Categories, ""), name)
+        item.Save()
+
+    def entry_id(self, item: Any) -> str:
+        """The mail's current EntryID (valid only for its current folder)."""
+        return safe_com(lambda: str(item.EntryID), "")
+
+    @contextmanager
+    def view_away_from_inbox(self) -> Iterator[bool | None]:
+        """Park the Explorer on another folder for the ``with`` body, to free
+        a mail it holds as its selected / reading-pane item.
+
+        An item the Explorer shows as its selection can keep a hold that
+        refuses every write, a ``Move`` included; selecting another folder
+        and then the message again clears the hold, with no restart needed.
+        ``ClearSelection`` and ``AddToSelection`` are no use: they
+        raise ``0x80004005`` in conversation view, which is Outlook's default.
+        Setting ``CurrentFolder`` works in every view. The move is retried
+        *inside* the block, while the view is away: coming back to the Inbox
+        first re-selects the mail and puts the hold back.
+
+        Only done when the active Explorer is showing this mailbox's Inbox,
+        the folder ``apply`` moves out of: any other folder is not holding the
+        mail, and moving the user's view for nothing is a cost. The original
+        folder is always put back on leaving the block, and the user's global
+        Outlook settings are never touched. The block is given one of:
+
+        ``True``   the Explorer is parked on another folder;
+        ``False``  there is no Explorer, or it is not on the Inbox, so nothing
+                   was done;
+        ``None``   the question could not be answered or the switch failed —
+                   not evidence that the hold survives a switch.
+        """
+        app = process.get_active_application()
+        if app is None:
+            yield None
+            return
+        explorer = safe_com(lambda: app.ActiveExplorer(), None)
+        if explorer is None:
+            yield False
+            return
+        current = safe_com(lambda: explorer.CurrentFolder, None)
+        current_id = safe_com(lambda: str(current.EntryID), "")
+        inbox_id = safe_com(lambda: str(self._inbox().EntryID), "")
+        if not current_id or not inbox_id:
+            yield None
+            return
+        if current_id != inbox_id:
+            yield False
+            return
+
+        # The mailbox's own Outbox, else its Drafts: an IMAP store other than
+        # the default one may have no Outbox of its own.
+        away, away_name = None, ""
+        try:
+            store = self.store()
+        except Exception as exc:
+            logger.warning("Could not pick a folder to switch Outlook to: %s", exc)
+            yield None
+            return
+        for kind, name in ((OL_FOLDER_OUTBOX, "Outbox"), (OL_FOLDER_DRAFTS, "Drafts")):
+            candidate = safe_com(lambda k=kind: store.GetDefaultFolder(k), None)
+            if candidate is not None and safe_com(lambda c=candidate: str(c.EntryID), "") != current_id:
+                away, away_name = candidate, name
+                break
+        if away is None:
+            logger.warning("Could not pick a folder to switch Outlook to: no Outbox or Drafts to use.")
+            yield None
+            return
+
+        switched = False
+        try:
+            try:
+                explorer.CurrentFolder = away
+                switched = True
+            except Exception as exc:
+                logger.warning("Could not switch Outlook to another folder: %s", exc)
+            if switched:
+                logger.info(
+                    "Outlook's view is parked on the mailbox's %s for the move; "
+                    "waiting %.1f s for it to let go of the selected mail.",
+                    away_name, EXPLORER_SETTLE_SECONDS,
+                )
+                time.sleep(EXPLORER_SETTLE_SECONDS)
+            yield True if switched else None
+        finally:
+            if switched:
+                try:
+                    explorer.CurrentFolder = current
+                    logger.info("Outlook's view is back on the Inbox.")
+                except Exception as exc:
+                    logger.error(
+                        "Could not put Outlook back on the folder it was showing: "
+                        "%s: %s", type(exc).__name__, exc,
+                    )
+
+    def is_open_in_inspector(self, entry_id: str) -> bool | None:
+        """Whether this mail is open in an Outlook window. ``None`` = unknown.
+
+        An inspector holds its item open for the life of the window, and every
+        write to that item is refused with MAPI_E_OBJECT_CHANGED meanwhile —
+        including on a reference re-acquired by EntryID, which is the same
+        underlying object, and including after a ``Save()``. So both of batch
+        mode's move defences fail by construction on an open mail, and the
+        only useful thing left to do is say so.
+
+        Three genuinely different answers, never two:
+
+        ``True``   this mail was found in an open inspector — close it;
+        ``False``  the inspectors were all read and none holds this mail;
+        ``None``   the question could not be answered — no EntryID (``""``),
+                   Outlook unreachable, or an inspector that would not be read.
+
+        ``None`` is deliberately not folded into ``False``: a check that could
+        not run is not evidence the window is closed, and reporting it as one
+        would point the next operator at the wrong remedy.
+        """
+        if not entry_id:
+            return None
+        app = process.get_active_application()
+        if app is None:
+            return None
+        try:
+            inspectors = app.Inspectors
+            count = int(inspectors.Count)
+        except Exception as exc:
+            logger.warning("Could not read Outlook's open windows: %s", exc)
+            return None
+
+        unread = False
+        for index in range(1, count + 1):
+            current = safe_com(
+                lambda i=index: inspectors.Item(i).CurrentItem, None
+            )
+            if current is None:
+                unread = True
+                continue
+            open_id = safe_com(lambda c=current: str(c.EntryID), "")
+            if not open_id:
+                # An unsaved compose window has no EntryID. It cannot be the
+                # mail being filed, so it is not a gap in the answer.
+                continue
+            if open_id == entry_id:
+                return True
+        # One window that would not be read is enough to make "none of them
+        # holds it" a guess rather than a finding.
+        return None if unread else False

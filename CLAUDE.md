@@ -7,7 +7,8 @@ folder-explorer: a public, read-only disk-space explorer. FastAPI + a static PWA
 **Hard rules for the scan (do not relax):**
 
 - Metadata only. Never open, read or stat a file one by one; the directory-handle listing in `src/winfs.py` is the only reader.
-- The one scoped exception, and only through `src/email/reader.py` (the only module that imports `extract_msg`; a test holds it), only for a `.msg` inside `email.roots`: the email stage reads new or changed mail (a child process, a per-run download budget, a failed file not retried until it changes), and "Show all" reads one mail by row id in a child process with a timeout. Nothing else opens a file.
+- The one scoped exception, and only through `src/email/reader.py` (the only module that imports `extract_msg`; a test holds it), only for a `.msg` inside `email.roots`: the email stage reads new or changed mail (a child process, a per-run download budget, a failed file not retried until it changes), "Show all" reads one mail by row id in a child process with a timeout, and `email batch renumber` reads a mail's date when the index has none. Nothing else opens a scanned file.
+- The archive verbs (`python -m app.cli email batch`, run by task-os and life-os) are the only writers of user files: they save, rename and delete only inside `email.roots` (`src/email/archive_paths.py` refuses anything else), make every COM call in their own process, never start a hidden Outlook, and keep the JSON contract `tests/archive/test_consumer_contract.py` replays. Never run them against a live mailbox in a test.
 - Never hydrate a OneDrive placeholder: no call that reads file data, no `GetCompressedFileSizeW` per file, no thumbnail or content sniffing.
 - Junctions, symlinks and mount points are counted, never followed.
 - Scan output lives in the runtime-data folder (`src/runtime_data.py`), never in the repo.

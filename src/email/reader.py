@@ -22,10 +22,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import sys
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable
+
+from src.email.naming import clean_subject, normalize_message_id
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +44,6 @@ FALLBACK_ENCODING = "cp1252"
 # MAPI property keys (id + type): PidTagFlagStatus and PidTagInternetMessageId.
 _PR_FLAG_STATUS = "10900003"
 _PR_INTERNET_MESSAGE_ID = "1035001F"
-_REPLY_PREFIX = re.compile(r"^\s*(re|rv|fwd?)\s*:?\s*", re.IGNORECASE)
-_MSG_SUFFIX = re.compile(r"\s*\.msg$", re.IGNORECASE)
 
 
 class ReadError(Exception):
@@ -61,17 +60,6 @@ def _text(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return str(value).strip()
-
-
-def clean_subject(raw: Optional[str]) -> str:
-    """The subject as the index stores it: no leading Re:/Fwd:, no trailing .msg."""
-    return _MSG_SUFFIX.sub("", _REPLY_PREFIX.sub("", (raw or "").strip())).strip()
-
-
-def normalize_message_id(raw: Optional[str]) -> str:
-    """The Message-ID without angle brackets or surrounding space; case kept."""
-    s = str(raw or "").strip()
-    return s[1:-1].strip() if s.startswith("<") and s.endswith(">") and len(s) > 1 else s
 
 
 def _prop(msg: Any, key: str) -> Any:
@@ -110,7 +98,7 @@ def _facts(msg: Any, preview_chars: int) -> dict[str, Any]:
     names = _attachments(msg)
     to, cc = _text(msg.to), _text(getattr(msg, "cc", None))
     return {
-        "subject": clean_subject(_text(msg.subject)), "sender": _text(msg.sender),
+        "subject": clean_subject(_text(msg.subject), strip_msg_suffix=True), "sender": _text(msg.sender),
         "recipients": to, "to_addrs": to, "cc_addrs": cc,
         "date_sent": _date(msg), "body_preview": _text(msg.body)[:preview_chars],
         "flag_status": int(flag or 0) if str(flag or 0).isdigit() else 0,

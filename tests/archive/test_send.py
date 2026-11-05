@@ -1,0 +1,581 @@
+"""Tests for the draft read-back and the guarded `send` verb (issue #82).
+
+A caller shows the user a preview, the user approves it in a later message,
+and only then is `main_batch.py send` spawned. These tests pin what that
+approval depends on:
+
+- ``read`` reports the item as stored — recipients by line, the whole body,
+  attachment bytes — and a fingerprint that is stable while nothing changes;
+- ``send`` sends exactly one item, the right one, when the live fingerprint
+  matches, and in every refusal path sends nothing and names what differs;
+- the one ``Send`` call lives in ``outlook/sending.py`` and nowhere else.
+
+Every address, path and subject here is synthetic.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+import types
+from pathlib import Path
+
+import pytest
+
+from app.cli import email_batch as main_batch
+from src.email.batch import draft
+from src.email.batch import send
+from src.outlook import mapi, process
+from src.outlook.client import OutlookClient
+from src.outlook.drafts import DraftUpdateError
+from src.outlook.mapi import (
+    mark_body_html,
+    marked_body_region,
+    recipient_address,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SELF = "me@example.invalid"
+OTHER = "someone@example.invalid"
+REGION = draft.text_to_html("Hello,\n\nSecond paragraph & more.")
+HTML = f"<html><body>{mark_body_html(REGION)}<div id=\"_MailAutoSig\">-- sig</div></body></html>"
+
+
+# --------------------------------------------------------------- fake COM ---
+
+class _FakeRecipient:
+    def __init__(self, kind: int, address: str = "", name: str = "", entry_address: str = "") -> None:
+        self.Type = kind
+        self.Address = address
+        self.Name = name
+        self.AddressEntry = types.SimpleNamespace(Address=entry_address)
+
+
+class _FakeCollection:
+    def __init__(self, items: list) -> None:
+        self.items = items
+
+    @property
+    def Count(self) -> int:  # noqa: N802 - COM's spelling
+        return len(self.items)
+
+    def Item(self, i: int):  # noqa: N802 - COM's spelling
+        return self.items[i - 1]
+
+
+class _FakeAttachment:
+    Type = mapi.OL_BY_VALUE
+
+    def __init__(self, name: str, data: bytes) -> None:
+        self.FileName = name
+        self.data = data
+
+    def SaveAsFile(self, path: str) -> None:  # noqa: N802 - COM's spelling
+        Path(path).write_bytes(self.data)
+
+
+class _FakeInnerMail:
+    """A mail attached to a draft as an item, as OpenSharedItem opens it."""
+
+    def __init__(self, subject: str = "An attached mail", body: str = "Its text.",
+                 attachments: list | None = None) -> None:
+        self.Subject = subject
+        self.SenderEmailAddress = OTHER
+        self.SentOn = "2026-01-02 03:04:05+00:00"
+        self.To = SELF
+        self.CC = ""
+        self.Body = body
+        self.Attachments = _FakeCollection(attachments or [])
+        self.closed_with: list[int] = []
+
+    def Close(self, mode: int) -> None:  # noqa: N802 - COM's spelling
+        self.closed_with.append(mode)
+
+
+class _FakeEmbeddedAttachment:
+    """A saved mail attached as an item: Outlook writes it out afresh on every
+    ``SaveAsFile``, so the bytes differ from one save to the next (issue #135)."""
+
+    Type = mapi.OL_EMBEDDED_ITEM
+    opened: dict[str, _FakeInnerMail] = {}
+
+    def __init__(self, inner: _FakeInnerMail) -> None:
+        self.FileName = f"{inner.Subject}.msg"
+        self.Size = 4946
+        self.inner = inner
+
+    def SaveAsFile(self, path: str) -> None:  # noqa: N802 - COM's spelling
+        key = os.urandom(8).hex()
+        _FakeEmbeddedAttachment.opened[key] = self.inner
+        Path(path).write_bytes(key.encode() + b"|" + os.urandom(64))
+
+
+class _FakeDraft:
+    def __init__(self, entry_id: str = "draft-1") -> None:
+        self.EntryID = entry_id
+        self.Subject = "A subject"
+        self.HTMLBody = HTML
+        self.Sent = False
+        self.Parent = types.SimpleNamespace(EntryID="drafts")
+        # Unresolved, as on a fresh draft: the address is in Name, Address is empty.
+        self.Recipients = _FakeCollection([
+            _FakeRecipient(mapi.OL_TO, name=OTHER),
+            _FakeRecipient(mapi.OL_BCC, address=SELF),
+        ])
+        self.Attachments = _FakeCollection([_FakeAttachment("note.txt", b"synthetic bytes")])
+        self.calls: list[tuple] = []
+
+    def Send(self) -> None:  # noqa: N802 - COM's spelling
+        self.calls.append(("Send",))
+        self.Sent = True
+
+
+class _FakeNamespace:
+    def __init__(self, items: dict[str, _FakeDraft]) -> None:
+        self.items = items
+
+    def GetItemFromID(self, entry_id: str):  # noqa: N802 - COM's spelling
+        if entry_id not in self.items:
+            raise RuntimeError("The operation failed. An object could not be found.")
+        return self.items[entry_id]
+
+    def OpenSharedItem(self, path: str):  # noqa: N802 - COM's spelling
+        if not path.lower().endswith(".msg"):
+            raise RuntimeError("Invalid path or URL.")  # what Outlook says
+        key =Path(path).read_bytes().split(b"|", 1)[0].decode()
+        return _FakeEmbeddedAttachment.opened[key]
+
+    @property
+    def DefaultStore(self):  # noqa: N802 - COM's spelling
+        # The default store's folders are this namespace's (issue #108).
+        return self
+
+    def GetDefaultFolder(self, kind: int):  # noqa: N802 - COM's spelling
+        assert kind == mapi.OL_FOLDER_DRAFTS
+        return types.SimpleNamespace(EntryID="drafts")
+
+
+class _FakeInspector:
+    def __init__(self, item: _FakeDraft, on_close=None) -> None:
+        self.CurrentItem = item
+        self.closed_with: list[int] = []
+        self._on_close = on_close
+
+    def Close(self, mode: int) -> None:  # noqa: N802 - COM's spelling
+        self.closed_with.append(mode)
+        if self._on_close:
+            self._on_close()
+
+
+def _client(monkeypatch, *items: _FakeDraft, inspectors: list[_FakeInspector] | None = None) -> OutlookClient:
+    client = OutlookClient()
+    namespace = _FakeNamespace({item.EntryID: item for item in items})
+    monkeypatch.setattr(client, "_namespace", lambda: namespace)
+    # Never the real Outlook: the only one on this machine is the user's own.
+    app = types.SimpleNamespace(Inspectors=_FakeCollection(inspectors or []))
+    monkeypatch.setattr(process, "get_active_application", lambda: app)
+    return client
+
+
+def _approved(monkeypatch, mail: _FakeDraft) -> dict:
+    """The fingerprint `read` reports for ``mail`` as it is now."""
+    return send.fingerprint(_client(monkeypatch, mail).read_draft(mail.EntryID))
+
+
+def _send(monkeypatch, mail: _FakeDraft, approval: dict, *, parts: bool = True,
+          expect_to: list[str] | None = None, inspectors=None) -> dict:
+    client = _client(monkeypatch, mail, inspectors=inspectors)
+    return send.send(client, mail.EntryID, approval["hash"], approval["parts"] if parts else {}, expect_to)
+
+
+# ------------------------------------------------------------------ read ---
+
+def test_read_reports_the_item_as_stored_and_changes_nothing(monkeypatch):
+    mail = _FakeDraft()
+    doc = send.read_document(_client(monkeypatch, mail).read_draft("draft-1"))
+
+    assert (doc["verb"], doc["entry_id"], doc["subject"]) == ("read", "draft-1", "A subject")
+    assert (doc["to"], doc["cc"], doc["bcc"], doc["unreadable_recipients"]) == ([OTHER], [], [SELF], 0)
+    assert doc["body"] == {
+        "html": HTML, "region_html": REGION, "region_text": "Hello,\n\nSecond paragraph & more.",
+        "after_region_html": '<div id="_MailAutoSig">-- sig</div></body></html>',
+    }
+    assert doc["attachments"] == [{
+        "name": "note.txt", "kind": "file", "size_bytes": len(b"synthetic bytes"),
+        "sha256": hashlib.sha256(b"synthetic bytes").hexdigest(),
+    }]
+    assert set(doc["fingerprint"]["parts"]) == set(send.PARTS)
+    assert mail.calls == [] and mail.HTMLBody == HTML
+
+
+QUOTED_ORIGINAL = '<div id="quote">On a day, they wrote:<blockquote>original text</blockquote></div>'
+
+
+def test_a_reply_as_outlook_re_serialized_it_still_reads_back_its_text_and_its_quote(monkeypatch):
+    # Issue #105: with the compose window open Outlook drops the region's closing
+    # comment and pads each paragraph with an empty <o:p>. The read-back used to
+    # find no region, so a caller could neither show the quote nor approve.
+    mail = _FakeDraft()
+    mail.HTMLBody = (
+        "<html><body><div class=WordSection1>"
+        "<div id=archive-draft-body><p>Hello,<o:p></o:p></p><p>Second paragraph &amp; more.<o:p></o:p></p></div>"
+        f'<div id="_MailAutoSig">-- sig</div>{QUOTED_ORIGINAL}</div></body></html>'
+    )
+
+    body = send.read_document(_client(monkeypatch, mail).read_draft("draft-1"))["body"]
+
+    assert body["region_text"] == "Hello,\n\nSecond paragraph & more."
+    assert body["after_region_html"].startswith('<div id="_MailAutoSig">') and "original text" in body["after_region_html"]
+
+
+def test_a_body_without_the_region_reports_nothing_after_it(monkeypatch):
+    mail = _FakeDraft()
+    mail.HTMLBody = f"<html><body><p>typed over</p>{QUOTED_ORIGINAL}</body></html>"
+
+    body = send.read_document(_client(monkeypatch, mail).read_draft("draft-1"))["body"]
+
+    assert (body["region_html"], body["region_text"], body["after_region_html"]) == (None, None, None)
+
+
+def test_the_fingerprint_is_stable_while_nothing_changes(monkeypatch):
+    mail = _FakeDraft()
+    assert _approved(monkeypatch, mail) == _approved(monkeypatch, mail)
+
+
+def _with_attached_mail(inner: _FakeInnerMail) -> _FakeDraft:
+    mail = _FakeDraft()
+    mail.Attachments.items.append(_FakeEmbeddedAttachment(inner))
+    return mail
+
+
+def test_an_attached_mail_keeps_its_fingerprint_although_its_bytes_change(monkeypatch):
+    # Issue #135: Outlook re-serialises an attached mail on every SaveAsFile,
+    # so a hash of those bytes never matched between `read` and `send`.
+    inner = _FakeInnerMail(attachments=[_FakeAttachment("inner.txt", b"inner bytes")])
+    mail = _with_attached_mail(inner)
+
+    first = send.read_document(_client(monkeypatch, mail).read_draft("draft-1"))
+
+    assert first["fingerprint"] == _approved(monkeypatch, mail)
+    assert first["attachments"][1]["kind"] == "embedded"
+    assert first["attachments"][1]["name"] == "An attached mail.msg"
+    assert inner.closed_with == [mapi.OL_DISCARD, mapi.OL_DISCARD]
+
+
+def test_an_attached_mail_keeps_its_fingerprint_when_outlook_settles_its_size(monkeypatch):
+    # Attachment.Size reads 0 on a draft just written and only the
+    # stored size once the draft is saved, which `send` does before it compares.
+    inner = _FakeInnerMail(attachments=[_FakeAttachment("inner.txt", b"inner bytes")])
+    mail = _with_attached_mail(inner)
+    mail.Attachments.items[1].Size = 0
+    approved = _approved(monkeypatch, mail)
+
+    mail.Attachments.items[1].Size = 8106
+
+    settled = send.read_document(_client(monkeypatch, mail).read_draft("draft-1"))
+    assert settled["fingerprint"] == approved
+    assert settled["attachments"][1]["size_bytes"] == 8106
+    _send(monkeypatch, mail, approved)
+    assert mail.calls == [("Send",)]
+
+
+@pytest.mark.parametrize("change", [
+    lambda inner: setattr(inner, "Body", "Other text."),
+    lambda inner: setattr(inner, "SentOn", "2026-01-03 03:04:05+00:00"),
+    lambda inner: setattr(inner.Attachments.items[0], "data", b"inner bytez"),
+])
+def test_a_change_inside_an_attached_mail_changes_its_hash(monkeypatch, change):
+    inner = _FakeInnerMail(attachments=[_FakeAttachment("inner.txt", b"inner bytes")])
+    mail = _with_attached_mail(inner)
+    before = _approved(monkeypatch, mail)["parts"]["attachments"]
+
+    change(inner)
+
+    assert _approved(monkeypatch, mail)["parts"]["attachments"] != before
+
+
+def test_recipient_order_and_case_do_not_change_the_fingerprint(monkeypatch):
+    mail = _FakeDraft()
+    before = _approved(monkeypatch, mail)
+    mail.Recipients.items.reverse()
+    mail.Recipients.items[0].Address = SELF.upper()
+    assert _approved(monkeypatch, mail) == before
+
+
+@pytest.mark.parametrize("recipient, expected", [
+    (_FakeRecipient(1, address=OTHER), OTHER),
+    (_FakeRecipient(1, name=OTHER), OTHER),
+    (_FakeRecipient(1, address="/o=ExchangeLabs/cn=x", entry_address=OTHER, name="Some One"), OTHER),
+    (_FakeRecipient(1, name="Some One"), ""),
+])
+def test_a_recipient_address_is_read_from_wherever_outlook_left_it(recipient, expected):
+    assert recipient_address(recipient) == expected
+
+
+def test_the_region_text_is_only_given_for_a_body_text_to_html_wrote():
+    assert draft.html_to_text(draft.text_to_html("a  b\nc &lt; d\n\ne")) == "a  b\nc &lt; d\n\ne"
+    assert draft.html_to_text("<p>Outlook <b>rewrote</b> this</p>") is None
+    assert draft.html_to_text("<div>not ours</div>") is None
+    assert marked_body_region("<body>no markers</body>") is None
+
+
+def test_quotes_are_written_literally_so_outlook_has_nothing_to_rewrite():
+    text = "I'll say \"yes\" & <go>"
+    body_html = draft.text_to_html(text)
+    assert body_html == "<p>I'll say \"yes\" &amp; &lt;go&gt;</p>"
+    assert draft.html_to_text(body_html) == text
+
+
+# ------------------------------------------------------------ send: match ---
+
+def test_a_matching_draft_is_sent_exactly_once(monkeypatch):
+    mail, bystander = _FakeDraft(), _FakeDraft("draft-2")
+    approval = _approved(monkeypatch, mail)
+    client = _client(monkeypatch, mail, bystander)
+
+    doc = send.send(client, "draft-1", approval["hash"], approval["parts"], [OTHER])
+
+    assert mail.calls == [("Send",)]
+    assert bystander.calls == []
+    assert (doc["verb"], doc["sent"], doc["entry_id"], doc["to"], doc["bcc"]) == ("send", True, "draft-1", [OTHER], [SELF])
+
+
+def test_a_draft_with_an_attached_mail_is_sent_with_the_hash_read_gave(monkeypatch):
+    mail = _with_attached_mail(_FakeInnerMail())
+
+    _send(monkeypatch, mail, _approved(monkeypatch, mail))
+
+    assert mail.calls == [("Send",)]
+
+
+def test_swapping_the_attached_mail_for_another_is_refused(monkeypatch):
+    mail = _with_attached_mail(_FakeInnerMail())
+    approval = _approved(monkeypatch, mail)
+    mail.Attachments.items[1] = _FakeEmbeddedAttachment(_FakeInnerMail(body="A different mail."))
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval)
+
+    assert (refused.value.code, refused.value.differs) == ("approval_mismatch", ["attachments"])
+    assert mail.calls == []
+
+
+def test_a_window_open_on_the_draft_is_closed_saving_before_the_read(monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    inspector = _FakeInspector(mail)
+
+    _send(monkeypatch, mail, approval, inspectors=[inspector])
+
+    assert inspector.closed_with == [mapi.OL_SAVE]
+    assert mail.calls == [("Send",)]
+
+
+# --------------------------------------------------------- send: refusals ---
+
+def _tamper_body(mail):
+    mail.HTMLBody = HTML.replace("Second paragraph", "Second paragraph!")
+
+
+def _tamper_outside_region(mail):
+    mail.HTMLBody = HTML.replace("-- sig", "-- sig, and a line typed by hand")
+
+
+def _tamper_subject(mail):
+    mail.Subject = "A subject."
+
+
+def _tamper_recipient(mail):
+    mail.Recipients.items[0].Name = "other@example.invalid"
+
+
+def _add_recipient(mail):
+    mail.Recipients.items.append(_FakeRecipient(mapi.OL_CC, address="extra@example.invalid"))
+
+
+def _tamper_attachment(mail):
+    mail.Attachments.items[0].data = b"synthetic bytez"
+
+
+@pytest.mark.parametrize("tamper, differs", [
+    (_tamper_body, ["body"]),
+    (_tamper_outside_region, ["body"]),
+    (_tamper_subject, ["subject"]),
+    (_tamper_recipient, ["to"]),
+    (_add_recipient, ["cc"]),
+    (_tamper_attachment, ["attachments"]),
+])
+def test_any_change_after_approval_is_refused_naming_the_part(monkeypatch, tamper, differs):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    tamper(mail)
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval)
+
+    assert (refused.value.code, refused.value.differs) == ("approval_mismatch", differs)
+    assert "Nothing was sent" in str(refused.value)
+    assert mail.calls == []
+
+
+def test_an_edit_saved_from_an_open_window_is_caught(monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    inspector = _FakeInspector(mail, on_close=lambda: _tamper_body(mail))
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval, inspectors=[inspector])
+
+    assert refused.value.differs == ["body"]
+    assert mail.calls == []
+
+
+def test_a_hash_mismatch_without_parts_is_still_refused(monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    _tamper_body(mail)
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval, parts=False)
+
+    assert (refused.value.code, refused.value.differs) == ("approval_mismatch", [])
+    assert mail.calls == []
+
+
+def test_a_wrong_expected_to_is_refused_even_when_the_hash_matches(monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval, expect_to=[OTHER, "extra@example.invalid"])
+
+    assert refused.value.differs == ["to"]
+    assert mail.calls == []
+
+
+def test_a_recipient_with_no_readable_address_is_refused(monkeypatch):
+    mail = _FakeDraft()
+    mail.Recipients.items.append(_FakeRecipient(mapi.OL_CC, name="Nobody Resolvable"))
+    approval = _approved(monkeypatch, mail)
+
+    with pytest.raises(send.SendRefused) as refused:
+        _send(monkeypatch, mail, approval)
+
+    assert refused.value.code == "recipient_unreadable"
+    assert mail.calls == []
+
+
+@pytest.mark.parametrize("setup, code", [
+    (lambda mail: setattr(mail, "Sent", True), "draft_not_editable"),
+    (lambda mail: setattr(mail, "Parent", types.SimpleNamespace(EntryID="inbox")), "draft_not_editable"),
+])
+def test_a_sent_or_moved_item_is_refused(monkeypatch, setup, code):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    setup(mail)
+
+    with pytest.raises(DraftUpdateError) as refused:
+        _send(monkeypatch, mail, approval)
+
+    assert refused.value.code == code
+    assert mail.calls == []
+
+
+def test_a_missing_item_is_refused(monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    client = _client(monkeypatch)
+
+    with pytest.raises(DraftUpdateError) as refused:
+        send.send(client, "draft-1", approval["hash"], approval["parts"], None)
+
+    assert refused.value.code == "draft_not_found"
+    assert mail.calls == []
+
+
+def test_send_is_called_only_from_the_sending_module():
+    # Spelled in two halves so a grep of the repo for the call finds only the one.
+    needle = "." + "Send("
+    holders = sorted(
+        str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+        for path in [*(REPO_ROOT / "src").rglob("*.py"), *(REPO_ROOT / "app").rglob("*.py")]
+        if needle in path.read_text(encoding="utf-8")
+    )
+    assert holders == ["src/outlook/sending.py"]
+
+
+# ------------------------------------------------------ process contract ---
+
+@pytest.fixture
+def batch_process(monkeypatch, capsys):
+    """``main_batch.main`` with a temp config, a stub pythoncom and a fake
+    Outlook client over the given drafts."""
+    monkeypatch.setattr(main_batch, "load_config", lambda: {"outlook": {}})
+    monkeypatch.setattr(main_batch, "setup_logging", lambda: None)
+    monkeypatch.setitem(sys.modules, "pythoncom", types.SimpleNamespace(
+        CoInitialize=lambda: None, CoUninitialize=lambda: None,
+    ))
+    started: list[OutlookClient] = []
+
+    def run(argv: list[str], *items: _FakeDraft) -> tuple[int, dict, list]:
+        client = _client(monkeypatch, *items)
+        monkeypatch.setattr(client, "ensure_running", lambda timeout: None)
+
+        def _factory(mailbox=None) -> OutlookClient:
+            started.append(client)
+            return client
+
+        monkeypatch.setattr(main_batch, "OutlookClient", _factory)
+        code = main_batch.main(argv)
+        return code, json.loads(capsys.readouterr().out), started
+
+    return run
+
+
+def test_read_prints_the_snapshot_document(batch_process):
+    code, doc, _ = batch_process(["read", "--entry-id", "draft-1"], _FakeDraft())
+
+    assert code == main_batch.EXIT_OK
+    assert doc["verb"] == "read" and len(doc["fingerprint"]["hash"]) == 64
+
+
+def test_a_matching_send_prints_its_document(batch_process, monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    argv = ["send", "--entry-id", "draft-1", "--expect-hash", approval["hash"], "--expect-to", OTHER]
+    argv += [f"--expect-part={name}={digest}" for name, digest in approval["parts"].items()]
+
+    code, doc, _ = batch_process(argv, mail)
+
+    assert (code, doc["sent"]) == (main_batch.EXIT_OK, True)
+    assert mail.calls == [("Send",)]
+
+
+def test_a_refused_send_exits_2_naming_the_part(batch_process, monkeypatch):
+    mail = _FakeDraft()
+    approval = _approved(monkeypatch, mail)
+    _tamper_body(mail)
+    argv = ["send", "--entry-id", "draft-1", "--expect-hash", approval["hash"],
+            f"--expect-part=body={approval['parts']['body']}"]
+
+    code, doc, _ = batch_process(argv, mail)
+
+    assert code == main_batch.EXIT_CANNOT_START
+    assert (doc["error"]["code"], doc["error"]["differs"]) == ("approval_mismatch", ["body"])
+    assert mail.calls == []
+
+
+@pytest.mark.parametrize("argv", [
+    ["send", "--entry-id", "draft-1", "--expect-hash", "not-a-hash"],
+    ["send", "--entry-id", "draft-1", "--expect-hash", "a" * 64, "--expect-part", "signature=" + "b" * 64],
+    ["send", "--entry-id", "draft-1", "--expect-hash", "a" * 64, "--expect-to", " "],
+    ["send", "--entry-id", " ", "--expect-hash", "a" * 64],
+    ["read", "--entry-id", " "],
+])
+def test_bad_send_input_exits_2_without_starting_outlook(batch_process, argv):
+    code, doc, started = batch_process(argv, _FakeDraft())
+
+    assert code == main_batch.EXIT_CANNOT_START
+    assert doc["error"]["code"] == "bad_input"
+    assert started == []

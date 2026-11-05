@@ -1,5 +1,7 @@
 -r requirements.txt
 -r requirements-tray.txt
+# The archive suggester's tests rank with it (requirements-email.txt at run time).
+rapidfuzz>=3.0
 httpx>=0.27
 pytest>=8.0
 pytest-playwright>=0.7

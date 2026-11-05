@@ -6,6 +6,7 @@ Shape `webapp-tray` (see `.fleet.toml`).
 folder-explorer/
 ├── app/                        # entry points and the web layer
 │   ├── cli/__main__.py         # `python -m app.cli scan|roots|email`: scans and the email index with no app running
+│   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
 │   │   ├── tray.py             # menu, adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
@@ -27,8 +28,14 @@ folder-explorer/
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
-│   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history)
-│   │   └── reader.py           # the only module that opens a file (a .msg, for the stage and Show all)
+│   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),
+│   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths
+│   │   │                       #   (the email-folder guard), archive_settings, mailboxes, repository,
+│   │   │                       #   suggester, renumber
+│   │   ├── batch/              # the archive verbs: verbs (plan, apply, mailboxes, renumber), revert,
+│   │   │                       #   dismiss, draft, send, find, sync, move, common (the envelope)
+│   │   └── reader.py           # the only module that opens a file (a .msg, for the stage, Show all, renumber)
+│   ├── outlook/                # every COM call: client, drafts, sending (the one Send), syncing, stores, process
 │   ├── scanner.py              # the walk and the index writer
 │   ├── index.py                # every query over an index, and the open-index pool
 │   ├── store.py                # scan history and current index per root (state.sqlite3)
@@ -41,7 +48,8 @@ folder-explorer/
 │   ├── login_alert.py          # the guessing alert's text and Telegram notifier
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL
 │   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, pooled_http, runtime_data, usage_log
-├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite
+├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
+│                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract)
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py
 └── docs/                       # this file, scanning.md, and design/ (the search study and the app mock-up, invented data)

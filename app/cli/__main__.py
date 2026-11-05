@@ -16,6 +16,9 @@
                                         the Outlook archive verbs (plan, apply, revert, dismiss, renumber,
                                         draft, read, send, mailboxes, find, sync): one JSON document on
                                         stdout; verbs, flags and exit codes in app/cli/email_batch.py
+    python -m app.cli folders search --query WORDS [--limit N] --json
+                                        folder search over every root's index, one JSON document
+                                        on stdout; its keys and exit codes in app/cli/folders.py
 
 ``scan`` exit codes: 0 every root scanned, 1 a root failed, 2 another scan
 holds the lock (nothing was scanned), 3 an unknown root key. ``email index``:
@@ -133,6 +136,11 @@ def main(argv: list[str] | None = None) -> int:
         from app.cli import email_batch
 
         return email_batch.main(argv[2:])
+    if argv[:1] == ["folders"]:
+        # Likewise: the folder search's stdout carries only its JSON document.
+        from app.cli import folders
+
+        return folders.main(argv[1:])
     for stream in (sys.stdout, sys.stderr):
         if stream is not None and hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
@@ -155,6 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     conf = email.add_parser("config", help="the email folders and index, as JSON")
     conf.add_argument("--json", action="store_true", required=True, help="print one JSON document")
     email.add_parser("batch", help="the Outlook archive verbs, one JSON document on stdout (email batch --help)")
+    sub.add_parser("folders", help="folder search as one JSON document (folders search --help)")
     args = parser.parse_args(argv)
     if args.command == "scan":
         return cmd_scan(args.root, email=not args.no_email)

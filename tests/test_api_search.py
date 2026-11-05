@@ -1,13 +1,15 @@
-"""The search API: parts status, folder and email search, one mail, Show all, PC-only actions, saved searches."""
+"""The search API (parts status, folder and email search, one mail, Show all, PC-only actions, saved searches) and the folders CLI."""
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.cli.__main__ import main as cli
 from app.webapp.routers import search as search_routes
 from app.webapp.server import app
 from app.webapp.state import EMAILS
@@ -139,3 +141,24 @@ def test_config_validates_the_search_settings(isolated: Path) -> None:
         assert c.post("/api/config", json={"folder_search": {"skip_levels": 99}}).status_code == 400
         assert c.post("/api/config", json={"email": {"index_path": 5}}).status_code == 400
         assert c.post("/api/config", json={"email": {"bogus": 1}}).status_code == 400
+
+
+def test_the_folders_cli_prints_one_document(setup: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    capsys.readouterr()
+    assert cli(["folders", "search", "--query", "harbour", "--json"]) == 0
+    doc = json.loads(capsys.readouterr().out)
+    assert doc["schema_version"] == 1 and doc["query"] == "harbour" and doc["total"] == 1
+    hit = doc["results"][0]
+    assert hit["name"] == "harbour-trip" and Path(hit["path"]) == setup / "Invented drive" / "Photos" / "2024" / "harbour-trip"
+    assert cli(["folders", "search", "--query", "2024", "--limit", "1", "--json"]) == 0
+    one = json.loads(capsys.readouterr().out)
+    assert len(one["results"]) == 1 and one["total"] > 1 and one["truncated"] is True
+    assert cli(["folders", "search", "--query", " ; ", "--json"]) == 1
+    assert json.loads(capsys.readouterr().out)["error"]["code"] == "bad_query"
+
+
+def test_the_folders_cli_says_when_nothing_is_scanned(isolated: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    capsys.readouterr()
+    assert cli(["folders", "search", "--query", "harbour", "--json"]) == 4
+    assert json.loads(capsys.readouterr().out) == {
+        "schema_version": 1, "error": {"code": "not_set_up", "message": "no root has a finished scan yet"}}

@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import bisect
 import os
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
-from src.index import Index
+from src import store
+from src.index import Index, open_index
 from src.roots import Root
 from src.scanner import search_key
 
@@ -84,6 +86,25 @@ def _with_path(hit: dict[str, Any], root: Root, index: Index, skip: int) -> dict
     names = [p["name"] for p in index.path(hit["id"])][1:]
     path = full_path(root, names)
     return {**hit, "path": path, "display": display_path(path, skip)}
+
+
+@contextmanager
+def open_scanned(roots: list[Root]) -> Iterator[list[tuple[Root, Index]]]:
+    """Each root with a finished scan and its current index, opened for this block only.
+
+    The web app shares its open-index pool; a one-shot caller (the CLI) opens
+    its own read-only connections here and closes them on the way out.
+    """
+    opened: list[tuple[Root, Index]] = []
+    try:
+        for root in roots:
+            scan = store.current_index(root.key)
+            if scan is not None:
+                opened.append((root, Index(open_index(store.index_dir() / scan["index_file"]))))
+        yield opened
+    finally:
+        for _, index in opened:
+            index.conn.close()
 
 
 def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int, limit: int = LIMIT) -> dict[str, Any]:

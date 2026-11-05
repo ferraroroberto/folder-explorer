@@ -30,7 +30,7 @@ def lock() -> ScanLock:
 
 def _scan_root(root: Root, trigger: str) -> dict[str, Any]:
     scan_id = store.begin_scan(root.key, root.path, trigger)
-    index_name = "%s-%d.sqlite3" % (root.key, scan_id)
+    index_name = store.index_name(root.key, scan_id)
     last = [0.0]
 
     def progress(counters: dict[str, int]) -> None:

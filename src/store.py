@@ -66,6 +66,11 @@ def index_dir() -> Path:
     return path
 
 
+def index_name(root_key: str, scan_id: int) -> str:
+    """The index file one scan of one root writes."""
+    return "%s-%d.sqlite3" % (root_key, scan_id)
+
+
 def state_path() -> Path:
     return data_dir() / "state.sqlite3"
 
@@ -161,7 +166,8 @@ def prune_indexes(keep_per_root: int = 1) -> list[str]:
     """Delete index files older than each root's current one; returns the names removed.
 
     A file a reader still has open cannot be deleted on Windows; it stays and
-    goes on the next prune.
+    goes on the next prune. A running scan's file is kept too: the scan puts
+    its finished index in place a moment before it records it.
     """
     with connect() as conn:
         keep = {
@@ -172,6 +178,8 @@ def prune_indexes(keep_per_root: int = 1) -> list[str]:
                 (STATUS_OK, STATUS_OK, keep_per_root),
             )
         }
+        keep |= {index_name(r["root_key"], int(r["id"]))
+                 for r in conn.execute("SELECT id, root_key FROM scans WHERE status = ?", (STATUS_RUNNING,))}
     removed = []
     for path in index_dir().glob("*.sqlite3"):
         if path.name in keep:
@@ -179,6 +187,7 @@ def prune_indexes(keep_per_root: int = 1) -> list[str]:
         try:
             path.unlink()
             removed.append(path.name)
+            logger.info("ℹ️ pruned a replaced index: %s", path.name)
         except OSError as exc:
             logger.info("ℹ️ old index still in use, kept for the next prune: %s (%s)", path.name, exc)
     return removed

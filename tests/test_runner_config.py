@@ -36,6 +36,23 @@ def test_failed_rescan_keeps_the_previous_index(isolated: Path) -> None:
     assert store.latest_scan(ok["root"])["status"] == "failed"
 
 
+def test_a_prune_mid_rescan_keeps_the_index_being_finished(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    write_config(isolated, roots=[str(build_tree(isolated / "Invented"))])
+    scan_runner.run_scans()
+    real = scan_runner.scan_to_index
+
+    def then_prune(*args: object, **kwargs: object) -> object:
+        # The page's poll lands after the new index is in place but before the scan records it.
+        counters = real(*args, **kwargs)
+        store.prune_indexes()
+        return counters
+
+    monkeypatch.setattr(scan_runner, "scan_to_index", then_prune)
+    [again] = scan_runner.run_scans()
+    current = store.current_index(again["root"])
+    assert current is not None and current["id"] == store.latest_scan(again["root"])["id"]
+
+
 def test_second_scan_is_refused_while_the_lock_is_held(isolated: Path) -> None:
     write_config(isolated, roots=[str(build_tree(isolated / "Invented"))])
     with ScanLock(scan_runner.lock().path):

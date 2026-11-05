@@ -1,8 +1,10 @@
 # folder-explorer
 
-Where the space on your drives goes, and where a folder or an archived mail is. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type, and searches folder paths and an email archive's index. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. A scan never opens a file, so it never downloads one.
+Where the space on your drives goes, and where a folder or an archived mail is. A Windows web app that scans folders by their listings only, then shows a folder tree with sizes and shares, the largest files, the top percentile of files and a breakdown by file type, and searches folder paths and an email archive's index. OneDrive files that live only in the cloud are counted both ways: **Size** (what the cloud stores) and **On disk** (what this PC holds), with a toggle for which one drives the totals. The disk walk never opens a file, so it never downloads one.
 
-FastAPI + a static PWA, a Windows tray, and the fleet design system. The app itself is read-only: it never moves or deletes your files, and the only file it opens is a mail you ask it to show in full (see Search). Two things file Outlook mail into the email folders, both only on request: the Archive sheet and the Outlook macro on this PC (see Archive sheet), and the archive verbs another app runs (see Archive verbs).
+FastAPI + a static PWA, a Windows tray, and the fleet design system. The disk views are read-only. Mail is the one exception, and only for `.msg` files inside the configured email folders (`email.roots`): the email stage reads new or changed mail (see Scans), Show all reads the one mail you ask for (see Search), and two things file Outlook mail into those folders, both only on request: the Archive sheet and the Outlook macro on this PC (see Archive sheet), and the archive verbs another app runs (see Archive verbs). Nothing outside the email folders is ever opened, moved or deleted.
+
+It replaces two older tools: email-archiver (the Outlook archive, its email index and its batch CLI) and the folder searcher tray from the `automation` repo. Both are retired; see Moving over.
 
 ## Install
 
@@ -51,7 +53,7 @@ The default roots are every local fixed drive plus each OneDrive folder, dedupli
 
 On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-app schedule stays off. `exclude` (Settings: Skip these folders) lists folders every scan leaves out; the disk index, folder search and the email index all skip them.
 
-**The email index.** With `email.roots` set (the email folders, each inside a scan root) and `email.index_path` left empty, the app keeps its own email index, `emails.sqlite3` in the runtime-data folder, and is its only writer. Every scan ends with the email stage: it compares the scan's list of `.msg` files with the index by path, size and modified time, reads only new or changed mail through `src/email/reader.py`, and removes rows for mail that is gone only after a complete listing of its folder. It is the one place besides Show all that opens a file. Reading an online-only mail downloads it, so each run downloads at most `email.download_budget_mb` (2 GB by default; 0 reads local files only) and leaves the rest for the next run. A file that fails is not read again until it changes. The Scans tab shows each run (new, downloaded, waiting for budget, failed) and runs it now, or for one folder:
+**The email index.** With `email.roots` set (the email folders, each inside a scan root) and `email.index_path` left empty, the app keeps its own email index, `emails.sqlite3` in the runtime-data folder, and is its only writer. Every scan ends with the email stage: it compares the scan's list of `.msg` files with the index by path, size and modified time, reads only new or changed mail through `src/email/reader.py`, and removes rows for mail that is gone only after a complete listing of its folder. Besides Show all and the `renumber` verb, this stage is the only thing that opens a file, and it opens only a `.msg` inside `email.roots`. Reading an online-only mail downloads it, so each run downloads at most `email.download_budget_mb` (2 GB by default; 0 reads local files only) and leaves the rest for the next run. A file that fails is not read again until it changes. The Scans tab shows each run (new, downloaded, waiting for budget, failed) and runs it now, or for one folder:
 
 - `& .\.venv\Scripts\python.exe -m app.cli email index` (every email folder) or `... email index --root <folder>` (one folder below one, in seconds, under the email lock only, so it never waits behind a disk scan). Exit 0 indexed, 1 failed, 2 busy (another email run held the lock past `--wait S`), 3 not inside an email folder, 4 not set up here.
 - `... email import --from <emails.db>` copies another app's email index in once, keeping its rows; the next run reads each mail once more to fill To, Cc, attachments and size. `... email status` lists the last runs.
@@ -80,7 +82,8 @@ The first tab searches **Folders** or **Emails**; the mode and the box live in t
 
 The **Outlook macro** puts the same flow on Outlook's ribbon. It starts `pythonw -m app.outlook archive --entry-id <id> --store-id <id>` hidden and returns at once, so Outlook never waits. The entry fetches the mail again by those ids, then hands it to the Archive sheet of a page open on this PC; with no page open, a small window shows the same suggestions. Failures say which case they are: Outlook not reachable, no mail selected, the mail moved, no email folder mounted, pywin32 not installed.
 
-- Every Outlook step runs `python -m app.outlook` in its own process with a timeout (the web server makes no COM call), attaches to the running Outlook and never starts one. Filing writes only inside `email.roots`. The verbs log to `outlook.log` in the runtime-data folder.
+- The sheet and the macro read the mail from Outlook, never a `.msg` from disk, and write only the filed `.msg` and its attachments inside `email.roots`.
+- Every Outlook step runs `python -m app.outlook` in its own process with a timeout (the web server makes no COM call), attaches to the running Outlook and never starts one. The verbs log to `outlook.log` in the runtime-data folder.
 - Needs `requirements-outlook.txt` (pywin32) and Outlook (classic); otherwise the card says why it is off. The new Outlook for Windows runs neither macros nor COM.
 - `FOLDER_EXPLORER_OUTLOOK=off` keeps a process from starting the bridge at all (the e2e suite's disposable instance sets it).
 
@@ -96,10 +99,19 @@ Set the macro up once per PC:
 `python -m app.cli email batch <verb>` is the headless Outlook archive that task-os and life-os drive: `plan` (Inbox or Sent mail with ranked archive folders), `apply` (save a mail as `NNN - subject.msg` with its attachments into an email folder, move it to the Outlook archive folder and tag it), `revert`, `dismiss` (move without keeping a file), `renumber` (put a folder's sequence back in date order), `draft`, `read` and `send` (an unsent draft, sent only when its fingerprint matches the approved one), `mailboxes`, `find` (live Outlook folders, read-only) and `sync` (Send/Receive). Every verb prints one JSON document on stdout (`schema_version` 1) and logs to stderr and `email-batch.log` in the runtime-data folder; flags, error codes and exit codes are in `app/cli/email_batch.py`. `tests/archive/test_consumer_contract.py` replays every command shape the two apps send.
 
 - The verbs write only inside `email.roots`: a destination, a file to delete or a folder to renumber anywhere else is refused per item. They read and write this app's own `emails.sqlite3`; the email stage still indexes new mail (`email index --root <folder>` after filing).
-- `renumber` reads a `.msg` for its date only when the index has none, through `src/email/reader.py`.
+- `renumber` reads a `.msg` inside `email.roots` for its date only when the index has none, through `src/email/reader.py`.
 - Outlook is reached over COM in the verb's own process, which the caller runs with a timeout. A closed Outlook is started visibly (`outlook.exe`), never as a hidden COM instance; Exchange senders resolve through `GetExchangeUser()`.
 - `mailboxes.json` beside `config.json` (gitignored; `mailboxes.sample.json` is the template) lists the mailboxes `--mailbox` picks from; without it the verbs use Outlook's default store.
 - Needs `requirements-outlook.txt` (pywin32); without it every Outlook verb answers `com_unavailable` and `mailboxes` reports each mailbox `unknown`. The suggester needs `rapidfuzz` (`requirements-email.txt`).
+
+## Moving over
+
+This app replaces email-archiver and the folder searcher tray, which are retired.
+
+- **The email index:** `email import --from <emails.db>` copies email-archiver's index in once (see Scans); from then on this app is the index's only writer.
+- **Callers:** task-os and life-os run the archive verbs and `email index --root` here, and life-os looks folders up with `folders search --json`. life-os finds this checkout beside its own (`LIFE_OS_FOLDER_EXPLORER_REPO` overrides that). For one release it still falls back to email-archiver (`LIFE_OS_EMAIL_ARCHIVER_REPO`) and the folder searcher's index file when this app is not found, and email-archiver's own scan hands over to `email index --fresh` here once its `database.path` points at this app's index.
+- **Nightly:** this app's scan replaces both email-archiver's scan and the folder searcher's scan in the nightly chain.
+- **Archiving a mail:** the Outlook macro and the Archive sheet replace email-archiver's archive dialog and its Stream Deck buttons.
 
 ## Features
 

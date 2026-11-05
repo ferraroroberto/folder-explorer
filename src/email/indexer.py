@@ -83,12 +83,18 @@ def _from_scan(folder: str, roots: list[Root]) -> Optional[Manifest]:
     return None
 
 
-def manifests(part: EmailPart, scope: Optional[str], roots: list[Root], exclude: frozenset[str]) -> list[Manifest]:
+def manifests(part: EmailPart, scope: Optional[str], roots: list[Root], exclude: frozenset[str],
+              fresh: bool = False) -> list[Manifest]:
+    """Each folder's manifest: a listing of ``scope``, else the scan index per email folder.
+
+    ``fresh`` lists every email folder now instead: a mail filed since the last
+    scan is not in that scan's index.
+    """
     if scope is not None:
         return [walk(scope, exclude=exclude)]
     out = []
     for folder in part.roots:
-        m = _from_scan(folder, roots)
+        m = None if fresh else _from_scan(folder, roots)
         out.append(m if m is not None else walk(folder, exclude=exclude))
     return out
 
@@ -129,7 +135,8 @@ def spawn(trigger: str, scope: Optional[str] = None) -> "subprocess.Popen[bytes]
         log.close()
 
 
-def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, read: Optional[Reader] = None) -> dict[str, Any]:
+def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, read: Optional[Reader] = None,
+        fresh: bool = False) -> dict[str, Any]:
     """One email run; raises ``NotSetUp``, ``UnknownFolder`` or ``EmailBusy`` before touching anything."""
     cfg = config.load()
     roots = resolve_roots(cfg["roots"])
@@ -147,7 +154,7 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
         run_id = store.begin_email_run(trigger, scope or "all")
         t0 = time.monotonic()
         try:
-            lists = manifests(part, scope, roots, exclude_keys(cfg["exclude"]))
+            lists = manifests(part, scope, roots, exclude_keys(cfg["exclude"]), fresh)
             conn = open_writer(part.index_path)
             try:
                 counts = Stage(conn, part.budget_bytes, read or read_facts).run(lists).as_dict()

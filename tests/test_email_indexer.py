@@ -75,6 +75,13 @@ def test_a_full_run_reads_the_scan_index_not_the_disk(setup: Path, monkeypatch: 
     assert result["status"] == "ok" and result["counts"]["new"] == 3
     assert indexed_names() == ["001 - Kickoff.msg", "002 - Budget.msg", "003 - Invoice.msg"]
     assert store.email_runs(1)[0]["message"].startswith("3 new")
+    # A mail filed after the scan reaches the index only through a fresh listing.
+    filed = setup / "Mail" / "Clients" / "005 - Filed today.msg"
+    filed.write_bytes(b"invented")
+    assert indexer.run(read=FakeReader())["counts"]["new"] == 0
+    monkeypatch.setattr(indexer, "walk", manifest.walk)
+    assert indexer.run(read=FakeReader(), fresh=True)["counts"]["new"] == 1
+    assert cli(["email", "index", "--fresh"]) == 0
 
 
 def test_a_scoped_run_lists_only_its_folder(setup: Path) -> None:

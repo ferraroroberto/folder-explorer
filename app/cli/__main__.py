@@ -4,8 +4,9 @@
     python -m app.cli scan --root c     scan one root (repeat --root for more)
     python -m app.cli scan --no-email   scan only, leave the email index as it is
     python -m app.cli roots             list the roots and their last scan
-    python -m app.cli email index [--root FOLDER] [--wait S]
-                                        index the email folders (or one folder below one)
+    python -m app.cli email index [--root FOLDER] [--wait S] [--fresh]
+                                        index the email folders (or one folder below one);
+                                        --fresh lists them now instead of using the last scan
     python -m app.cli email import --from FILE
                                         copy another app's email index in, once
     python -m app.cli email status      the email index's size and its last runs
@@ -47,9 +48,9 @@ def _gib(n: int) -> str:
     return "%.1f GiB" % (n / 2**30)
 
 
-def cmd_email_index(scope: Optional[str], wait_s: float, trigger: str) -> int:
+def cmd_email_index(scope: Optional[str], wait_s: float, trigger: str, fresh: bool = False) -> int:
     try:
-        result = indexer.run(scope, trigger=trigger, wait_s=wait_s)
+        result = indexer.run(scope, trigger=trigger, wait_s=wait_s, fresh=fresh)
     except indexer.NotSetUp as exc:
         logger.info("ℹ️ email index not run: %s", exc)
         return EXIT_NOT_SET_UP
@@ -136,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     index = email.add_parser("index", help="index the email folders now")
     index.add_argument("--root", default=None, help="one folder inside an email folder (default: every email folder)")
     index.add_argument("--wait", type=float, default=0.0, help="seconds to wait for a running email run")
+    index.add_argument("--fresh", action="store_true", help="list the email folders now, not from the last scan")
     index.add_argument("--trigger", default="cli", help=argparse.SUPPRESS)
     imp = email.add_parser("import", help="copy another app's email index in, once")
     imp.add_argument("--from", dest="source", required=True, help="the email index file to copy")
@@ -147,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_scan(args.root, email=not args.no_email)
     if args.command == "email":
         if args.verb == "index":
-            return cmd_email_index(args.root, args.wait, args.trigger)
+            return cmd_email_index(args.root, args.wait, args.trigger, args.fresh)
         if args.verb == "config":
             return cmd_email_config()
         return cmd_email_import(args.source) if args.verb == "import" else cmd_email_status()

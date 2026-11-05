@@ -54,6 +54,7 @@ On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-
 
 - `& .\.venv\Scripts\python.exe -m app.cli email index` (every email folder) or `... email index --root <folder>` (one folder below one, in seconds, under the email lock only, so it never waits behind a disk scan). Exit 0 indexed, 1 failed, 2 busy (another email run held the lock past `--wait S`), 3 not inside an email folder, 4 not set up here.
 - `... email import --from <emails.db>` copies another app's email index in once, keeping its rows; the next run reads each mail once more to fill To, Cc, attachments and size. `... email status` lists the last runs.
+- `... email index --fresh` lists the email folders now instead of reading the last scan's index: a mail filed since that scan is only seen this way.
 - `... scan --no-email` scans the disks only.
 
 Downloaded mail stays on the disk until OneDrive frees it. The app never sets a file back to online-only, because that is a write. How a scan reads sizes without downloading anything, and the index it writes: [docs/scanning.md](docs/scanning.md).

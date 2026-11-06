@@ -44,16 +44,14 @@ function render() {
     stat(fmtNum(c.downloaded || 0) + ' · ' + Math.round((c.downloaded_bytes || 0) / MB) + ' MB', 'Downloaded, last run') +
     stat(fmtNum(c.waiting || 0), 'Waiting for budget', c.waiting ? 'tone-attention-text' : '') +
     stat(fmtNum(body.failed), 'Failed reads', body.failed ? 'tone-danger-text' : '', body.failed ? 'failures' : '');
-  if (document.activeElement !== $('emailBudget')) $('emailBudget').value = String(body.budget_mb);
-  $('emailBudget').disabled = !!body.stage_problem;
   $('emailScope').innerHTML = body.roots.map((r) => '<option value="' + esc(r) + '" title="' + esc(r) + '">' + esc(shortPath(r)) + '</option>').join('');
   const off = body.stage_problem;
   $('indexEmails').disabled = !!off || body.running;
   $('indexOne').disabled = !!off || body.running || !body.roots.length;
   $('indexEmails').textContent = body.running ? 'Indexing…' : 'Index emails now';
-  if (document.activeElement !== $('emailRootsInput')) $('emailRootsInput').value = body.folders.join('\n');
-  $('emailNote').textContent = !body.ready ? 'Not set up here: ' + body.problem + '.' : off ? 'Indexing is off here: ' + off + '.'
-    : body.budget_mb ? 'Each run downloads up to this much online-only mail; the rest waits for the next run.' : 'Online-only mail is left in the cloud.';
+  $('emailNote').textContent = !body.folders.length ? 'No email folders yet: add one in Settings, Email folders.'
+    : !body.ready ? 'Not set up here: ' + body.problem + '.' : off ? 'Indexing is off here: ' + off + '.'
+    : 'Folders, exclusions and the download budget are in Settings.';
   $('emailRuns').innerHTML = body.runs.length ? body.runs.map(runRow).join('') : '<li class="rows-note">No runs yet.</li>';
 }
 
@@ -94,21 +92,7 @@ async function showFailures() {
   d.showModal();
 }
 
-/** Change some of the email settings, keeping the rest as saved. */
-async function saveEmail(update, okText) {
-  try {
-    const cfg = (await getJSON('/api/config')).config;
-    await postJSON('/api/config', { email: { ...cfg.email, ...update } });
-    showToast(okText);
-  } catch (e) {
-    showToast('Could not save: ' + e.message, 'error');
-  }
-  loadEmailScans();
-}
-
 export function initEmailScans() {
-  $('emailBudget').addEventListener('change', (e) => saveEmail({ download_budget_mb: Number(e.target.value) }, 'Saved: the next run uses it'));
-  $('emailRootsInput').addEventListener('change', (e) => saveEmail({ roots: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) }, 'Email folders saved'));
   $('indexEmails').addEventListener('click', () => start(null));
   $('indexOne').addEventListener('click', () => start($('emailScope').value));
   $('emailInfo').addEventListener('click', () => $('emailInfoDialog').showModal());

@@ -412,5 +412,21 @@ button.list-row .lr-name { font-weight: 600; }
 .row-controls .input-native[hidden] { display: none; }
 .row-note { margin: 0; font-size: var(--font-body-sm); color: var(--muted); }
 .row-note:empty { display: none; }
-.roots-input { width: 100%; min-height: 5.5em; height: auto; padding: var(--space-sm); resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: var(--font-body-sm); }
+/* The folder lists (folder-list.js): a section title, rows of paths with a kebab, and an add row. */
+.folder-section > span:first-child { font-size: var(--font-body); }
+.folder-section .row-line > span:first-child { font-weight: 400; }
+.folder-section .sub-head { margin-top: var(--space-xs); }
+.folder-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); min-width: 0; }
+.folder-list[hidden] { display: none; }
+.folder-rows { border: 1px solid var(--line-muted); border-radius: var(--radius-md); }
+.folder-rows .action-row-main { padding-left: var(--space-sm); }
+/* The full path is what tells two folders of the same name apart, so it wraps whole instead of the meta's two-line cut. */
+.folder-rows .action-row-meta { overflow-wrap: anywhere; -webkit-line-clamp: unset; line-clamp: none; padding-bottom: var(--space-xs); }
+.folder-empty { margin: 0; padding: var(--space-sm); }
+.folder-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); }
+.folder-add .input-native { width: 100%; min-width: 0; box-sizing: border-box; }
+.folder-add .button-surface { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.folder-error { color: var(--danger-text); overflow-wrap: anywhere; }
+.folder-budget .select-native { max-width: 50%; }
+.folder-remove-path { overflow-wrap: anywhere; }
 .switch-slot { display: inline-flex; }

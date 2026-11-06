@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src import config, store
-from src.email.manifest import Manifest, from_index, walk
+from src.email.manifest import Manifest, from_index, walk, without
 from src.email.reader import read_facts
 from src.email.schema import open_writer
 from src.email.settings import EmailPart, email_part, is_under
@@ -95,8 +95,13 @@ def manifests(part: EmailPart, scope: Optional[str], roots: list[Root], exclude:
     out = []
     for folder in part.roots:
         m = None if fresh else _from_scan(folder, roots)
-        out.append(m if m is not None else walk(folder, exclude=exclude))
+        out.append(without(m, exclude) if m is not None else walk(folder, exclude=exclude))
     return out
+
+
+def exclude_for(cfg: dict[str, Any]) -> frozenset[str]:
+    """The folders the email index leaves out: the global skip list plus ``email.exclude``."""
+    return exclude_keys(list(cfg["exclude"]) + list(cfg["email"]["exclude"]))
 
 
 def summary(counts: dict[str, int]) -> str:
@@ -156,7 +161,7 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
         run_id = store.begin_email_run(trigger, scope or "all")
         t0 = time.monotonic()
         try:
-            lists = manifests(part, scope, roots, exclude_keys(cfg["exclude"]), fresh)
+            lists = manifests(part, scope, roots, exclude_for(cfg), fresh)
             conn = open_writer(part.index_path)
             try:
                 counts = Stage(conn, part.budget_bytes, read or read_facts).run(lists).as_dict()

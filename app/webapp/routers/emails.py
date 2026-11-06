@@ -19,7 +19,6 @@ from app.webapp.state import EMAILS
 
 router = APIRouter(prefix="/api/email")
 
-MB = 1024 * 1024
 # Failed files listed at most, newest first.
 FAILURES_SHOWN = 200
 
@@ -55,7 +54,7 @@ def status() -> dict[str, Any]:
     failed, _ = _failures(part, 0)
     return {
         "ready": part.ready, "problem": part.problem, "own": part.own, "stage_problem": part.stage_problem,
-        "roots": part.roots, "folders": cfg["email"]["roots"], "budget_mb": part.budget_bytes // MB, "running": indexer.is_running(),
+        "roots": part.roots, "folders": cfg["email"]["roots"], "running": indexer.is_running(),
         "indexed": indexed, "failed": failed, "runs": store.email_runs(10),
     }
 

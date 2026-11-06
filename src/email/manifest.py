@@ -61,6 +61,27 @@ def from_index(index: Index, root_path: str, folder: str) -> Optional[Manifest]:
     return out
 
 
+def _excluded(path: str, top: str, exclude: frozenset[str]) -> bool:
+    """Whether a folder from ``path``'s parent up to ``top`` is excluded."""
+    top_key = exclude_key(top)
+    folder = os.path.dirname(path)
+    while True:
+        key = exclude_key(folder)
+        if key in exclude:
+            return True
+        if len(key) <= len(top_key):
+            return False
+        folder = os.path.dirname(folder)
+
+
+def without(manifest: Manifest, exclude: frozenset[str]) -> Manifest:
+    """``manifest`` less the files inside an excluded folder (a scan index lists them all)."""
+    if not exclude:
+        return manifest
+    kept = [f for f in manifest.files if not _excluded(f.path, manifest.folder, exclude)]
+    return Manifest(manifest.folder, kept, manifest.complete)
+
+
 def walk(folder: str, lister: Lister = winfs.list_dir, exclude: frozenset[str] = frozenset()) -> Manifest:
     """List ``folder`` and everything below it; links are counted out, never followed."""
     out = Manifest(folder)

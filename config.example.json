@@ -9,6 +9,7 @@
   "email": {
     "index_path": null,
     "roots": [],
+    "exclude": [],
     "download_budget_mb": 2048
   },
   "folder_search": {

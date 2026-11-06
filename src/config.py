@@ -13,6 +13,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.atomic_write import atomic_write_text
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -253,9 +255,6 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
     except (OSError, ValueError):
         current = {}
     current.update(clean)
-    tmp = path.with_name(path.name + ".tmp")
-    # runtime-write-exempt: config.json at the repo root is the documented settings file (gitignored)
-    tmp.write_text(json.dumps(current, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_text(path, json.dumps(current, indent=2) + "\n")
     logger.info("ℹ️ settings saved: %s", ", ".join(sorted(clean)))
     return load()

@@ -142,6 +142,7 @@ def import_index(source: Path, dest: Path) -> int:
             out.close()
     finally:
         src.close()
+    # must-use-exempt: renames a database SQLite built and closed in place; there is no text to write
     os.replace(part, dest)
     logger.info("✅ imported %d emails into %s", rows, dest.name)
     return rows

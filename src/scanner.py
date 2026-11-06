@@ -323,5 +323,6 @@ def scan_to_index(
         part.unlink(missing_ok=True)
         raise
     conn.close()
+    # must-use-exempt: renames an index SQLite built and closed in place; there is no text to write
     os.replace(part, index_path)
     return walk.counters

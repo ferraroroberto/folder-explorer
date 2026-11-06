@@ -69,12 +69,8 @@ Why a separate process rather than a library call: the Inbox verbs drive
 Outlook over COM, and a COM modal (the address-book security prompt, a profile
 chooser) blocks whatever thread it is raised on. Spawning this with a timeout
 means such a prompt hangs *this* process, which the caller can kill, and never
-the caller. ``renumber`` and ``fix-cut-names`` are the exceptions that prove the
-rule: they read a folder, the index and (for ``fix-cut-names``) each mail's
-subject, and touch no COM at all, so they never start Outlook. ``fix-cut-names``
-renames archived mails whose name lost its first letters; a dry run unless
-``--apply``, with an undo log (``--revert``), and `error.code` ``email_not_set_up``
-or ``email_busy`` when the email index is not set up or an index run holds its lock.
+the caller. ``renumber`` and ``fix-cut-names`` (app/cli/cut_names.py) touch no COM at
+all: they read a folder, the index and subjects, so they never start Outlook.
 """
 from __future__ import annotations
 
@@ -90,9 +86,8 @@ from typing import Any
 
 from src import config, store
 from src.email.batch import common as batch_common
-from src.email import indexer
+from app.cli import cut_names
 from src.email.batch import dismiss, draft, find, send, sync
-from src.email.batch import fix_cut_names as cut_names_verb
 from src.email.batch import revert as revert_verb
 from src.email.batch import verbs as batch
 from src.email.mailboxes import (
@@ -123,7 +118,7 @@ EXIT_CANNOT_START = 2
 EXIT_DEFERRED = 3
 
 ERROR_CONFIG_MISSING = "config_missing"
-ERROR_BAD_INPUT = "bad_input"
+ERROR_BAD_INPUT = batch_common.ERROR_BAD_INPUT
 ERROR_OUTLOOK_UNAVAILABLE = "outlook_unavailable"
 ERROR_COM_UNAVAILABLE = "com_unavailable"
 ERROR_SELF_ADDRESS_UNRESOLVED = "self_address_unresolved"
@@ -135,10 +130,7 @@ ERROR_ACCOUNT_NOT_IN_OUTLOOK = "account_not_in_outlook"
 # Outlook was reached but the walk then hit something unclassified (a locked
 # or corrupt index database, a renumber or disk error) — distinct from
 # com_unavailable, which is reserved for "pywin32 is not installed".
-ERROR_RUN_FAILED = "run_failed"
-# `fix-cut-names`: no email index to read, or an index run holds its lock.
-ERROR_EMAIL_NOT_SET_UP = "email_not_set_up"
-ERROR_EMAIL_BUSY = "email_busy"
+ERROR_RUN_FAILED = batch_common.ERROR_RUN_FAILED
 
 
 def _emit(document: dict[str, Any]) -> None:
@@ -413,20 +405,6 @@ def _add_renumber_parser(sub: Any) -> None:
     )
 
 
-def _add_fix_cut_names_parser(sub: Any) -> None:
-    p = sub.add_parser(
-        "fix-cut-names",
-        help="Rename archived mails whose name lost its first letters to the full subject "
-             "(a dry run unless --apply; writes an undo log first).",
-    )
-    mode = p.add_mutually_exclusive_group()
-    mode.add_argument("--dry-run", action="store_true", help="List the renames and change nothing (the default).")
-    mode.add_argument("--apply", action="store_true", help="Rename the files and follow them in the index.")
-    mode.add_argument("--revert", metavar="LOG", help="Undo the renames of this undo log.")
-    p.add_argument("--root", default=None, help="One folder inside an email folder (default: every email folder).")
-    p.add_argument("--wait", type=float, default=0.0, help="Seconds to wait for a running email run.")
-
-
 def _add_draft_read_send_parsers(sub: Any) -> list[argparse.ArgumentParser]:
     p_draft = sub.add_parser(
         "draft",
@@ -535,7 +513,7 @@ def _build_parser() -> argparse.ArgumentParser:
     mailbox_verbs += _add_apply_revert_parsers(sub)
     mailbox_verbs.append(_add_dismiss_parser(sub))
     _add_renumber_parser(sub)
-    _add_fix_cut_names_parser(sub)
+    cut_names.add_parser(sub)
     mailbox_verbs += _add_draft_read_send_parsers(sub)
     sub.add_parser(
         "mailboxes",
@@ -711,26 +689,6 @@ def _renumber(cfg: dict[str, Any], args: argparse.Namespace) -> int:
             args.verb, ERROR_BAD_INPUT,
             f"{refusal['folder_path']}: {refusal['reason']}",
         )
-    _emit(document)
-    return EXIT_OK
-
-
-def _fix_cut_names(cfg: dict[str, Any], args: argparse.Namespace) -> int:
-    """The ``fix-cut-names`` verb: no Outlook, no COM; it reads subjects, renames files and follows them in the index."""
-    try:
-        if args.revert:
-            document = cut_names_verb.revert_cut_names(cfg, args.revert, args.wait)
-        else:
-            document = cut_names_verb.fix_cut_names(cfg, apply=args.apply, scope=args.root, wait_s=args.wait)
-    except cut_names_verb.UndoLogError as exc:
-        return _fail(args.verb, ERROR_BAD_INPUT, str(exc))
-    except indexer.NotSetUp as exc:
-        return _fail(args.verb, ERROR_EMAIL_NOT_SET_UP, str(exc))
-    except indexer.EmailBusy as exc:
-        return _fail(args.verb, ERROR_EMAIL_BUSY, str(exc))
-    except Exception as exc:
-        logger.exception("fix-cut-names failed")
-        return _fail(args.verb, ERROR_RUN_FAILED, f"{type(exc).__name__}: {exc}")
     _emit(document)
     return EXIT_OK
 
@@ -913,8 +871,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if verb == "renumber":
         return _renumber(cfg, args)
-    if verb == "fix-cut-names":
-        return _fix_cut_names(cfg, args)
+    if verb == cut_names.VERB:
+        return cut_names.run(cfg, args, _emit, _fail)
 
     # Every other verb is about a mailbox. The registry is read here, before
     # Outlook: a malformed file must stop the run, never fall back to the

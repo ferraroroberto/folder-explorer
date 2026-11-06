@@ -4,7 +4,7 @@
 layer       = "working-web"
 icon        = "🗂️"
 port        = ":8453"
-description = "Disk-space explorer and search: folder tree, largest files, file types, folder and email-archive search, the Archive sheet and Outlook macro, and the headless Outlook archive verbs."
+description = "Disk-space explorer and search: folder tree, largest files, file types, folder and mail search."
 depends_on  = ["project-scaffolding"]
 shape       = "webapp-tray"
 extra_roots = []

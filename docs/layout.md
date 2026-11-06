@@ -38,6 +38,7 @@ folder-explorer/
 │   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths
 │   │   │                       #   (the email-folder guard), archive_settings, mailboxes, repository,
 │   │   │                       #   suggester, renumber, archive_sheet (the Archive sheet's suggest and file)
+│   │   ├── subject_audit.py    # `email subjects`: the read-only dry run for names cut by the old reply-prefix rule
 │   │   ├── batch/              # the archive verbs: verbs (plan, apply, mailboxes, renumber), revert,
 │   │   │                       #   dismiss, draft, send, find, sync, move, common (the envelope)
 │   │   └── reader.py           # the only module that opens a file (a .msg, for the stage, Show all, renumber)

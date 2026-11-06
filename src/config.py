@@ -44,7 +44,9 @@ DEFAULTS: dict[str, Any] = {
     # index_path null means this app's own index in the runtime-data folder;
     # a path names another app's index, read-only, and the stage stays off.
     # download_budget_mb caps what one run downloads from OneDrive (0: never).
-    "email": {"index_path": None, "roots": [], "download_budget_mb": 2048},
+    # exclude names folders inside the email folders that only the email
+    # index leaves out; the global exclude above still applies to it too.
+    "email": {"index_path": None, "roots": [], "exclude": [], "download_budget_mb": 2048},
     # Folder search: how many leading path components a result hides (display
     # only) and whether a folder of per-person subfolders shows as one result.
     "folder_search": {"skip_levels": 0, "prune_people": True},
@@ -66,7 +68,7 @@ DEFAULTS: dict[str, Any] = {
 MAX_SKIP_LEVELS = 8
 # The largest per-run download budget Settings accepts, in MB.
 MAX_BUDGET_MB = 1024 * 1024
-_EMAIL_KEYS = {"index_path", "roots", "download_budget_mb"}
+_EMAIL_KEYS = {"index_path", "roots", "exclude", "download_budget_mb"}
 # The longest path the archiver may be told to write; Windows' own limit is 260.
 MAX_PATH_LENGTH = 260
 # Settings only config.json sets: no Settings control writes them.
@@ -149,6 +151,7 @@ def _clean_email(raw: Any) -> dict[str, Any]:
     if isinstance(path, str) and path.strip():
         out["index_path"] = path.strip()
     out["roots"] = _clean_paths(raw.get("roots"))
+    out["exclude"] = _clean_paths(raw.get("exclude"))
     budget = raw.get("download_budget_mb")
     if isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB:
         out["download_budget_mb"] = budget
@@ -220,13 +223,16 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
 
 def _validate_email(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) - _EMAIL_KEYS:
-        raise ValueError("email takes index_path, roots and download_budget_mb")
+        raise ValueError("email takes index_path, roots, exclude and download_budget_mb")
     path = value.get("index_path")
     if path is not None and not isinstance(path, str):
         raise ValueError("email.index_path must be a file path or null")
     roots = value.get("roots", [])
     if not (isinstance(roots, list) and all(isinstance(r, str) for r in roots)):
         raise ValueError("email.roots must be a list of folder paths")
+    excluded = value.get("exclude", [])
+    if not (isinstance(excluded, list) and all(isinstance(r, str) for r in excluded)):
+        raise ValueError("email.exclude must be a list of folder paths")
     budget = value.get("download_budget_mb", DEFAULTS["email"]["download_budget_mb"])
     if not (isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB):
         raise ValueError("email.download_budget_mb must be a whole number of MB, 0 or more")

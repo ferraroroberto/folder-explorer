@@ -28,7 +28,6 @@ from src.email.reader import ReadError, read_facts
 from src.email.settings import email_part
 from src.email.stage import Reader
 from src.roots import resolve_roots
-from src.scanner import exclude_keys
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +140,7 @@ def audited(scope: Optional[str] = None, wait_s: float = 0.0, read: Optional[Rea
     guard = indexer.lock()
     indexer.take_lock(guard, wait_s)
     try:
-        lists = indexer.manifests(part, scope, roots, exclude_keys(cfg["exclude"]), fresh=True)
+        lists = indexer.manifests(part, scope, roots, indexer.exclude_for(cfg), fresh=True)
         yield audit(lists, part.budget_bytes, read or read_facts, get_max_path_length(cfg))
     finally:
         guard.release()

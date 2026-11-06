@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from src import config, store
+from src import config, folder_lists, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 from app.webapp.auth import is_pc_itself
 from app.webapp.bind import resolve_bind
@@ -73,7 +73,7 @@ def get_config(request: Request) -> dict[str, Any]:
 @router.post("/api/config")
 def post_config(request: Request, updates: dict[str, Any] = Body(...)) -> JSONResponse:
     try:
-        config.save(updates)
+        folder_lists.save(updates)
     except ValueError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
     return JSONResponse(settings_body(is_pc_itself(request)))

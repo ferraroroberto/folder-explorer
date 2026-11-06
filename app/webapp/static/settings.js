@@ -1,15 +1,19 @@
-/* Settings: text size, default basis, remote access, the in-app schedule, the scan roots and the email part. */
+/* Settings: text size, default basis, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
 import { fmtBytes } from './fmt.js';
 import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { folderList } from './folder-list.js';
 
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
+// The four folder lists, built once in initSettings.
+const lists = {};
+let config = null;
 
 const REMOTE_TEXT = {
   on: 'On: your devices reach it on the tailnet over HTTPS, after signing in.',
@@ -34,20 +38,46 @@ function render(body) {
     ? 'Off: scans run from Rescan, the tray menu or the command line.'
     : (cfg.schedule === 'nightly' ? 'Every night at ' + cfg.schedule_time : 'Every hour') + ', while the app is running.';
 
+  config = cfg;
   const auto = cfg.roots === null;
   setSwitch(autoSwitch, auto);
   autoSwitch.setAttribute('aria-label', 'Every local drive and OneDrive');
-  $('rootsInput').hidden = auto;
-  if (!auto) $('rootsInput').value = cfg.roots.join('\n');
-  $('rootsNote').textContent = (auto ? 'Scanning ' : 'One folder per line, saved when you leave the box. Scanning ') +
-    state.roots.map((r) => r.name).join(', ') + '.';
+  $('rootsEditor').hidden = auto;
+  if (!auto) lists.roots.render(cfg.roots);
+  $('rootsNote').textContent = auto ? 'Scanning ' + state.roots.map((r) => r.name).join(', ') + '.' : '';
+  lists.exclude.render(cfg.exclude);
+  lists.emailRoots.render(cfg.email.roots);
+  lists.emailExclude.render(cfg.email.exclude);
+  renderBudget(cfg.email.download_budget_mb);
   $('indexSize').textContent = fmtBytes(body.index_bytes) + ', kept on this PC';
   $('outlookNote').textContent = body.archive.ready
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
-  if (document.activeElement !== $('excludeInput')) $('excludeInput').value = cfg.exclude.join('\n');
   setBasis(readPref('basis', 'size'));
 }
+
+function renderBudget(mb) {
+  const sel = $('emailBudget');
+  // A budget set in config.json to a value the menu doesn't offer still shows as itself.
+  if (![...sel.options].some((o) => o.value === String(mb))) sel.add(new Option(mb + ' MB', String(mb)));
+  sel.value = String(mb);
+  $('emailBudgetNote').textContent = mb ? 'Each email run downloads up to this much online-only mail; the rest waits for the next run.'
+    : 'Online-only mail is left in the cloud.';
+}
+
+/** Save one setting from a folder list: null when saved, else the server's sentence. */
+async function saveList(update, okText, after) {
+  try {
+    render(await postJSON('/api/config', update));
+  } catch (e) {
+    return e.message;
+  }
+  showToast(okText);
+  if (after) after();
+  return null;
+}
+
+const withEmail = (change) => ({ email: { ...config.email, ...change } });
 
 function setBasis(value) {
   $('defaultBasisSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
@@ -74,24 +104,34 @@ export function initSettings(opts) {
       if (next) {
         if (await save({ roots: null })) onRootsChanged();
       } else {
+        // Start the explicit list from what is scanned now; nothing is saved until it changes.
         setSwitch(autoSwitch, false);
-        $('rootsInput').hidden = false;
-        $('rootsInput').value = state.roots.map((r) => r.path).join('\n');
-        $('rootsInput').focus();
+        $('rootsEditor').hidden = false;
+        $('rootsNote').textContent = '';
+        lists.roots.render(state.roots.map((r) => r.path));
+        $('rootsEditor').querySelector('input').focus();
       }
     },
   });
   $('rootsAutoSlot').appendChild(autoSwitch);
-  $('rootsInput').addEventListener('change', async () => {
-    const roots = $('rootsInput').value.split('\n').map((s) => s.trim()).filter(Boolean);
-    if (!roots.length) { showToast('Add at least one folder, or switch back to every drive.', 'error'); return; }
-    if (await save({ roots })) { showToast('Roots saved'); onRootsChanged(); }
+  lists.roots = folderList($('rootsEditor'), {
+    name: 'roots', label: 'Add a folder to scan', empty: 'No folders yet.',
+    onSave: (roots) => saveList({ roots }, 'Folders to scan saved', onRootsChanged),
   });
+  lists.exclude = folderList($('excludeEditor'), {
+    name: 'exclude', label: 'Add a folder to skip', empty: 'Nothing is skipped.',
+    onSave: (exclude) => saveList({ exclude }, 'Saved: the next scan leaves them out'),
+  });
+  lists.emailRoots = folderList($('emailRootsEditor'), {
+    name: 'email-roots', label: 'Add an email folder', empty: 'No email folders yet.',
+    onSave: (roots) => saveList(withEmail({ roots }), 'Email folders saved'),
+  });
+  lists.emailExclude = folderList($('emailExcludeEditor'), {
+    name: 'email-exclude', label: 'Add a folder to leave out of the email index', empty: 'Nothing is left out.',
+    onSave: (exclude) => saveList(withEmail({ exclude }), 'Saved: the next email run leaves them out'),
+  });
+  $('emailBudget').addEventListener('change', (e) => save(withEmail({ download_budget_mb: Number(e.target.value) })));
   $('scheduleSelect').addEventListener('change', (e) => save({ schedule: e.target.value }));
-  $('excludeInput').addEventListener('change', async () => {
-    const exclude = $('excludeInput').value.split('\n').map((x) => x.trim()).filter(Boolean);
-    if (await save({ exclude })) showToast('Saved: the next scan leaves them out');
-  });
   $('scheduleTime').addEventListener('change', (e) => { if (e.target.value) save({ schedule_time: e.target.value }); });
   $('defaultBasisSeg').addEventListener('click', (e) => {
     const b = e.target.closest('.segmented-item');

@@ -9,6 +9,7 @@ from playwright.sync_api import Page, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._shot import settle
+from tests.e2e.test_settings_folders import BELOW_FOLD
 
 TABS = ("search", "explore", "largest", "types", "scans")
 TITLES = {"search": "Search", "explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
@@ -109,4 +110,4 @@ def test_settings_show_remote_access_and_the_schedule(page: Page, app_url: str) 
     expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#remoteNote")).to_contain_text("this PC only")
     expect(sheet.locator("#scheduleSelect")).to_have_value("off")
-    assert_layout_clean(page)
+    assert_layout_clean(page, allow=BELOW_FOLD)

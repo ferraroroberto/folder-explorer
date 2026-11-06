@@ -497,19 +497,7 @@
         </button>
       </div>
       <div class="email-stats" id="emailStats"></div>
-      <div class="email-budget">
-        <span>OneDrive downloads per run</span>
-        <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
-          <option value="0">None (local only)</option>
-          <option value="512">512 MB</option>
-          <option value="2048">2 GB</option>
-          <option value="5120">5 GB</option>
-        </select>
-      </div>
       <p class="row-note email-note" id="emailNote"></p>
-      <label class="email-folders"><span>Email folders, one per line, each inside a scan root</span>
-        <textarea class="input-native roots-input" id="emailRootsInput" rows="2" spellcheck="false" aria-label="Email folders, one per line" data-track="email-roots-input"></textarea>
-      </label>
       <div class="scoped">
         <select class="select-native" id="emailScope" aria-label="Email folder to index" data-track="email-scope"></select>
         <button type="button" class="button-surface" id="indexOne" data-track="email-index-one">Index this folder</button>
@@ -676,16 +664,35 @@
       </div>
       <p class="row-note" id="scheduleNote"></p>
     </div>
-    <div class="row row-stack">
+    <div class="row row-stack folder-section" id="scanFolders">
+      <span>Folders to scan</span>
       <div class="row-line">
         <span>Every local drive and OneDrive</span>
         <span class="switch-slot" id="rootsAutoSlot" data-track="roots-auto"></span>
       </div>
-      <textarea class="input-native roots-input" id="rootsInput" rows="3" spellcheck="false" aria-label="Scan roots, one folder per line" data-track="roots-input" hidden></textarea>
+      <div id="rootsEditor" hidden></div>
       <p class="row-note" id="rootsNote"></p>
-      <label class="ff-col"><span class="row-note">Skip these folders, one per line: the disk scan, folder search and the email index all leave them out</span>
-        <textarea class="input-native roots-input" id="excludeInput" rows="2" spellcheck="false" aria-label="Folders to skip, one per line" data-track="exclude-input"></textarea>
-      </label>
+      <p class="sub-head">Skip these folders</p>
+      <p class="row-note">The disk scan, folder search and the email index all leave them out. Each sits inside a folder to scan.</p>
+      <div id="excludeEditor"></div>
+    </div>
+    <div class="row row-stack folder-section" id="emailFolders">
+      <span>Email folders</span>
+      <p class="row-note">The email index reads the .msg files in these folders. Each sits inside a folder to scan.</p>
+      <div id="emailRootsEditor"></div>
+      <p class="sub-head">Leave out of the email index</p>
+      <p class="row-note">Folders inside an email folder that only the email index skips.</p>
+      <div id="emailExcludeEditor"></div>
+      <div class="row-line folder-budget">
+        <span>OneDrive downloads per run</span>
+        <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
+          <option value="0">None (local only)</option>
+          <option value="512">512 MB</option>
+          <option value="2048">2 GB</option>
+          <option value="5120">5 GB</option>
+        </select>
+      </div>
+      <p class="row-note" id="emailBudgetNote"></p>
     </div>
     <div class="row row-stack">
       <div class="row-line">
@@ -697,6 +704,24 @@
     <div class="row">
       <span>Index size</span>
       <span class="row-value" id="indexSize"></span>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog" id="folderRemoveDialog" data-track-view="folder-remove-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Remove this folder?</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="folder-remove-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="prose">
+      <p class="mono folder-remove-path" data-remove-path></p>
+      <p>Only the list changes: the folder and everything in it stay on disk.</p>
+    </div>
+    <div class="detail-actions">
+      <button type="button" class="button-tint danger detail-save-btn" data-remove-ok data-track="folder-remove-ok">Remove</button>
     </div>
   </div>
 </dialog>

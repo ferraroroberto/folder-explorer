@@ -110,6 +110,8 @@ def summary(counts: dict[str, int]) -> str:
         text += ", %d failed" % counts["failed"]
     if counts.get("purged"):
         text += ", %d removed" % counts["purged"]
+    if counts.get("cleaned"):
+        text += ", %d previews cleaned" % counts["cleaned"]
     return text
 
 

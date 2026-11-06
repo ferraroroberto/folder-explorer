@@ -59,6 +59,7 @@ from src.outlook.process import DEFAULT_START_TIMEOUT_SECONDS
 from src.outlook.stores import resolve_store
 from src.email.naming import clean_subject as _clean_subject
 from src.email.naming import normalize_message_id
+from src.email.preview import clean_preview
 
 logger = logging.getLogger(__name__)
 
@@ -456,7 +457,7 @@ class OutlookClient(DraftSurface):
             recipients=_get_recipients_smtp(item),
             date_sent=sent_datetime(item),
             date_received=_com_datetime(item, "ReceivedTime"),
-            body_preview=safe_com(lambda: (item.Body or "")[:preview_len], ""),
+            body_preview=safe_com(lambda: clean_preview(item.Body or "")[:preview_len], ""),
             attachment_count=safe_com(lambda: int(item.Attachments.Count), 0),
             flag_status=self._flag_status(item),
             item=item,

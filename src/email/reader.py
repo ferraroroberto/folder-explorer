@@ -27,6 +27,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 from src.email.naming import clean_subject, normalize_message_id
+from src.email.preview import clean_preview
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def _facts(msg: Any, preview_chars: int) -> dict[str, Any]:
     return {
         "subject": clean_subject(_text(msg.subject), strip_msg_suffix=True), "sender": _text(msg.sender),
         "recipients": to, "to_addrs": to, "cc_addrs": cc,
-        "date_sent": _date(msg), "body_preview": _text(msg.body)[:preview_chars],
+        "date_sent": _date(msg), "body_preview": clean_preview(_text(msg.body))[:preview_chars],
         "flag_status": int(flag or 0) if str(flag or 0).isdigit() else 0,
         "message_id": normalize_message_id(mid),
         "attachment_names": "\n".join(names), "has_attachments": 1 if names else 0,

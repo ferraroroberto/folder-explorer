@@ -1,6 +1,6 @@
 """Sign-in for callers on other devices: password -> bearer token, loopback exempt.
 
-A request from this PC (loopback) always passes. A request from any other
+A request from this PC (loopback, or the PC's own tailnet or LAN address) always passes. A request from any other
 device must carry ``Authorization: Bearer <token>``; the page gets the token
 by posting the password to ``/api/login`` through the vendored sign-in sheet.
 The page shell, static assets, ``/healthz`` and ``/api/version`` stay open so
@@ -24,6 +24,7 @@ from src.login_lockout import LockoutAlert, LoginLockout, retry_after_header
 from src.notify import NotifierError
 from src.secret_compare import secrets_equal
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
+from src.this_pc import is_local_address
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +45,12 @@ def _client(scope_or_request: Any) -> str:
 def is_pc_itself(scope_or_request: Any) -> bool:
     """True for a caller on this PC: it needs no token and is never locked out.
 
-    The app binds the tailnet directly (no tunnel in front), so a loopback
-    socket is this machine and nothing else.
+    The app binds the tailnet directly (no tunnel in front), so a socket whose
+    peer is loopback or one of this machine's own addresses (the PC opening the
+    app through its tailnet name) is this machine and nothing else.
     """
-    return _client(scope_or_request) in LOOPBACK
+    host = _client(scope_or_request)
+    return host in LOOPBACK or is_local_address(host)
 
 
 def token_ok(presented: str) -> bool:

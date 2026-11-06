@@ -182,7 +182,7 @@ def pending(request: Request) -> dict[str, Any]:
 
 @router.post("/archive/file")
 def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, Any]:
-    """File the prepared mail in the chosen folder, with the chosen category or none."""
+    """File the prepared mail in the chosen folder, with the chosen category or none; ``duplicate: true`` files another copy of an archived one."""
     _pc_only(request)
     ids = PREPARED.ids(str(body.get("token", "")))
     folder = body.get("folder")
@@ -191,9 +191,13 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
     if not isinstance(folder, str) or not folder.strip():
         raise HTTPException(status_code=400, detail="pick a folder first")
     category = body.get("category") or ""
+    # Only a literal true asks for another copy of a mail that is already archived.
+    duplicate = body.get("duplicate") is True
     # One "--flag=value" argument each, so a value that starts with "--" is never read as a flag.
     args = ["file", "--entry-id=" + ids["entry_id"], "--store-id=" + ids["store_id"], "--folder=" + folder,
             "--category=" + str(category)]
+    if duplicate:
+        args.append("--duplicate")
     doc = bridge(args, FILE_TIMEOUT_S)
     if doc.get("files"):
         PREPARED.drop(str(body["token"]))

@@ -138,8 +138,13 @@ def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dic
     }
 
 
-def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str]) -> dict[str, Any]:
-    """Save the mail and its attachments into ``folder_path`` and tag it with ``category`` (none when blank)."""
+def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],
+              duplicate: bool = False) -> dict[str, Any]:
+    """Save the mail and its attachments into ``folder_path`` and tag it with ``category`` (none when blank).
+
+    A mail the index already holds is refused unless ``duplicate`` says the user asked for another copy;
+    the copy still takes the folder's next sequence number, so no file is ever overwritten.
+    """
     roots = mounted_roots(cfg)
     folder, refusal = resolve_under_roots(folder_path, roots)
     if folder is None:
@@ -151,7 +156,7 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
         filed = _filed_as(EmailRepository(conn), mail.message_id)
     finally:
         conn.close()
-    if filed:
+    if filed and not duplicate:
         raise SheetError(ERR_ALREADY, "This mail is already archived as " + os.path.basename(filed) + ".")
     try:
         archived = EmailArchiver(cfg).archive(item, str(folder), mail.subject)
@@ -168,6 +173,6 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
             logger.exception("⚠️ archive sheet: tagging the mail failed")
             doc["ok"] = False
             doc["error"] = {"code": ERR_CATEGORY, "message": MESSAGES[ERR_CATEGORY] + " " + type(exc).__name__}
-    logger.info("✅ archive sheet: filed %s (%d attachment(s))", os.path.basename(archived.email_path),
-                len(archived.attachment_paths))
+    logger.info("✅ archive sheet: filed %s (%d attachment(s))%s", os.path.basename(archived.email_path),
+                len(archived.attachment_paths), ", a copy of " + os.path.basename(filed) if filed else "")
     return doc

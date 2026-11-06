@@ -24,7 +24,7 @@ from src import config
 from src.email import body as child
 from src.email.archive_sheet import ERR_GONE, ERR_NO_COM, ERR_NO_ROOT, ERR_OUTLOOK, ERR_TIMEOUT, MESSAGES
 from src.outlook.mapi import OutlookUnavailableError
-from tests.archive.batch_support import FAKE_STORE_ID, FakeOutlookClient, _mail, _seed_index
+from tests.archive.batch_support import FAKE_STORE_ID, FakeOutlookClient, _index_archived_file, _mail, _seed_index
 from tests.conftest import write_config
 
 LOCAL = ("127.0.0.1", 50000)
@@ -95,6 +95,31 @@ def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNam
         assert fake.spawned == [("archive", str(Path(dest).resolve()))]
         again = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest})
         assert again.status_code == 404
+
+
+def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[list[str]] = []
+    monkeypatch.setattr(archive_routes, "bridge", lambda args, timeout: asked.append(args) or _in_process(args, timeout))
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        dest = str(fake.root / "Project Alpha")
+
+        def prepared() -> str:
+            c.get("/api/archive/pending")  # a page that polled is open, so the hand-off is shown there, not in the Tk window
+            assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+            return c.get("/api/archive/pending").json()["mail"]["token"]
+
+        token = prepared()
+        first = c.post("/api/archive/file", json={"token": token, "folder": dest}).json()
+        _index_archived_file(fake.cfg, first, message_id="kick@example.invalid", subject="Kickoff agenda")
+        token = prepared()
+        for extra in ({}, {"duplicate": False}, {"duplicate": "true"}, {"duplicate": 1}):
+            refused = c.post("/api/archive/file", json={"token": token, "folder": dest, **extra}).json()
+            assert not refused["ok"] and refused["error"]["code"] == "already_archived"
+        assert not any("--duplicate" in args for args in asked)
+        copy = c.post("/api/archive/file", json={"token": token, "folder": dest, "duplicate": True}).json()
+        assert copy["ok"] and Path(copy["files"][0]).name == "002 - Kickoff agenda.msg"
+        assert Path(first["files"][0]).is_file() and "--duplicate" in asked[-1]
 
 
 def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:

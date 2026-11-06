@@ -19,6 +19,9 @@ MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "
         "attachment_count": 1, "where": "Inbox", "message_id": "kick@example.invalid"}
 
 
+BELOW_FOLD = {"#archiveDialog #archMacro": "below the fold of the scrolling sheet on a phone"}
+
+
 def _suggestion(rel: str, label: str, tone: str, note: str, saved: str) -> dict[str, Any]:
     return {"folder_path": ROOT + "/" + rel, "display_name": "/".join(rel.split("/")[-2:]),
             "why": [{"label": label, "tone": tone}], "note": note, "saved_as": saved}
@@ -109,6 +112,37 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
     # The sheet is capped to the viewport and scrolls its card, so the VBA's Copy sits below a phone's fold by design.
     _lint_both_themes(page, allow={"#macroDialog #copyMacro": "below the fold of the scrolling sheet"})
+    assert errors == []
+
+
+def test_an_archived_mail_is_filed_again_only_through_the_copy_switch(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    filed: list[dict[str, Any]] = []
+    _archive_ready(page)
+    page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/current", lambda r: _json(r, dict(PREPARED, already_archived=ROOT + "/Clients/Project Alpha/2026/003 - Kickoff agenda.msg")))
+
+    def file_mail(route: Route) -> None:
+        filed.append(route.request.post_data_json)
+        _json(route, {"ok": True, "folder_path": filed[-1]["folder"], "files": [filed[-1]["folder"] + "/004 - Kickoff agenda.msg"],
+                      "categorized": True, "indexing": True, "error": None})
+    page.route("**/api/archive/file", file_mail)
+
+    page.goto(app_url + "/")
+    page.locator("#openArchive").click()
+    sheet = page.locator("#archiveDialog")
+    expect(sheet.locator(".arch-filed")).to_contain_text("Already archived as")
+    go, copy = sheet.locator("#archiveGo"), sheet.locator("#archCopy")
+    expect(copy).to_have_attribute("aria-checked", "false")
+    expect(go).to_be_disabled()
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    copy.click()
+    expect(copy).to_have_attribute("aria-checked", "true")
+    expect(go).to_have_text("Archive a copy to Project Alpha\\2026")
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    go.click()
+    expect(sheet).to_be_hidden()
+    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived", "duplicate": True}]
     assert errors == []
 
 

@@ -33,6 +33,7 @@
 <link rel="stylesheet" href="/static/_vendored/card/card.css">
 <link rel="stylesheet" href="/static/_vendored/button/button.css">
 <link rel="stylesheet" href="/static/_vendored/icon-button/icon-button.css">
+<link rel="stylesheet" href="/static/_vendored/code-listing/code-listing.css">
 <link rel="stylesheet" href="/static/_vendored/segmented/segmented.css">
 <link rel="stylesheet" href="/static/_vendored/select-native/select-native.css">
 <link rel="stylesheet" href="/static/_vendored/switch/switch.css">
@@ -560,7 +561,14 @@
         <p class="setup-note">Run this once in a Command Prompt or PowerShell window. It sets <code class="code-chip">FOLDER_EXPLORER_HOME</code> for your user (no admin needed); the app never runs it for you.</p>
         <div id="setupBox" hidden>
           <div class="code-listing">
-            <div class="code-listing-head"><span>Command Prompt · PowerShell</span><button type="button" class="button-surface" id="copySetx" data-track="macro-copy-setx">Copy</button></div>
+            <div class="code-listing-head">
+              <span class="code-listing-title">Command Prompt · PowerShell</span>
+              <span class="code-listing-status" role="status" aria-live="polite"></span>
+              <button type="button" class="icon-button code-listing-copy" id="copySetx" data-track="macro-copy-setx" aria-label="Copy" title="Copy">
+                <svg class="icon code-listing-copy-glyph" aria-hidden="true"><use href="#i-copy"></use></svg>
+                <svg class="icon code-listing-copied" aria-hidden="true"><use href="#i-circle-check"></use></svg>
+              </button>
+            </div>
             <pre id="setxText"></pre>
           </div>
           <p class="setup-state" id="homeState" role="status"></p>
@@ -571,7 +579,14 @@
         <h3 class="setup-step-title">Import the macro</h3>
         <p class="setup-note">In Outlook press Alt+F11, choose <strong>File, then Import File…</strong> and pick <code class="code-chip">assets/ArchiveMacro.bas</code>, or copy the text below into a new module.</p>
         <div class="code-listing">
-          <div class="code-listing-head"><span>VBA · ArchiveCurrentItem</span><button type="button" class="button-surface" id="copyMacro" data-track="macro-copy">Copy</button></div>
+          <div class="code-listing-head">
+            <span class="code-listing-title">VBA · ArchiveCurrentItem</span>
+            <span class="code-listing-status" role="status" aria-live="polite"></span>
+            <button type="button" class="icon-button code-listing-copy" id="copyMacro" data-track="macro-copy" aria-label="Copy" title="Copy">
+              <svg class="icon code-listing-copy-glyph" aria-hidden="true"><use href="#i-copy"></use></svg>
+              <svg class="icon code-listing-copied" aria-hidden="true"><use href="#i-circle-check"></use></svg>
+            </button>
+          </div>
           <pre id="macroText"></pre>
         </div>
       </li>

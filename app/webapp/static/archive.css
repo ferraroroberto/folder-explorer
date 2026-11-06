@@ -74,3 +74,29 @@
 .code-listing-head { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 0 0 12px; border-bottom: 1px solid var(--line-muted); font-size: var(--font-caption); font-weight: 600; color: var(--muted); }
 .code-listing-head .button-surface { min-height: 44px; margin: 2px; font-size: var(--font-caption); }
 .code-listing pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 1.5; color: var(--ink); }
+
+/* A short numbered setup: the order is real, so the numbers carry it. */
+.setup-steps { margin: var(--space-md) 0 0; padding: 0; list-style: none; counter-reset: setup; }
+.setup-steps > li { position: relative; counter-increment: setup; padding: 0 0 var(--space-md) 36px; }
+.setup-steps > li:last-child { padding-bottom: 0; }
+.setup-steps > li::before {
+  content: counter(setup);
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--font-body-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.setup-step-title { margin: 0 0 var(--space-xs); font-size: var(--font-body); font-weight: 600; line-height: 24px; }
+.setup-note { margin: 0; font-size: var(--font-body-sm); color: var(--muted); }
+.setup-state { margin: var(--space-sm) 0 0; font-size: var(--font-body-sm); font-weight: 600; overflow-wrap: anywhere; }
+.setup-state.is-ok { color: var(--success); }
+.setup-state.is-warn { color: var(--ink); }

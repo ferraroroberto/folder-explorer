@@ -27,7 +27,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from src import config, folder_search, store
+from src import config, folder_search, macro_home, store
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
 from src.email import body as child
@@ -221,7 +221,14 @@ def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, A
 
 
 @router.get("/archive/macro")
-def macro() -> dict[str, str]:
-    """The VBA template to paste into Outlook, without the module header the editor's import reads."""
+def macro(request: Request) -> dict[str, Any]:
+    """The VBA template to paste into Outlook, without the module header the editor's import reads.
+
+    ``setup`` (the ``setx`` line with this PC's checkout and whether the variable is set) is
+    given to a page on this PC only: it names a folder, and the variable is this PC's.
+    """
     text = MACRO_FILE.read_text(encoding="utf-8")
-    return {"text": "\n".join(line for line in text.splitlines() if not line.startswith("Attribute ")).strip() + "\n"}
+    return {
+        "text": "\n".join(line for line in text.splitlines() if not line.startswith("Attribute ")).strip() + "\n",
+        "setup": macro_home.setup(PROJECT_ROOT) if is_pc_itself(request) else None,
+    }

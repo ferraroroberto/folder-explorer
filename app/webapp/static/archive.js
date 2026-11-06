@@ -196,15 +196,34 @@ function pickFound(path) {
 
 // --------------------------------------------------------------- macro
 
+// What the user environment says about FOLDER_EXPLORER_HOME, in words; the state also sets the colour.
+function homeStateText(s) {
+  if (s.state === 'ok') return 'Set — it points at this folder.';
+  if (s.state === 'different') return 'Set, but to another folder: ' + s.current;
+  if (s.state === 'unset') return 'Not set yet.';
+  return 'Couldn\'t read the user environment, so whether it is set is not confirmed.';
+}
+
+function renderSetup(setup) {
+  $('setupBox').hidden = !setup;
+  $('setupPcOnly').hidden = !!setup;
+  if (!setup) return;
+  $('setxText').textContent = setup.command;
+  const el = $('homeState');
+  el.textContent = homeStateText(setup);
+  el.classList.toggle('is-ok', setup.state === 'ok');
+  el.classList.toggle('is-warn', setup.state !== 'ok');
+}
+
+// The variable can change while the page stays open, so the sheet asks again each time it opens.
 async function openMacro() {
-  const pre = $('macroText');
-  if (!pre.textContent) {
-    try {
-      pre.textContent = (await getJSON('/api/archive/macro')).text;
-    } catch (e) {
-      showToast(e.message, 'error');
-      return;
-    }
+  try {
+    const doc = await getJSON('/api/archive/macro');
+    $('macroText').textContent = doc.text;
+    renderSetup(doc.setup);
+  } catch (e) {
+    showToast(e.message, 'error');
+    return;
   }
   if (!$('macroDialog').open) $('macroDialog').showModal();
 }
@@ -237,6 +256,7 @@ export function initArchive() {
   $('openArchive').addEventListener('click', () => openArchive());
   $('showMacro').addEventListener('click', () => { $('settingsDialog').close(); openMacro(); });
   $('copyMacro').addEventListener('click', async () => showToast((await copyText($('macroText').textContent)) ? 'Macro copied' : 'Copy isn\'t allowed here'));
+  $('copySetx').addEventListener('click', async () => showToast((await copyText($('setxText').textContent)) ? 'Command copied' : 'Copy isn\'t allowed here'));
   const body = $('archiveBody');
   $('archiveActions').addEventListener('click', (ev) => {
     const el = ev.target.closest('#archiveGo');

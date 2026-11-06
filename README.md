@@ -90,10 +90,10 @@ The **Outlook macro** puts the same flow on Outlook's ribbon. It starts `pythonw
 
 Set the macro up once per PC:
 
-1. Set the user environment variable `FOLDER_EXPLORER_HOME` to this checkout's folder (System Properties → Environment Variables), then restart Outlook so it sees it.
+1. Set the user environment variable `FOLDER_EXPLORER_HOME` to this checkout's folder. Settings → Outlook macro shows the exact `setx` line for this PC's checkout (a worktree resolves to its primary checkout) with a Copy button, and whether the variable is already set (read-only from the user environment; the app never runs `setx`). Open the sheet on the PC itself; other devices don't see the line.
 2. In Outlook (classic), press Alt+F11, then **File → Import File…** and pick `assets/ArchiveMacro.bas` (or paste the text from Settings → Outlook macro → Copy into a new module).
 3. **File → Options → Customize Ribbon**: add a custom group, choose **Macros** in "Choose commands from", add `ArchiveCurrentItem` and rename it **Archive**.
-4. If macros are blocked, allow them for this project in **Trust Center → Macro Settings** (or sign it with a self-made certificate from `SelfCert.exe`).
+4. Restart Outlook so it reads the variable. If macros are blocked, allow them for this project in **Trust Center → Macro Settings** (or sign it with a self-made certificate from `SelfCert.exe`).
 
 ## Archive verbs (Outlook)
 

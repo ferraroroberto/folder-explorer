@@ -1,10 +1,13 @@
 """Make a mail's HTML body safe to show: an allowlist of tags and attributes, nothing active.
 
 The page shows the result in an ``<iframe sandbox>`` whose ``srcdoc`` carries a
-Content-Security-Policy that blocks every remote load, so a tracking image
-never fires. This pass is the second wall: scripts, frames, forms, embedded
-objects, event handlers and ``javascript:`` links never reach the page, and an
-image keeps its source only when it is inline ``data:``.
+Content-Security-Policy that blocks every remote load unless the reader turns
+on "Load remote images" for that mail. This pass is the second wall: scripts,
+frames, forms, embedded objects, event handlers and ``javascript:`` links never
+reach the page. An image keeps its ``src`` only when it is inline ``data:``; an
+``https:`` image keeps its address in ``data-remote-src``, which the page turns
+into ``src`` only while that switch is on, so a mail read with the switch off
+has no remote ``src`` in it at all.
 """
 
 from __future__ import annotations
@@ -55,6 +58,9 @@ class _Clean(HTMLParser):
         self.in_style = tag == "style"
         kept = ["%s=\"%s\"" % (n, escape(v or "", quote=True)) for n, v in attrs
                 if n in _ATTRS and _attr_ok(tag, n, v or "")]
+        if tag == "img":
+            kept += ["data-remote-src=\"%s\"" % escape(v.strip(), quote=True) for n, v in attrs
+                     if n == "src" and v and v.strip().lower().startswith("https://")]
         self.out.append("<" + tag + (" " + " ".join(kept) if kept else "") + ">")
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:

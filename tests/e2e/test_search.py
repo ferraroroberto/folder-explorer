@@ -53,6 +53,30 @@ def test_email_search_refines_previews_and_shows_the_folder(page: Page, app_url:
     assert errors == []
 
 
+def test_open_folder_beside_show_folder_posts_the_mails_folder(page: Page, app_url: str, browser_name: str) -> None:
+    errors = _errors(page)
+    asked: list[dict] = []
+
+    def fake_open(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
+
+    page.route("**/api/open", fake_open)
+    page.goto(app_url + "/")
+    page.locator("#q").fill("budget")
+    page.locator("#results .result-row").first.click()
+    preview = _preview(page, browser_name)
+    expect(preview.locator('[data-act="folder"]').first).to_be_visible()
+    button = preview.locator('[data-act="openfolder"]')
+    expect(button).to_have_text("Open folder")
+    _lint(page)
+    button.click()
+    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
+    assert len(asked) == 1
+    assert asked[0]["kind"] == "folder" and asked[0]["verb"] == "explore" and asked[0]["id"] > 0 and "path" not in asked[0]
+    assert errors == []
+
+
 def test_folder_search_opens_from_a_link_and_matches_every_word(page: Page, app_url: str, browser_name: str,
                                                                 roots_count: int) -> None:
     errors = _errors(page)

@@ -32,7 +32,7 @@ reason = "The snake_case text is the owner's own mail snippets and folder names,
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]
 base = { src = "app/webapp/static/_vendored/base", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/base" }
-nav = { src = "app/webapp/static/_vendored/nav", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/nav" }
+nav = { src = "app/webapp/static/_vendored/nav", sha = "ea993a7aa7a8814749236621a5eac939e862bf4d", dest = "app/webapp/static/_vendored/nav" }
 icons = { src = "app/webapp/static/_vendored/icons", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/icons" }
 card = { src = "app/webapp/static/_vendored/card", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/card" }
 home-head = { src = "app/webapp/static/_vendored/home-head", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/home-head" }

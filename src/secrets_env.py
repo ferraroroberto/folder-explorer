@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from src.atomic_write import atomic_write_text
 from src.config import PROJECT_ROOT
 
 PASSWORD_VAR = "FOLDER_EXPLORER_PASSWORD"
@@ -62,7 +63,4 @@ def write_secrets(path: Path, values: dict[str, str]) -> None:
         else:
             out.append(line)
     out.extend(k + "=" + v for k, v in pending.items())
-    tmp = path.with_name(path.name + ".tmp")
-    # runtime-write-exempt: .env at the repo root is the documented secrets file (gitignored)
-    tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+    atomic_write_text(path, "\n".join(out) + "\n")

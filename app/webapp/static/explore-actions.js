@@ -1,4 +1,5 @@
 /* Explore's item actions: each row's menu, double-click to open on this PC, and Copy path on every device.
+ * Off the PC the menu says opening works there, instead of showing Copy path alone.
  *
  * Opening asks the server, which looks the item up by its id in the scan the
  * page shows and refuses any caller but this PC; the page never sends a path.
@@ -15,6 +16,9 @@ import { showToast } from './_vendored/toast/toast.js';
 // re-rendered, so the first press names the item; this bounds how stale it may be.
 const DOUBLE_MS = 800;
 const DONE = { explore: 'Opened in File Explorer', open: 'Opening', edit: 'Opening to edit', reveal: 'Shown in File Explorer' };
+
+// The one line a menu opens with when this device can't open anything, so Copy path isn't alone without a reason.
+const NOT_HERE = 'Opening files and folders works on the PC';
 
 let source = () => null;
 const menus = new Map();
@@ -91,7 +95,7 @@ export function wireRowMenus(container) {
   }
   container.querySelectorAll('[data-kebab]').forEach((btn) => {
     const it = c.items[Number(btn.dataset.kebab)];
-    if (it) menu.attach(it.kind + ':' + it.id, btn, menuItems(it));
+    if (it) menu.attach(it.kind + ':' + it.id, btn, menuItems(it), { header: () => (canOpen() ? '' : NOT_HERE) });
   });
   menu.endRender();
 }

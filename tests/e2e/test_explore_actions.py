@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
@@ -67,3 +68,20 @@ def test_hidden_items_switch_and_opening_items_on_the_pc(page: Page, app_url: st
     third = _wait_for(page, asked, 3)
     assert (third["kind"], third["id"], third["verb"]) == ("folder", folder_id, "explore")
     assert all(a["scan_id"] == asked[0]["scan_id"] and a["root"] for a in asked)
+
+
+@pytest.mark.desktop_only
+def test_off_the_pc_the_row_menu_says_opening_works_on_the_pc(page: Page, app_url: str) -> None:
+    def as_remote(route: Route) -> None:
+        body = route.fetch().json()
+        body["can_open"] = False
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+    page.route("**/api/folder?*", as_remote)
+    page.goto(app_url + "/")
+    page.locator('.tab[data-tab="explore"]').click()
+    dock = page.locator("#contentsDock")
+    dock.locator(".row-item", has_text="notes.txt").locator(".row-kebab").click()
+    menu = page.locator(".row-menu")
+    expect(menu.locator(".row-menu-head")).to_have_text("Opening files and folders works on the PC")
+    expect(menu.locator(".row-menu-label")).to_have_text(["Copy path"])

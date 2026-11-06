@@ -31,6 +31,7 @@ folder-explorer/
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
+│   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
 │   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),

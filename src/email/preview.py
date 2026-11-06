@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import re
 
-# A link target Outlook wraps in angle brackets. The final alternative also takes a target the 500-character cut
-# stopped inside, so a row stored before this cleaner existed loses its dangling half-URL too.
-_LINK = re.compile(r"[ \t]*<(?:[a-z][a-z0-9+.-]*:)[^>\s]*(?:>|$)", re.IGNORECASE)
+# A link target Outlook wraps in angle brackets. Outlook breaks a long target over lines, so it may hold whitespace;
+# the length bound keeps a stray "<scheme:" from eating the rest of a mail. A target the 500-character cut stopped
+# inside has no closing bracket and runs to the end of the text, as does a bare "<http" the cut left behind.
+_LINK = re.compile(r"[ \t]*<(?:[a-z][a-z0-9+.-]*:[^>]{0,2000}(?:>|\Z)|(?:https?|mailto|ftp)[ \t]*\Z)", re.IGNORECASE)
 # An image Outlook could not show: ``[cid:logo@01D…]``, ``[image]`` or ``[image: alt text]``.
 _IMAGE = re.compile(r"[ \t]*\[(?:cid:[^\]\s]*|image(?::[^\]]*)?)\]", re.IGNORECASE)
 # A line that is only a URL (a tracking link the sender printed on its own).

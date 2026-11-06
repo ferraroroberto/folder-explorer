@@ -12,6 +12,9 @@ For each ``.msg`` the manifest lists, by path:
 - it failed before with the same size and modified time: skip it, so one bad
   file never downloads every night.
 
+Before any of that, a stored preview that still carries Outlook's link or image
+markup is cleaned from its own text, without opening a file.
+
 A row whose file the manifest no longer lists is purged, but only under a
 folder whose manifest is complete: a listing that failed halfway proves
 nothing is gone.
@@ -26,6 +29,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from src.email.manifest import Manifest, MsgFile
+from src.email.preview import clean_preview
 from src.email.reader import ReadError, read_facts
 from src.email.settings import is_under
 
@@ -60,6 +64,7 @@ class Counts:
     failed: int = 0
     skipped_failed: int = 0
     purged: int = 0
+    cleaned: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return dict(self.__dict__)
@@ -145,7 +150,26 @@ class Stage:
         self._write(f, facts)
         self._tick()
 
+    def _tidy_stored(self) -> None:
+        """Clean the stored preview of every row that still carries link or image markup, from the stored text alone.
+
+        Rows indexed before ``clean_preview`` existed hold Outlook's ``<url>`` and ``[image]`` tokens. Re-reading
+        each file would download every online-only mail, so the row's own text is cleaned in place: no file is
+        opened, and the FTS mirror follows through the update trigger. Only rows the cleaner changes are written.
+        """
+        rows = self.conn.execute(
+            "SELECT id, body_preview FROM emails WHERE body_preview LIKE '%<%' OR body_preview LIKE '%[%'").fetchall()
+        for row in rows:
+            tidy = clean_preview(row["body_preview"])
+            if tidy != row["body_preview"]:
+                self.conn.execute("UPDATE emails SET body_preview = ? WHERE id = ?", (tidy, row["id"]))
+                self.counts.cleaned += 1
+        self.conn.commit()
+        if self.counts.cleaned:
+            logger.info("ℹ️ email stage: cleaned the stored preview of %d mail(s), no file opened", self.counts.cleaned)
+
     def run(self, manifests: list[Manifest]) -> Counts:
+        self._tidy_stored()
         known, failures = self._known(), self._failures()
         listed: set[str] = set()
         for m in manifests:

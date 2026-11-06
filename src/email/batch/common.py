@@ -37,6 +37,8 @@ SCHEMA_VERSION = 1
 ERROR_NOT_IN_INBOX = "not_in_inbox"            # already moved, or never there
 ERROR_CATEGORY_FAILED = "category_failed"
 ERROR_BAD_DECISION = "bad_decision"            # caller sent an unusable entry
+ERROR_BAD_INPUT = "bad_input"                  # a flag or input file the run cannot use
+ERROR_RUN_FAILED = "run_failed"                # unclassified failure once the run had started
 
 
 def now_iso() -> str:

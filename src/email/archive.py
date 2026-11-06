@@ -310,6 +310,13 @@ def resolve_date_prefix_for_folder(cfg: dict[str, Any], folder_path: str) -> boo
     return _resolve_date_prefix_mode(mode, inferred)
 
 
+def fit_msg_filename(folder_path: str, seq: str, subject: str, date_prefix: str | None,
+                     max_path: int = DEFAULT_MAX_PATH_LENGTH) -> str:
+    """The ``.msg`` name the archive gives ``subject`` in ``folder_path``: sequence (and date), sanitized, cut to fit the path."""
+    return _fit_filename_to_path(folder_path, seq, sanitize_filename(subject), ".msg",
+                                 date_prefix=date_prefix, max_path=max_path)
+
+
 def planned_name(cfg: dict[str, Any], folder_path: str, subject: str, sent: datetime | None) -> str:
     """The ``.msg`` name ``EmailArchiver.archive`` would give this mail in ``folder_path`` now.
 
@@ -320,8 +327,7 @@ def planned_name(cfg: dict[str, Any], folder_path: str, subject: str, sent: date
     scan = _scan_folder(folder_path) if os.path.isdir(folder_path) else _FolderScan("001", None)
     dated = _resolve_date_prefix_mode(get_date_prefix_mode(cfg), scan.inferred_date_prefix)
     prefix = f"{sent.year:04d}-{sent.month:02d}-{sent.day:02d}" if dated and sent is not None else None
-    return _fit_filename_to_path(folder_path, scan.next_sequence, sanitize_filename(subject), ".msg",
-                                 date_prefix=prefix, max_path=get_max_path_length(cfg))
+    return fit_msg_filename(folder_path, scan.next_sequence, subject, prefix, get_max_path_length(cfg))
 
 
 def _resolve_date_prefix_mode(mode: bool | str, inferred: bool | None) -> bool:

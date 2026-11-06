@@ -18,6 +18,7 @@ one the caller approved (`read` reports it).
     python -m app.cli email batch revert --items revert.json [--renumber] [--category <name>]
     python -m app.cli email batch dismiss --message-id <id> [--message-id <id> ...] [--category <name>]
     python -m app.cli email batch renumber --folder "<a folder>" [--dry-run]
+    python -m app.cli email batch fix-cut-names [--apply | --revert <undo log>] [--root FOLDER] [--wait S]
     python -m app.cli email batch draft --spec spec.json
     python -m app.cli email batch draft --update <entry_id> --spec spec.json
     python -m app.cli email batch read --entry-id <entry_id>
@@ -68,8 +69,8 @@ Why a separate process rather than a library call: the Inbox verbs drive
 Outlook over COM, and a COM modal (the address-book security prompt, a profile
 chooser) blocks whatever thread it is raised on. Spawning this with a timeout
 means such a prompt hangs *this* process, which the caller can kill, and never
-the caller. ``renumber`` is the exception that proves the rule: it reads a
-folder and the index and touches no COM at all, so it never starts Outlook.
+the caller. ``renumber`` and ``fix-cut-names`` (app/cli/cut_names.py) touch no COM at
+all: they read a folder, the index and subjects, so they never start Outlook.
 """
 from __future__ import annotations
 
@@ -85,6 +86,7 @@ from typing import Any
 
 from src import config, store
 from src.email.batch import common as batch_common
+from app.cli import cut_names
 from src.email.batch import dismiss, draft, find, send, sync
 from src.email.batch import revert as revert_verb
 from src.email.batch import verbs as batch
@@ -116,7 +118,7 @@ EXIT_CANNOT_START = 2
 EXIT_DEFERRED = 3
 
 ERROR_CONFIG_MISSING = "config_missing"
-ERROR_BAD_INPUT = "bad_input"
+ERROR_BAD_INPUT = batch_common.ERROR_BAD_INPUT
 ERROR_OUTLOOK_UNAVAILABLE = "outlook_unavailable"
 ERROR_COM_UNAVAILABLE = "com_unavailable"
 ERROR_SELF_ADDRESS_UNRESOLVED = "self_address_unresolved"
@@ -128,7 +130,7 @@ ERROR_ACCOUNT_NOT_IN_OUTLOOK = "account_not_in_outlook"
 # Outlook was reached but the walk then hit something unclassified (a locked
 # or corrupt index database, a renumber or disk error) — distinct from
 # com_unavailable, which is reserved for "pywin32 is not installed".
-ERROR_RUN_FAILED = "run_failed"
+ERROR_RUN_FAILED = batch_common.ERROR_RUN_FAILED
 
 
 def _emit(document: dict[str, Any]) -> None:
@@ -511,6 +513,7 @@ def _build_parser() -> argparse.ArgumentParser:
     mailbox_verbs += _add_apply_revert_parsers(sub)
     mailbox_verbs.append(_add_dismiss_parser(sub))
     _add_renumber_parser(sub)
+    cut_names.add_parser(sub)
     mailbox_verbs += _add_draft_read_send_parsers(sub)
     sub.add_parser(
         "mailboxes",
@@ -868,6 +871,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if verb == "renumber":
         return _renumber(cfg, args)
+    if verb == cut_names.VERB:
+        return cut_names.run(cfg, args, _emit, _fail)
 
     # Every other verb is about a mailbox. The registry is read here, before
     # Outlook: a malformed file must stop the run, never fall back to the

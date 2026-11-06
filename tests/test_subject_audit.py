@@ -41,6 +41,50 @@ def test_a_whole_name_or_an_unrelated_one_is_left_alone(filename: str, subject: 
     assert cut_name(filename, subject) is None
 
 
+LONG = "Recibo de pago de Tesla del mes de marzo de dos mil veintiseis"
+
+
+@pytest.mark.parametrize(
+    ("filename", "subject", "expected"),
+    [
+        # The whole stem is compared, not its first 24 characters: a long name is found too.
+        ("2026-03-02 - 009 - cibo de pago de Tesla del mes de marzo de dos mil veintiseis.msg", LONG,
+         "2026-03-02 - 009 - " + LONG + ".msg"),
+        # A name the archive cut short to fit the path ends in an ellipsis and is still recognised.
+        ("009 - cibo de pago de Tesla del mes de ma....msg", LONG, "009 - " + LONG + ".msg"),
+        # An archive written when only ASCII was kept in a name.
+        ("004 - visi_n anual.msg", "Revisión anual", "004 - Revisión anual.msg"),
+        # Case differs, name is still cut.
+        ("004 - VISIÓN ANUAL.msg", "Revisión anual", "004 - Revisión anual.msg"),
+    ],
+)
+def test_a_long_cut_or_shortened_or_legacy_name_is_found(filename: str, subject: str, expected: str) -> None:
+    assert cut_name(filename, subject) == expected
+
+
+@pytest.mark.parametrize(
+    ("filename", "subject"),
+    [
+        # Same first 24 characters as the cut form, a different ending: not this mail's cut name.
+        ("009 - cibo de pago de Tesla de otro mes.msg", LONG),
+        # The ellipsis form of the whole subject is a correct name, not a cut one.
+        ("009 - Recibo de pago de Tesla del mes de ma....msg", LONG),
+        # A cut head that also begins the whole subject cannot be told apart, so it is left alone.
+        ("003 - re....msg", "Rere ere"),
+    ],
+)
+def test_a_name_that_only_looks_alike_is_left_alone(filename: str, subject: str) -> None:
+    assert cut_name(filename, subject) is None
+
+
+def test_the_new_name_is_cut_to_fit_the_path_like_the_archive_does() -> None:
+    folder = "C:/" + "f" * 200
+    name = cut_name("009 - cibo de pago de Tesla del mes de marzo de dos mil veintiseis.msg", LONG, 255, folder)
+
+    assert name is not None and name.startswith("009 - Recibo de pago") and name.endswith("....msg")
+    assert len(folder) + 1 + len(name) <= 255
+
+
 def _facts(subjects: dict[str, str]) -> Any:
     def read(path: str, _preview: int) -> dict[str, Any]:
         name = Path(path).name

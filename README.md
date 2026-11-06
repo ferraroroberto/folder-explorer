@@ -57,6 +57,7 @@ On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-
 
 - `& .\.venv\Scripts\python.exe -m app.cli email index` (every email folder) or `... email index --root <folder>` (one folder below one, in seconds, under the email lock only, so it never waits behind a disk scan). Exit 0 indexed, 1 failed, 2 busy (another email run held the lock past `--wait S`), 3 not inside an email folder, 4 not set up here.
 - `... email import --from <emails.db>` copies another app's email index in once, keeping its rows; the next run reads each mail once more to fill To, Cc, attachments and size. `... email status` lists the last runs.
+- `... email subjects [--root <folder>] [--limit N]` is a dry run that lists archived mails whose file name lost its first letters to an old reply-prefix rule ("Recibo" filed as "cibo"): a count and N names, printed locally. It reads each mail's subject under the email stage's download budget and lock, and renames nothing.
 - `... email index --fresh` lists the email folders now instead of reading the last scan's index: a mail filed since that scan is only seen this way.
 - `... scan --no-email` scans the disks only.
 

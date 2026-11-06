@@ -9,6 +9,9 @@
                                         --fresh lists them now instead of using the last scan
     python -m app.cli email import --from FILE
                                         copy another app's email index in, once
+    python -m app.cli email subjects [--root FOLDER] [--wait S] [--limit N]
+                                        dry run: archived mails whose name lost its first letters to the old
+                                        reply-prefix rule (count plus N names); reads, renames nothing
     python -m app.cli email status      the email index's size and its last runs
     python -m app.cli email config --json
                                         {"roots": [...], "db": "<index>", "own": true|false} for consumers
@@ -39,7 +42,7 @@ from pathlib import Path
 from typing import Optional
 
 from src import config, scan_runner, store
-from src.email import indexer
+from src.email import indexer, subject_audit
 from src.email.schema import import_index, own_index_path
 from src.email.settings import email_part
 from src.roots import resolve_roots
@@ -87,6 +90,21 @@ def cmd_email_config() -> int:
     part = email_part(cfg, resolve_roots(cfg["roots"]))
     sys.stdout.write(json.dumps({"roots": part.roots, "db": str(part.index_path) if part.index_path else None,
                                  "own": part.own}) + "\n")
+    return EXIT_OK
+
+
+def cmd_email_subjects(scope: Optional[str], wait_s: float, limit: int) -> int:
+    """Dry run: list archived mails whose name lost its first letters; renames nothing."""
+    try:
+        result = subject_audit.run(scope, wait_s)
+    except indexer.NotSetUp as exc:
+        logger.info("ℹ️ subject audit not run: %s", exc)
+        return EXIT_NOT_SET_UP
+    except indexer.EmailBusy:
+        logger.warning("⚠️ another email run held the lock for %.0f s; nothing read", wait_s)
+        return EXIT_BUSY
+    for line in subject_audit.describe(result, limit):
+        sys.stdout.write(line + "\n")
     return EXIT_OK
 
 
@@ -157,6 +175,10 @@ def main(argv: list[str] | None = None) -> int:
     index.add_argument("--wait", type=float, default=0.0, help="seconds to wait for a running email run")
     index.add_argument("--fresh", action="store_true", help="list the email folders now, not from the last scan")
     index.add_argument("--trigger", default="cli", help=argparse.SUPPRESS)
+    subj = email.add_parser("subjects", help="dry run: list archived mails whose name lost its first letters (renames nothing)")
+    subj.add_argument("--root", default=None, help="one folder inside an email folder (default: every email folder)")
+    subj.add_argument("--wait", type=float, default=0.0, help="seconds to wait for a running email run")
+    subj.add_argument("--limit", type=int, default=10, help="how many names to print (default 10)")
     imp = email.add_parser("import", help="copy another app's email index in, once")
     imp.add_argument("--from", dest="source", required=True, help="the email index file to copy")
     email.add_parser("status", help="the email index and its last runs")
@@ -170,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "email":
         if args.verb == "index":
             return cmd_email_index(args.root, args.wait, args.trigger, args.fresh)
+        if args.verb == "subjects":
+            return cmd_email_subjects(args.root, args.wait, args.limit)
         if args.verb == "config":
             return cmd_email_config()
         return cmd_email_import(args.source) if args.verb == "import" else cmd_email_status()

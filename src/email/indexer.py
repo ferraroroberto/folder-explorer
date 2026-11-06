@@ -55,7 +55,7 @@ def lock() -> ScanLock:
     return ScanLock(store.data_dir() / "email.lock")
 
 
-def _take(guard: ScanLock, wait_s: float) -> None:
+def take_lock(guard: ScanLock, wait_s: float) -> None:
     deadline = time.monotonic() + max(0.0, wait_s)
     while True:
         try:
@@ -146,7 +146,7 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
     if scope is not None and not any(is_under(scope, f) for f in part.roots):
         raise UnknownFolder("not inside an email folder: " + scope)
     guard = lock()
-    _take(guard, wait_s)
+    take_lock(guard, wait_s)
     try:
         settled = store.settle_email_runs()
         if settled:

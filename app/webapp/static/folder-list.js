@@ -43,7 +43,7 @@ export function folderList(host, { name, label, empty, onSave }) {
     '<form class="folder-add" novalidate>' +
     '<input class="input-native" type="text" spellcheck="false" autocomplete="off" placeholder="Add a folder path" aria-label="' +
     esc(label) + '" data-track="' + name + '-add-input">' +
-    '<button type="submit" class="button-surface" data-track="' + name + '-add">' + glyph('plus') + 'Add</button>' +
+    '<button type="submit" class="button-primary" data-track="' + name + '-add">' + glyph('plus') + 'Add</button>' +
     '</form><p class="row-note folder-error" role="alert"></p>';
   const rows = host.querySelector('.folder-rows');
   const form = host.querySelector('.folder-add');

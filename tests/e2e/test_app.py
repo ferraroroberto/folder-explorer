@@ -101,6 +101,17 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
     assert_layout_clean(page)
 
 
+def test_scans_footer_actions_share_one_box(page: Page, app_url: str) -> None:
+    _open(page, app_url)
+    _tab(page, "scans")
+    expect(page.locator("#emailCard")).to_be_visible()
+    boxes = [page.locator(sel).bounding_box() for sel in ("#rescanAll", "#indexEmails")]
+    assert all(boxes)
+    left, right = boxes[0], boxes[1]
+    assert abs(left["x"] - right["x"]) <= 1 and abs(left["width"] - right["width"]) <= 1
+    assert abs(left["height"] - right["height"]) <= 1
+
+
 @pytest.mark.desktop_only
 def test_settings_show_remote_access_and_the_schedule(page: Page, app_url: str) -> None:
     _open(page, app_url)

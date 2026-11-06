@@ -7,11 +7,17 @@ import { getJSON, postJSON, api } from './api.js';
 import { S, $, WIDE, copyText, effectiveMode, hl, mailDate, marked, shortFolder } from './search-state.js';
 import { esc, fmtBytes, fmtNum, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { switchEl } from './_vendored/switch/switch.js';
 
 let showInExplore = () => {};
 
 export function initPreview(opts) {
   showInExplore = opts.showInExplore;
+  // A frame that follows the app's theme follows it live; one the reader flipped keeps its look.
+  new MutationObserver(() => {
+    const item = current();
+    if (item && effectiveMode() === 'emails' && !S.frame.get(item.id)?.look) refreshFrame(item.id);
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   $('previewDialog').addEventListener('close', () => {
     const row = document.querySelector('#results .result-row[aria-selected="true"]');
     if (row) row.focus({ preventScroll: true });
@@ -36,8 +42,39 @@ const BODY_TITLES = {
   read: 'Couldn\'t read the file', not_set_up: 'Show all isn\'t set up here', outside: 'Outside the email folders',
 };
 
-// The frame's policy: nothing loads from anywhere, styles inline only, images only from data: URLs.
-const FRAME_CSP = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">';
+// The frame's policy: nothing loads from anywhere, styles inline only, images only from data: URLs,
+// plus https: ones while the reader has "Load remote images" on for that mail. Never scripts.
+const frameCsp = (remote) => '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:' +
+  (remote ? ' https:' : '') + '">';
+
+// The dark reader look: the mail's own colours inverted in luminance with the hue turned back, and images
+// inverted again so photos and logos keep their colours. The ground #ebeff5 comes out as the page's --bg (#0d1117) once the hue is turned back.
+const DARK_LOOK = '<style>html{background:#ebeff5!important;filter:invert(1) hue-rotate(180deg)!important}' +
+  'img{filter:invert(1) hue-rotate(180deg)!important}</style>';
+
+const appLook = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+const frameView = (id) => S.frame.get(id) || { look: null, remote: false };
+
+/** The mail's HTML as the frame gets it: the policy first, then the look, then the mail. */
+function frameDoc(html, view) {
+  const body = view.remote ? html.replace(/ data-remote-src="/g, ' src="') : html;
+  return frameCsp(view.remote) + (view.look === 'dark' ? DARK_LOOK : '') + body;
+}
+
+/** The full-message block of an HTML mail: label, look button, the remote-images switch and the frame. */
+function frameBlock(d, html) {
+  const view = { ...frameView(d.id), look: frameView(d.id).look || appLook() };
+  const dark = view.look === 'dark';
+  const sw = switchEl(view.remote, { label: 'Load remote images' });
+  sw.dataset.act = 'images';
+  sw.dataset.track = 'frame-images';
+  return '<div class="pv-section" data-frame="' + d.id + '">' +
+    '<div class="pv-frame-head"><span class="pv-label">Full message · HTML, remote images ' + (view.remote ? 'shown' : 'blocked') + '</span>' +
+    '<button type="button" class="icon-button" data-act="look" data-track="frame-look" aria-label="' + (dark ? 'Show this message in the light look' : 'Show this message in the dark look') +
+    '" title="' + (dark ? 'Light look for this message' : 'Dark look for this message') + '">' + glyph(dark ? 'sun' : 'moon') + '</button></div>' +
+    '<div class="pv-frame-opt"><span aria-hidden="true">Load remote images</span>' + sw.outerHTML + '</div>' +
+    '<iframe class="pv-frame ' + view.look + '" sandbox="" referrerpolicy="no-referrer" title="Message body" srcdoc="' + esc(frameDoc(html, view)) + '"></iframe></div>';
+}
 
 function bodyHtml(d) {
   const st = S.body.get(d.id) || { state: 'idle' };
@@ -56,10 +93,7 @@ function bodyHtml(d) {
       (st.error === 'timeout' || st.error === 'read' ? '<button type="button" class="button-ghost" data-act="showall" data-track="show-all-retry">Try again</button>' : '') +
       '</div></div>';
   }
-  if (st.data.html) {
-    return '<div class="pv-section"><span class="pv-label">Full message · HTML, remote images blocked</span>' +
-      '<iframe class="pv-frame" sandbox="" referrerpolicy="no-referrer" title="Message body" srcdoc="' + esc(FRAME_CSP + st.data.html) + '"></iframe></div>';
-  }
+  if (st.data.html) return frameBlock(d, st.data.html);
   return '<div class="pv-section"><span class="pv-label">Full message</span><pre class="pv-body">' + hl(st.data.text, d.words) + '</pre></div>';
 }
 
@@ -164,6 +198,26 @@ async function showAll(d) {
   renderPreview();
 }
 
+/** Redraw one mail's full-message block where it shows, in place, and keep the keyboard on the control that was used. */
+function refreshFrame(id, focusAct) {
+  const st = S.body.get(id);
+  if (!st || st.state !== 'ok' || !st.data.html) return;
+  for (const host of [$('previewDock'), $('previewSheetBody')]) {
+    const old = host.querySelector('[data-frame="' + id + '"]');
+    if (!old) continue;
+    old.outerHTML = frameBlock({ id }, st.data.html);
+    if (focusAct) host.querySelector('[data-frame="' + id + '"] [data-act="' + focusAct + '"]')?.focus({ preventScroll: true });
+  }
+}
+
+/** Flip this message to the other look, or turn its remote images on or off; neither is remembered past the session. */
+function setFrame(d, act) {
+  const view = frameView(d.id);
+  if (act === 'look') S.frame.set(d.id, { ...view, look: (view.look || appLook()) === 'dark' ? 'light' : 'dark' });
+  else S.frame.set(d.id, { ...view, remote: !view.remote });
+  refreshFrame(d.id, act);
+}
+
 async function findInMailbox(d) {
   showToast('Looking for the live copy in Outlook…');
   try {
@@ -195,6 +249,7 @@ export async function previewAction(act) {
   }
   const d = await detail(item);
   if (act === 'showall') showAll(d);
+  else if (act === 'look' || act === 'images') setFrame(d, act);
   else if (act === 'copy') showToast((await copyText(d.path)) ? 'Path copied' : 'Copy isn\'t allowed here');
   else if (act === 'outlook' && d.can_open) post('/api/emails/' + d.id + '/open', {}, 'Opening in Outlook');
   else if (act === 'mailbox' && canFind()) findInMailbox(d);

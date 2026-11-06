@@ -55,7 +55,19 @@ def test_fetch_body_returns_text_and_inert_html() -> None:
     html = '<p onclick="x()">Hi <img src="https://tracker.example/p.gif"><script>alert(1)</script></p>'
     body = fetch_body("x.msg", run=_runner(json.dumps({"ok": True, "text": "Hi", "html": html})))
     assert body.ok and body.text == "Hi"
-    assert "script" not in body.html and "onclick" not in body.html and "tracker" not in body.html
+    assert "script" not in body.html and "onclick" not in body.html
+    assert " src=" not in body.html  # the address waits in data-remote-src until the reader loads remote images
+
+
+def test_sanitize_keeps_a_remote_image_address_out_of_src() -> None:
+    clean = sanitize_html(
+        '<img src="https://images.example/a.png" alt="a"><img src="http://images.example/b.png">'
+        '<img src="data:image/png;base64,AAAA"><img src="javascript:x()" data-remote-src="https://images.example/c.png">'
+        '<p src="https://images.example/d.png">t</p>')
+    assert '<img alt="a" data-remote-src="https://images.example/a.png">' in clean
+    assert "http://images.example" not in clean and "javascript" not in clean and "d.png" not in clean
+    assert "c.png" not in clean
+    assert clean.count(' src="') == 1 and 'src="data:image/png' in clean
 
 
 def test_sanitize_keeps_layout_and_drops_everything_active() -> None:

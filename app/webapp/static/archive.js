@@ -117,8 +117,9 @@ function optionHtml(o, i) {
 function mailHtml(mail) {
   const when = mail.date_sent ? mailDate(mail.date_sent, true) : '';
   const bits = [mail.sender || '(no sender)', when, mail.attachment_count ? plural(mail.attachment_count, 'attachment') : '', mail.where].filter(Boolean);
-  return '<div class="arch-mail"><strong>' + esc(mail.subject || '(no subject)') + '</strong><span>' + esc(bits.join(' · ')) + '</span>' +
-    '<details class="arch-preview"' + (A.previewOpen ? ' open' : '') + '><summary data-track="archive-preview">Preview</summary>' +
+  return '<div class="arch-mail"><div class="arch-mail-head"><strong>' + esc(mail.subject || '(no subject)') + '</strong><span>' + esc(bits.join(' · ')) + '</span></div>' +
+    '<details class="arch-preview"' + (A.previewOpen ? ' open' : '') + '><summary data-track="archive-preview"><span>Preview</span>' +
+    glyph('chevron-right', 'summary-chevron') + '</summary>' +
     '<p>' + esc(mail.preview || '(no readable text)') + '</p></details></div>';
 }
 

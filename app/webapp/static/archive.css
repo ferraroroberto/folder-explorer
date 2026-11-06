@@ -10,11 +10,17 @@
 /* ------------------------------------------------------------- the sheet */
 .arch-source { margin: 0 0 12px; font-size: var(--font-body-sm); color: var(--accent-text); display: flex; gap: 6px; align-items: center; }
 .arch-source .icon { width: var(--icon-inline); height: var(--icon-inline); }
-.arch-mail { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); display: grid; gap: 4px; }
+.arch-mail { border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.arch-mail-head { padding: 12px 14px; display: grid; gap: 4px; }
 .arch-mail strong { font-size: var(--font-body); overflow-wrap: anywhere; }
-.arch-mail > span { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
-.arch-preview summary { min-height: 44px; display: flex; align-items: center; font-size: var(--font-body-sm); font-weight: 600; color: var(--accent-text); cursor: pointer; }
-.arch-preview p { margin: 0; font-size: var(--font-body-sm); color: var(--ink); white-space: pre-line; overflow-wrap: anywhere; max-height: 12em; overflow-y: auto; }
+.arch-mail-head > span { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+/* The design system's disclosure: the summary owns the 52px closed box, the open state's only divider is its border. */
+.arch-preview { border-top: 1px solid var(--line-muted); }
+.arch-preview > summary { list-style: none; min-height: 52px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; font-size: var(--font-body); font-weight: 600; cursor: pointer; }
+.arch-preview > summary::-webkit-details-marker { display: none; }
+.arch-preview[open] > summary { border-bottom: 1px solid var(--line-muted); }
+.arch-preview[open] .summary-chevron { transform: rotate(90deg); }
+.arch-preview > p { margin: 0; padding: 12px 14px 14px; font-size: var(--font-body-sm); color: var(--ink); white-space: pre-line; overflow-wrap: anywhere; max-height: 12em; overflow-y: auto; }
 .arch-filed { margin: 10px 0 0; font-size: var(--font-body-sm); overflow-wrap: anywhere; }
 .arch-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; }
 .arch-head h3 { margin: 0; font-size: var(--font-body); font-weight: 700; }

@@ -9,6 +9,13 @@ depends_on  = ["project-scaffolding"]
 shape       = "webapp-tray"
 extra_roots = []
 
+# The coupling scan reads tray.bat's REM example of a VERSION_URL override
+# (127.0.0.1:8000, the hub's port); the app never calls the hub.
+[contracts]
+ignore_refs = [
+  { path = "tray.bat", repo = "local-llm-hub", why = "REM example URL for the VERSION_URL override, not a call to the hub" },
+]
+
 # Explore is a tree with attribute columns and Search a list beside its preview,
 # so both span the window on desktop.
 [design]

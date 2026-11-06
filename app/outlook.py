@@ -8,6 +8,7 @@
     python -m app.outlook prepare --entry-id <id> --store-id <id>
         the Archive sheet's opening document for the open or selected mail, or for one mail
     python -m app.outlook file --entry-id <id> --store-id <id> --folder <folder> [--category <name>] [--duplicate]
+            [--date-prefix auto|on|off]
         save that mail into an email folder, tag it, and start indexing the folder
     python -m app.outlook show --message-id <id>
         Find in mailbox: open the live copy of an archived mail in Outlook
@@ -33,6 +34,7 @@ import urllib3
 
 from src import config, store
 from src.email import archive_sheet, indexer
+from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_settings import get_mailbox_archive_folder
 from src.email.archive_sheet import (
     ERR_FAILED,
@@ -116,12 +118,12 @@ def prepare(cfg: dict[str, Any], entry_id: Optional[str], store_id: str) -> dict
 
 
 def file_one(cfg: dict[str, Any], entry_id: str, store_id: str, folder: str, category: Optional[str],
-             duplicate: bool = False) -> dict[str, Any]:
+             duplicate: bool = False, date_prefix: str = "auto") -> dict[str, Any]:
     """File the mail the ids name, then start indexing its folder so search finds it."""
     item = bridge.mail_by_ids(bridge.attach(), entry_id, store_id)
     if item is None:
         raise SheetError(ERR_GONE)
-    doc = archive_sheet.file_mail(OutlookClient(), cfg, item, folder, category, duplicate)
+    doc = archive_sheet.file_mail(OutlookClient(), cfg, item, folder, category, duplicate, date_prefix)
     try:
         indexer.spawn("archive", doc["folder_path"])
         doc["indexing"] = True
@@ -213,6 +215,8 @@ def _parser() -> argparse.ArgumentParser:
             p.add_argument("--folder", required=True)
             p.add_argument("--category", default="")
             p.add_argument("--duplicate", action="store_true", help="file another copy of a mail that is already archived")
+            p.add_argument("--date-prefix", choices=sorted(DATE_PREFIX_CHOICES), default="auto",
+                           help="date the file name: auto (the folder's own form), on or off")
     sub.add_parser("show").add_argument("--message-id", required=True)
     return parser
 
@@ -231,7 +235,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                 doc = _guarded(lambda: prepare(cfg, None if args.current else args.entry_id, args.store_id))
     elif args.verb == "file":
         with _apartment():
-            doc = _guarded(lambda: file_one(cfg, args.entry_id, args.store_id, args.folder, args.category or None, args.duplicate))
+            doc = _guarded(lambda: file_one(cfg, args.entry_id, args.store_id, args.folder, args.category or None, args.duplicate,
+                                             args.date_prefix))
     else:
         with _apartment():
             doc = _guarded(lambda: show(cfg, args.message_id))

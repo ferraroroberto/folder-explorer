@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-from src.email.archive import EmailArchiver, planned_name
+from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
 from src.email.archive_settings import get_outlook_category
 from src.email.repository import EmailRepository, open_index
@@ -36,6 +36,9 @@ ERR_CATEGORY = "category_failed"
 ERR_NOT_IN_MAILBOX = "not_in_mailbox"
 ERR_TIMEOUT = "timeout"
 ERR_FAILED = "failed"
+
+# The live mail's readable text the sheet's preview shows: the index's own preview length.
+PREVIEW_CHARS = 500
 
 # What the sheet, the fallback window and the toast say for each failure.
 MESSAGES = {
@@ -86,7 +89,10 @@ def _plural(n: int, word: str) -> str:
 
 
 def _why(repo: EmailRepository, s: RankedSuggestion, sender: str) -> tuple[list[dict[str, str]], str]:
-    """The chips and the one line that say why a folder is suggested, strongest reason first."""
+    """The chips and the one line that say why a folder is suggested, strongest reason first.
+
+    A folder suggested on topic alone gets no line: its similar count and example say it.
+    """
     from_sender = repo.count_from_sender(s.folder_path, sender)
     chips = []
     if s.exact_subject:
@@ -99,17 +105,15 @@ def _why(repo: EmailRepository, s: RankedSuggestion, sender: str) -> tuple[list[
         note = "This conversation is filed here"
     elif from_sender:
         note = _plural(from_sender, "email") + " from " + sender
-    elif s.match_count:
-        note = _plural(s.match_count, "similar email")
     else:
-        note = s.sample_subjects[0] if s.sample_subjects else ""
+        note = ""
     return chips, note
 
 
 def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dict[str, Any]:
     """The sheet's opening document for one live mail: the mail, where it is already filed, and the folders to offer."""
     roots = mounted_roots(cfg)
-    mail = client.read_mail(item)
+    mail = client.read_mail(item, PREVIEW_CHARS)
     ranked = SuggestionEngine(cfg).suggest(EmailData(subject=mail.subject, sender=mail.sender,
                                                      recipients=mail.recipients, date_sent=mail.date_sent))
     conn = open_index(cfg)
@@ -121,8 +125,10 @@ def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dic
             if not any(is_within(Path(s.folder_path), r) for r in roots):
                 continue
             chips, note = _why(repo, s, mail.sender)
-            suggestions.append({"folder_path": s.folder_path, "display_name": s.display_name, "why": chips,
-                                "note": note, "saved_as": planned_name(cfg, s.folder_path, mail.subject, mail.date_sent)})
+            suggestions.append({"folder_path": s.folder_path, "display_name": s.display_name.replace("/", "\\"),
+                                "why": chips, "note": note, "score": round(s.score, 3), "similar": s.match_count,
+                                "example": s.sample_subjects[0] if s.sample_subjects else "",
+                                "saved_as": planned_names(cfg, s.folder_path, mail.subject, mail.date_sent)})
     finally:
         conn.close()
     logger.info("ℹ️ archive sheet: %d folder(s) suggested%s", len(suggestions), ", already filed" if filed else "")
@@ -130,7 +136,7 @@ def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dic
         "ok": True,
         "mail": {"message_id": mail.message_id, "subject": mail.subject, "sender": mail.sender,
                  "date_sent": mail.date_sent.isoformat() if mail.date_sent else "",
-                 "attachment_count": mail.attachment_count, "where": where},
+                 "attachment_count": mail.attachment_count, "where": where, "preview": mail.body_preview},
         "already_archived": filed,
         "suggestions": suggestions,
         "category": get_outlook_category(cfg),
@@ -139,12 +145,15 @@ def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dic
 
 
 def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],
-              duplicate: bool = False) -> dict[str, Any]:
+              duplicate: bool = False, date_prefix: str = "auto") -> dict[str, Any]:
     """Save the mail and its attachments into ``folder_path`` and tag it with ``category`` (none when blank).
 
     A mail the index already holds is refused unless ``duplicate`` says the user asked for another copy;
     the copy still takes the folder's next sequence number, so no file is ever overwritten.
+    ``date_prefix`` is one of ``DATE_PREFIX_CHOICES``: ``auto`` keeps the configured mode for the folder.
     """
+    if date_prefix not in DATE_PREFIX_CHOICES:
+        raise ValueError("unknown date prefix choice: " + str(date_prefix))
     roots = mounted_roots(cfg)
     folder, refusal = resolve_under_roots(folder_path, roots)
     if folder is None:
@@ -159,7 +168,7 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
     if filed and not duplicate:
         raise SheetError(ERR_ALREADY, "This mail is already archived as " + os.path.basename(filed) + ".")
     try:
-        archived = EmailArchiver(cfg).archive(item, str(folder), mail.subject)
+        archived = EmailArchiver(cfg, date_prefix=DATE_PREFIX_CHOICES[date_prefix]).archive(item, str(folder), mail.subject)
     except Exception as exc:
         logger.exception("❌ archive sheet: saving the mail failed")
         raise SheetError(ERR_ARCHIVE, MESSAGES[ERR_ARCHIVE] + " " + type(exc).__name__ + ": " + str(exc)) from exc

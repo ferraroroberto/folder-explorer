@@ -12,11 +12,18 @@
 .arch-source .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .arch-mail { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); display: grid; gap: 4px; }
 .arch-mail strong { font-size: var(--font-body); overflow-wrap: anywhere; }
-.arch-mail span { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+.arch-mail > span { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+.arch-preview summary { min-height: 44px; display: flex; align-items: center; font-size: var(--font-body-sm); font-weight: 600; color: var(--accent-text); cursor: pointer; }
+.arch-preview p { margin: 0; font-size: var(--font-body-sm); color: var(--ink); white-space: pre-line; overflow-wrap: anywhere; max-height: 12em; overflow-y: auto; }
 .arch-filed { margin: 10px 0 0; font-size: var(--font-body-sm); overflow-wrap: anywhere; }
 .arch-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; }
 .arch-head h3 { margin: 0; font-size: var(--font-body); font-weight: 700; }
 .arch-options { list-style: none; margin: 0; padding: 0; }
+/* The choice and its Open action sit side by side: a button inside a button is not allowed. */
+.arch-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; border-top: 1px solid var(--line-muted); }
+.arch-options li:first-child { border-top: 0; }
+.arch-row .ao-open { margin-left: 4px; }
+.arch-row:has(.arch-opt[aria-checked="true"]), .arch-row:has(.arch-opt[aria-checked="true"]) + .arch-row { border-top-color: transparent; }
 .arch-opt {
   font: inherit;
   line-height: normal;
@@ -29,17 +36,22 @@
   min-height: var(--row-lg);
   padding: 10px 8px;
   border: 0;
-  border-top: 1px solid var(--line-muted);
   background: transparent;
   color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
-.arch-options li:first-child .arch-opt { border-top: 0; }
-.arch-opt .icon { grid-row: span 2; width: 20px; height: 20px; color: var(--muted); }
-.arch-opt[aria-checked="true"] { background: var(--accent-soft); border-radius: var(--radius-sm); border-top-color: transparent; }
-.arch-opt[aria-checked="true"] .icon { color: var(--accent-text); }
-.arch-options li:has(.arch-opt[aria-checked="true"]) + li .arch-opt { border-top-color: transparent; }
+.arch-opt > .icon { grid-row: 1 / span 3; align-self: start; margin-top: 2px; width: 20px; height: 20px; color: var(--muted); }
+.arch-row:has(.arch-opt[aria-checked="true"]) { background: var(--accent-soft); border-radius: var(--radius-sm); }
+.arch-opt[aria-checked="true"] > .icon { color: var(--accent-text); }
+.ao-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--space-sm); min-width: 0; }
+.ao-line .rank { min-width: 1ch; }
+.ao-score { display: inline-flex; align-items: center; gap: 6px; }
+.ao-score .chip { margin: 0; font-variant-numeric: tabular-nums; min-width: 4ch; text-align: center; }
+.ao-score .share-bar { width: 40px; }
+.ao-similar { font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
+/* Three short labels would fall under the 44px tap target. */
+#archDate .segmented-item { min-width: 44px; }
 .ao-path { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .ao-why { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: var(--font-body-sm); color: var(--muted); overflow-wrap: anywhere; }
 .ao-why .chip { margin: 0; }

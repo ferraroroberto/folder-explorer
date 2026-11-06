@@ -16,8 +16,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.webapp.routers.archive import with_locations
 from app.webapp.server import app
-from src import desktop
+from app.webapp.state import locate_folder
+from src import config, desktop
+from src.roots import resolve_roots
 from tests.conftest import write_config
 from tests.fixture_tree import build_tree
 
@@ -142,3 +145,18 @@ def test_open_says_why_nothing_opened(scanned: dict[str, Any], monkeypatch: pyte
         assert off.status_code == 503 and off.json()["detail"] == desktop.OFF_REASON
         os.remove(os.path.join(scanned["path"], "notes.txt"))
         assert _ask(c, scanned, "file", "notes.txt", "open").status_code == 410
+
+
+def test_an_offered_archive_folder_opens_by_its_place_in_the_scan(scanned: dict[str, Any], launched: list[tuple[str, Any]]) -> None:
+    roots = resolve_roots(config.load()["roots"])
+    # The separator the stored path uses does not matter: Windows paths mix them.
+    wanted = scanned["path"].replace("\\", "/") + "/Photos/2024"
+    loc = locate_folder(roots, wanted)
+    assert loc is not None and loc["root"] == scanned["root"] and loc["scan_id"] == scanned["scan_id"]
+    assert locate_folder(roots, os.path.join(scanned["path"], "Made after the scan")) is None
+    doc = with_locations({"ok": True, "suggestions": [{"folder_path": wanted}, {"folder_path": "Z:/elsewhere"}]})
+    assert doc["suggestions"][0]["location"] == loc and doc["suggestions"][1]["location"] is None
+    with TestClient(app, client=LOCAL) as c:
+        r = c.post("/api/open", json={"kind": "folder", "verb": "explore", **loc})
+    assert r.json() == {"status": "opened"}
+    assert launched[0][1][1] == os.path.join(scanned["path"], "Photos", "2024")

@@ -17,7 +17,7 @@ import { initPreview, openPreviewSheet, previewAction, renderPreview } from './s
 import { renderOutlookCard } from './archive.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { showToast } from './_vendored/toast/toast.js';
-import { esc, fmtBytes, glyph, plural } from './fmt.js';
+import { esc, fmtBytes, glyph, plural, winPath } from './fmt.js';
 
 // How long typing pauses before the box searches.
 const DEBOUNCE_MS = 200;
@@ -71,7 +71,7 @@ function emailRow(h, i) {
 }
 
 function folderRow(f, i, terms) {
-  return '<li><button type="button" class="result-row is-folder" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(f.path) + '" data-track="folder-result">' +
+  return '<li><button type="button" class="result-row is-folder" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(winPath(f.path)) + '" data-track="folder-result">' +
     '<span class="rr-who">' + glyph(f.people ? 'users' : 'folder') + '<span>' + hl(f.name, terms) + '</span></span>' +
     '<span class="rr-when">' + fmtBytes(f.size) + '</span>' +
     '<span class="rr-snip">' + hl(f.display, terms) + '</span>' +

@@ -5,6 +5,8 @@ as a windowless child with a timeout, so a COM dialog hangs the child, never
 the server. What filing a prepared mail needs (its EntryID and StoreID) stays
 here under a token; the page only ever sends back that token, a folder and a
 category, and the child checks the folder against the email folders again.
+Each offered folder carries its place in the scan (root, scan id, folder id),
+so the sheet's Open asks ``/api/open`` by id, never by a path.
 
 The macro's entry hands its prepared mail to ``/archive/handoff``. A page on
 this PC polls ``/archive/pending`` while it is visible, so the server knows
@@ -31,12 +33,13 @@ from src import config, folder_search, macro_home, store
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
 from src.email import body as child
+from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_sheet import ERR_FAILED, ERR_TIMEOUT, error_document
 from src.email.settings import under_any
 from src.outlook.bridge import pywin32_installed
 from src.roots import resolve_roots
 from app.webapp.auth import is_pc_itself
-from app.webapp.state import POOL
+from app.webapp.state import POOL, locate_folder
 
 logger = logging.getLogger(__name__)
 
@@ -146,18 +149,27 @@ def archive_status(cfg: dict[str, Any], pc: bool) -> dict[str, Any]:
     return {"ready": reason is None, "reason": reason}
 
 
+def with_locations(doc: dict[str, Any]) -> dict[str, Any]:
+    """``doc`` with each suggested folder's place in the scan (``location``, ``None`` when unscanned)."""
+    if doc.get("ok") and doc.get("suggestions"):
+        roots = resolve_roots(config.load()["roots"])
+        for s in doc["suggestions"]:
+            s["location"] = locate_folder(roots, str(s.get("folder_path", "")))
+    return doc
+
+
 @router.post("/archive/current")
 def current(request: Request) -> dict[str, Any]:
     """The sheet's document for the mail open or selected in Outlook."""
     _pc_only(request)
-    return PREPARED.keep(bridge(["prepare", "--current"], PREPARE_TIMEOUT_S))
+    return PREPARED.keep(with_locations(bridge(["prepare", "--current"], PREPARE_TIMEOUT_S)))
 
 
 @router.post("/archive/handoff")
 def handoff(request: Request, doc: dict[str, Any] = Body(...)) -> dict[str, bool]:
     """The macro's entry gives its prepared mail; ``shown`` says whether a page is open to show it."""
     _pc_only(request)
-    public = PREPARED.keep(doc)
+    public = PREPARED.keep(with_locations(doc))
     now = time.monotonic()
     with PREPARED.lock:
         shown = now - PREPARED.last_poll <= PAGE_LIVE_S
@@ -182,7 +194,10 @@ def pending(request: Request) -> dict[str, Any]:
 
 @router.post("/archive/file")
 def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, Any]:
-    """File the prepared mail in the chosen folder, with the chosen category or none; ``duplicate: true`` files another copy of an archived one."""
+    """File the prepared mail in the chosen folder, with the chosen category or none.
+
+    ``duplicate: true`` files another copy of an archived one; ``date_prefix`` is ``auto``, ``on`` or ``off``.
+    """
     _pc_only(request)
     ids = PREPARED.ids(str(body.get("token", "")))
     folder = body.get("folder")
@@ -193,9 +208,12 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
     category = body.get("category") or ""
     # Only a literal true asks for another copy of a mail that is already archived.
     duplicate = body.get("duplicate") is True
+    date_prefix = body.get("date_prefix", "auto")
+    if not isinstance(date_prefix, str) or date_prefix not in DATE_PREFIX_CHOICES:
+        raise HTTPException(status_code=400, detail="date_prefix must be auto, on or off")
     # One "--flag=value" argument each, so a value that starts with "--" is never read as a flag.
     args = ["file", "--entry-id=" + ids["entry_id"], "--store-id=" + ids["store_id"], "--folder=" + folder,
-            "--category=" + str(category)]
+            "--category=" + str(category), "--date-prefix=" + date_prefix]
     if duplicate:
         args.append("--duplicate")
     doc = bridge(args, FILE_TIMEOUT_S)
@@ -212,15 +230,19 @@ def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, A
     email_roots = list((cfg.get("email") or {}).get("roots") or [])
     roots = resolve_roots(cfg["roots"])
     entries = []
+    scan_ids = {}
     for root in roots:
         scan = store.current_index(root.key)
         if scan is not None:
             entries.append((root, POOL.get(store.index_dir() / scan["index_file"])))
+            scan_ids[root.key] = scan["id"]
     with ExitStack() as stack:
         for _, (_, lock) in entries:
             stack.enter_context(lock)
         found = folder_search.search([(root, ix) for root, (ix, _) in entries], q, False, 0, limit=200)
-    hits = [{"path": r["path"], "name": r["name"]} for r in found["results"] if under_any(r["path"], email_roots)]
+    hits = [{"path": r["path"], "name": r["name"],
+             "location": {"root": r["root"], "scan_id": scan_ids[r["root"]], "id": r["id"]}}
+            for r in found["results"] if under_any(r["path"], email_roots)]
     return {"folders": hits[:FOLDER_HITS]}
 
 

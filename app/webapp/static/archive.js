@@ -7,7 +7,7 @@
 
 import { api, getJSON, postJSON } from './api.js';
 import { copyText, mailDate } from './search-state.js';
-import { esc, glyph, plural } from './fmt.js';
+import { bar, esc, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
@@ -15,6 +15,9 @@ const $ = (id) => document.getElementById(id);
 const PENDING_MS = 3000;
 // How long typing in "Another email folder" pauses before it searches.
 const DEBOUNCE_MS = 200;
+// Below this blended score a suggestion is a weak guess, and its % chip says so.
+const WEAK_SCORE = 0.35;
+const DATE_CHOICES = [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']];
 
 const A = {
   status: null, // /api/search/status .archive
@@ -24,10 +27,13 @@ const A = {
   extra: null, // a folder picked from "Another email folder"
   category: '',
   copy: false, // the user asked for another copy of a mail that is already archived
+  datePrefix: 'auto', // auto (the folder's own form), on or off
+  previewOpen: false, // the mail preview stays open across repaints
   busy: false,
   opening: false,
   error: null,
   lastFiled: '',
+  found: [], // the last "Another email folder" answer
 };
 
 let pollTimer = null;
@@ -35,15 +41,15 @@ let searchTimer = null;
 
 const lastTwo = (path) => (path || '').split(/[\\/]/).filter(Boolean).slice(-2).join('\\');
 
-/** ``path`` below the email folder that holds it, as the sheet lists a folder. */
+/** ``path`` below the email folder that holds it, with Windows separators, as the sheet lists a folder. */
 function underRoot(path) {
-  const lower = path.toLowerCase();
+  const win = winPath(path);
+  const lower = win.toLowerCase();
   for (const r of (A.doc && A.doc.roots) || []) {
-    const root = r.replace(/[\\/]+$/, '');
-    const next = lower.charAt(root.length);
-    if (lower.startsWith(root.toLowerCase()) && (next === '\\' || next === '/')) return path.slice(root.length + 1);
+    const root = winPath(r).replace(/\\+$/, '').toLowerCase();
+    if (lower.startsWith(root + '\\')) return win.slice(root.length + 1);
   }
-  return path;
+  return win;
 }
 
 const options = () => (A.extra ? [A.extra] : []).concat((A.doc && A.doc.suggestions) || []);
@@ -75,18 +81,58 @@ function errorBlock(title, message, retry) {
     (retry ? '<button type="button" class="button-ghost" id="archRetry" data-track="archive-retry">Try again</button>' : '') + '</div></div>';
 }
 
+/** The % match as a chip: neutral for a real match, attention for a weak guess; the bar shows the same share. */
+function scoreHtml(score) {
+  const p = Math.round(score * 100);
+  const weak = score < WEAK_SCORE;
+  return '<span class="ao-score"><span class="chip' + (weak ? ' tone-attention' : '') + '" title="' + (weak ? 'A weak match' : 'Match') + '">' +
+    p + '%</span>' + bar(p) + '</span>';
+}
+
+function similarHtml(o) {
+  const bits = [];
+  if (o.similar) bits.push(plural(o.similar, 'similar email'));
+  if (o.example) bits.push('e.g. “' + o.example + '”');
+  return bits.length ? '<span class="ao-similar">' + esc(bits.join(' · ')) + '</span>' : '';
+}
+
+function openButton(o, i) {
+  const what = o.location ? 'Open this folder in File Explorer' : 'Not in the last disk scan yet, so it can\'t be opened from here';
+  return '<button type="button" class="icon-button ao-open" data-open-choice="' + i + '" aria-label="' + esc(what) + '" title="' + esc(what) + '"' +
+    (o.location ? '' : ' disabled') + ' data-track="archive-open-folder">' + glyph('folder-open') + '</button>';
+}
+
 function optionHtml(o, i) {
   const on = i === A.choice;
-  return '<li><button type="button" class="arch-opt" role="radio" aria-checked="' + on + '" data-choice="' + i + '" data-track="archive-choice">' +
-    glyph(on ? 'circle-dot' : 'circle') + '<span class="ao-path">' + esc(underRoot(o.folder_path)) + '</span>' +
+  // A picked folder leads the list unranked; the suggestions keep their own rank after it.
+  const rank = A.extra ? i : i + 1;
+  return '<li class="arch-row"><button type="button" class="arch-opt" role="radio" aria-checked="' + on + '" data-choice="' + i + '" data-track="archive-choice">' +
+    glyph(on ? 'circle-dot' : 'circle') +
+    '<span class="ao-line">' + (typeof o.score === 'number' ? '<span class="rank">' + rank + '</span>' + scoreHtml(o.score) : '') +
+    '<span class="ao-path">' + esc(underRoot(o.folder_path)) + '</span></span>' +
     '<span class="ao-why">' + (o.why || []).map((w) => '<span class="chip' + (w.tone ? ' tone-' + w.tone : '') + '">' + esc(w.label) + '</span>').join('') +
-    esc(o.note || '') + '</span></button></li>';
+    esc(o.note || '') + '</span>' + similarHtml(o) + '</button>' + openButton(o, i) + '</li>';
 }
 
 function mailHtml(mail) {
   const when = mail.date_sent ? mailDate(mail.date_sent, true) : '';
   const bits = [mail.sender || '(no sender)', when, mail.attachment_count ? plural(mail.attachment_count, 'attachment') : '', mail.where].filter(Boolean);
-  return '<div class="arch-mail"><strong>' + esc(mail.subject || '(no subject)') + '</strong><span>' + esc(bits.join(' · ')) + '</span></div>';
+  return '<div class="arch-mail"><div class="arch-mail-head"><strong>' + esc(mail.subject || '(no subject)') + '</strong><span>' + esc(bits.join(' · ')) + '</span></div>' +
+    '<details class="arch-preview"' + (A.previewOpen ? ' open' : '') + '><summary data-track="archive-preview"><span>Preview</span>' +
+    glyph('chevron-right', 'summary-chevron') + '</summary>' +
+    '<p>' + esc(mail.preview || '(no readable text)') + '</p></details></div>';
+}
+
+function datePrefixHtml() {
+  return '<div class="row"><span>Date prefix</span><span class="segmented" role="group" aria-label="Date prefix" id="archDate">' +
+    DATE_CHOICES.map(([v, label]) => '<button type="button" class="segmented-item" aria-pressed="' + (A.datePrefix === v) + '" data-date="' + v +
+      '" data-track="archive-date-' + v + '">' + label + '</button>').join('') + '</span></div>';
+}
+
+/** The name the chosen folder would give the mail under the date-prefix choice. */
+function savedAs(choice) {
+  const names = choice && choice.saved_as;
+  return names && names[A.datePrefix] ? names[A.datePrefix] : 'Numbered after the folder\'s last mail';
 }
 
 function renderArchive() {
@@ -102,7 +148,7 @@ function renderArchive() {
   const choice = opts[A.choice] || null;
   const filed = d.already_archived;
   $('archiveBody').innerHTML = source + mailHtml(d.mail) +
-    (filed ? '<p class="arch-filed tone-attention-text">Already archived as ' + esc(lastTwo(filed)) + '</p>' +
+    (filed ? '<p class="arch-filed tone-attention-text">Already archived as ' + esc(underRoot(filed)) + '</p>' +
       '<div class="row"><span>Archive a copy anyway</span><button type="button" class="toggle' + (A.copy ? ' on' : '') + '" role="switch" aria-checked="' + A.copy +
       '" id="archCopy" aria-label="Archive a copy anyway" data-track="archive-copy"><span class="knob"></span><span class="toggle-label">' + (A.copy ? 'ON' : 'OFF') + '</span></button></div>' : '') +
     '<div class="arch-head"><h3>Suggested folders</h3><button type="button" class="icon-button" id="rankInfo" aria-label="How folders are suggested" title="How folders are suggested" data-track="rank-info">' + glyph('info') + '</button></div>' +
@@ -115,7 +161,8 @@ function renderArchive() {
     '<div class="row"><span>Outlook category</span><select class="select-native" id="archCat" aria-label="Outlook category" data-track="archive-category">' +
     (d.category ? '<option value="' + esc(d.category) + '"' + (A.category === d.category ? ' selected' : '') + '>' + esc(d.category) + '</option>' : '') +
     '<option value=""' + (A.category ? '' : ' selected') + '>No category</option></select></div>' +
-    '<div class="row"><span>Saved as</span><span class="row-value mono">' + esc(choice && choice.saved_as ? choice.saved_as : 'Numbered after the folder\'s last mail') + '</span></div>' +
+    datePrefixHtml() +
+    '<div class="row"><span>Saved as</span><span class="row-value mono">' + esc(savedAs(choice)) + '</span></div>' +
     '<div class="arch-foot">' + glyph('mail') + '<span>Outlook macro: archive straight from Outlook\'s ribbon.</span>' +
     '<button type="button" class="icon-button" id="archMacro" aria-label="About the Outlook macro" title="About the Outlook macro" data-track="macro-info">' + glyph('info') + '</button></div>' +
     (A.error ? errorBlock('Not archived', A.error.message, false) : '');
@@ -131,6 +178,8 @@ function showSheet(doc, fromMacro) {
   A.extra = null;
   A.error = null;
   A.copy = false;
+  A.datePrefix = 'auto';
+  A.previewOpen = false;
   A.busy = false;
   A.category = doc.ok ? doc.category || '' : '';
   renderArchive();
@@ -159,7 +208,7 @@ async function doArchive() {
   renderArchive();
   let r;
   try {
-    const payload = { token: A.doc.token, folder: o.folder_path, category: A.category };
+    const payload = { token: A.doc.token, folder: o.folder_path, category: A.category, date_prefix: A.datePrefix };
     if (A.doc.already_archived && A.copy) payload.duplicate = true;
     r = await postJSON('/api/archive/file', payload);
   } catch (e) {
@@ -178,6 +227,17 @@ async function doArchive() {
   renderArchive();
 }
 
+/** Show an offered folder in File Explorer, named by its place in the scan, never by its path. */
+async function openFolder(o) {
+  if (!o || !o.location) return;
+  try {
+    await postJSON('/api/open', { root: o.location.root, scan_id: o.location.scan_id, kind: 'folder', id: o.location.id, verb: 'explore' });
+    showToast('Opened in File Explorer');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
 async function findFolders(q) {
   const list = $('archFound');
   if (!list) return;
@@ -190,12 +250,13 @@ async function findFolders(q) {
     return;
   }
   if ($('archSearch') && $('archSearch').value !== q) return;
-  list.innerHTML = found.length ? found.map((f) => '<li><button type="button" data-folder="' + esc(f.path) + '" data-track="archive-found">' + esc(underRoot(f.path)) + '</button></li>').join('')
+  A.found = found;
+  list.innerHTML = found.length ? found.map((f, i) => '<li><button type="button" data-found="' + i + '" data-track="archive-found">' + esc(underRoot(f.path)) + '</button></li>').join('')
     : '<li><p class="row-note">No email folder matches every word.</p></li>';
 }
 
-function pickFound(path) {
-  A.extra = { folder_path: path, why: [{ label: 'Chosen', tone: '' }], note: 'picked from the folder index', saved_as: '' };
+function pickFound(f) {
+  A.extra = { folder_path: f.path, why: [{ label: 'Chosen', tone: '' }], note: 'picked from the folder index', saved_as: null, location: f.location };
   A.choice = 0;
   renderArchive();
 }
@@ -265,8 +326,9 @@ export function initArchive() {
   $('copySetx').addEventListener('click', async () => showToast((await copyText($('setxText').textContent)) ? 'Command copied' : 'Copy isn\'t allowed here'));
   const body = $('archiveBody');
   $('archiveActions').addEventListener('click', (ev) => {
-    const el = ev.target.closest('#archiveGo');
-    if (el && !el.disabled) doArchive();
+    const el = ev.target.closest('button');
+    if (!el || el.disabled) return;
+    if (el.id === 'archiveGo') doArchive();
   });
   body.addEventListener('click', (ev) => {
     const el = ev.target.closest('button');
@@ -274,7 +336,9 @@ export function initArchive() {
     if (el.classList.contains('arch-opt')) { A.choice = Number(el.dataset.choice); renderArchive(); }
     else if (el.id === 'archCopy') { A.copy = !A.copy; renderArchive(); }
     else if (el.id === 'rankInfo') $('rankNote').hidden = !$('rankNote').hidden;
-    else if (el.dataset.folder) pickFound(el.dataset.folder);
+    else if (el.dataset.openChoice) openFolder(options()[Number(el.dataset.openChoice)]);
+    else if (el.dataset.date) { A.datePrefix = el.dataset.date; renderArchive(); }
+    else if (el.dataset.found) pickFound(A.found[Number(el.dataset.found)]);
     else if (el.id === 'archRetry') { $('archiveDialog').close(); openArchive(); }
     else if (el.id === 'archMacro') openMacro();
   });
@@ -283,6 +347,8 @@ export function initArchive() {
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => findFolders(ev.target.value), DEBOUNCE_MS);
   });
+  // toggle does not bubble, so the sheet listens in the capture phase.
+  body.addEventListener('toggle', (ev) => { if (ev.target.classList.contains('arch-preview')) A.previewOpen = ev.target.open; }, true);
   body.addEventListener('change', (ev) => { if (ev.target.id === 'archCat') A.category = ev.target.value; });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && pollTimer) { clearTimeout(pollTimer); pollPending(); }

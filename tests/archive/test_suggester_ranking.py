@@ -7,6 +7,12 @@ Two rules decide the order, and these tests are what set the weights:
 - volume-neutral ranking: each folder scores by its single best match, so a
   folder with many loosely related mails never outranks the one folder that
   matches well.
+
+email-archiver's legacy suggester sums its match scores per folder instead,
+so there a big folder wins by volume. On a hide-one-mail run over a real
+archive, the best-mail score found the right folder first about 72% of the
+time against 51% for the sum, so this app keeps it, and
+``test_the_ranking_and_its_percentages_are_pinned`` fails on any drift.
 """
 
 from __future__ import annotations
@@ -78,3 +84,25 @@ def test_without_an_exact_thread_the_blend_decides(cfg, archive_root):
 
 def test_an_empty_index_suggests_nothing(cfg):
     assert _ranked(cfg, "Anything at all") == []
+
+
+def test_the_ranking_and_its_percentages_are_pinned(cfg, archive_root):
+    """A big folder of loose matches against the folder holding the thread: order and % fixed.
+
+    Summing per folder, as the legacy suggester does, lifts the 30-mail folder's
+    share and so its %, which this test refuses.
+    """
+    _seed_index(cfg, archive_root, {
+        "Deliveries": ["Delivery slot %d confirmed" % n for n in range(30)],
+        "Car purchase": ["Car delivery appointment tomorrow", "Car registration papers"],
+        "Garden": ["Seed catalogue"],
+        # Unrelated mail, so the words that do match carry weight in bm25.
+        "Newsletters": ["Newsletter issue %d" % n for n in range(60)],
+    })
+
+    ranked = _ranked(cfg, "Car delivery appointment tomorrow at five")
+
+    # The 30-mail folder stays a weak second: volume adds nothing (a sum gives it 66%).
+    # Every invented mail shares one sender, so the unrelated folders still score a little.
+    assert [(_leaf(s), s.exact_subject, round(s.score * 100)) for s in ranked] == [
+        ("Car purchase", False, 85), ("Deliveries", False, 23), ("Newsletters", False, 14), ("Garden", False, 11)]

@@ -5,7 +5,7 @@
 
 import { getJSON, postJSON, api } from './api.js';
 import { S, $, WIDE, copyText, effectiveMode, hl, mailDate, marked, shortFolder } from './search-state.js';
-import { esc, fmtBytes, fmtNum, glyph, plural } from './fmt.js';
+import { esc, fmtBytes, fmtNum, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 
 let showInExplore = () => {};
@@ -89,7 +89,7 @@ function emailHtml(d) {
     (canFind() ? '<button type="button" class="button-surface" data-act="mailbox" data-track="find-mailbox">' + glyph('search') + 'Find in mailbox</button>' : '') + '</div>' +
     (!S.status.pc ? '<p class="pv-note">Open in Outlook works on the PC.</p>' : (!d.can_open ? '<p class="pv-note">Outlook (classic) isn\'t installed on this PC.</p>' : '')) +
     '</div>' +
-    '<p class="pv-path mono">' + esc(d.path) + '</p></div>';
+    '<p class="pv-path mono">' + esc(winPath(d.path)) + '</p></div>';
 }
 
 // ---------------------------------------------------------------- folder
@@ -98,7 +98,7 @@ function folderHtml(f) {
   const pc = S.status.pc;
   return '<div class="pv">' +
     '<h2 class="pv-subject">' + esc(f.name) + '</h2>' +
-    '<p class="pv-path mono">' + esc(f.path) + '</p>' +
+    '<p class="pv-path mono">' + esc(winPath(f.path)) + '</p>' +
     '<div class="pv-stats">' +
     '<div class="stat"><div class="stat-value">' + fmtBytes(f.size) + '</div><div class="stat-label">Size</div></div>' +
     '<div class="stat"><div class="stat-value">' + fmtBytes(f.disk) + '</div><div class="stat-label">On disk</div></div>' +

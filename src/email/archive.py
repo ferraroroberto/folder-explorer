@@ -317,17 +317,27 @@ def fit_msg_filename(folder_path: str, seq: str, subject: str, date_prefix: str 
                                  date_prefix=date_prefix, max_path=max_path)
 
 
-def planned_name(cfg: dict[str, Any], folder_path: str, subject: str, sent: datetime | None) -> str:
-    """The ``.msg`` name ``EmailArchiver.archive`` would give this mail in ``folder_path`` now.
+# The Archive sheet's date-prefix choices: the configured mode for this folder, always dated, never dated.
+DATE_PREFIX_CHOICES = {"auto": None, "on": True, "off": False}
 
-    The Archive sheet shows it before anything is written. The folder is
-    listed once, as the archive itself lists it; a folder that does not exist
-    yet starts at ``001`` and the undated form, as ``archive`` would.
+
+def planned_names(cfg: dict[str, Any], folder_path: str, subject: str, sent: datetime | None) -> dict[str, str]:
+    """The ``.msg`` name ``EmailArchiver.archive`` would give this mail in ``folder_path`` now, per date-prefix choice.
+
+    The Archive sheet shows it before anything is written, keyed by
+    ``DATE_PREFIX_CHOICES``. The folder is listed once, as the archive itself
+    lists it; a folder that does not exist yet starts at ``001`` and, under
+    ``auto``, the undated form, as ``archive`` would.
     """
     scan = _scan_folder(folder_path) if os.path.isdir(folder_path) else _FolderScan("001", None)
-    dated = _resolve_date_prefix_mode(get_date_prefix_mode(cfg), scan.inferred_date_prefix)
-    prefix = f"{sent.year:04d}-{sent.month:02d}-{sent.day:02d}" if dated and sent is not None else None
-    return fit_msg_filename(folder_path, scan.next_sequence, subject, prefix, get_max_path_length(cfg))
+    auto = _resolve_date_prefix_mode(get_date_prefix_mode(cfg), scan.inferred_date_prefix)
+    stamp = f"{sent.year:04d}-{sent.month:02d}-{sent.day:02d}" if sent is not None else None
+    names = {}
+    for choice, override in DATE_PREFIX_CHOICES.items():
+        dated = auto if override is None else override
+        names[choice] = fit_msg_filename(folder_path, scan.next_sequence, subject, stamp if dated else None,
+                                         get_max_path_length(cfg))
+    return names
 
 
 def _resolve_date_prefix_mode(mode: bool | str, inferred: bool | None) -> bool:

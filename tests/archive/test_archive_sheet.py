@@ -27,7 +27,11 @@ def test_suggest_ranks_the_thread_folder_first_and_says_why(cfg: dict, archive_r
     assert first["folder_path"] == str(archive_root / "Project Alpha")
     assert [c["label"] for c in first["why"]] == ["Same subject", "Sender"]
     assert first["note"] == "This conversation is filed here"
-    assert first["saved_as"] == "001 - Kickoff agenda.msg"
+    assert first["saved_as"] == {"auto": "001 - Kickoff agenda.msg", "on": "2026-03-14 - 001 - Kickoff agenda.msg",
+                                 "off": "001 - Kickoff agenda.msg"}
+    assert 0 < first["score"] <= 1 and first["similar"] >= 1 and first["example"] in {"Kickoff agenda", "Budget notes"}
+    assert first["display_name"] == "archive\\Project Alpha"
+    assert doc["mail"]["preview"].startswith("synthetic body")
     assert doc["already_archived"] is None and doc["roots"] == [str(archive_root.resolve())]
 
 
@@ -106,3 +110,25 @@ def test_a_category_outlook_refuses_still_reports_the_files(cfg: dict, archive_r
     client.category_should_fail = True
     doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), "Filed")
     assert not doc["ok"] and doc["error"]["code"] == "category_failed" and Path(doc["files"][0]).is_file()
+
+
+def test_a_folder_offered_on_topic_alone_says_so_with_its_count_and_an_example(cfg: dict, archive_root: Path) -> None:
+    _seed_index(cfg, archive_root, {"Gardening": ["Tulip bulbs order", "Tulip bulbs delivery"]})
+    client, item = _client_with("Tulip bulbs invoice", sender="nobody@example.invalid")
+    first = archive_sheet.suggest(client, cfg, item)["suggestions"][0]
+    assert [c["label"] for c in first["why"]] == ["Topic"] and first["note"] == ""
+    assert first["similar"] == 2 and first["example"].startswith("Tulip bulbs")
+
+
+@pytest.mark.parametrize("choice, name", [("on", "2026-03-14 - 001 - Dated.msg"), ("off", "001 - Dated.msg")])
+def test_the_date_prefix_choice_names_the_filed_mail(cfg: dict, archive_root: Path, choice: str, name: str) -> None:
+    client, item = _client_with("Dated")
+    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None, date_prefix=choice)
+    assert Path(doc["files"][0]).name == name
+
+
+def test_an_unknown_date_prefix_choice_writes_nothing(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Dated")
+    with pytest.raises(ValueError):
+        archive_sheet.file_mail(client, cfg, item, str(archive_root), None, date_prefix="sometimes")
+    assert item.saved_as == []

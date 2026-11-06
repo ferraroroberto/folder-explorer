@@ -1,7 +1,7 @@
 /* Scans: the email index card: what the last run did, failed files, "Index emails now" and one folder. */
 
 import { getJSON, postJSON, ApiError } from './api.js';
-import { esc, fmtAgo, fmtNum } from './fmt.js';
+import { esc, fmtAgo, fmtNum, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
@@ -83,7 +83,7 @@ async function showFailures() {
   try {
     const f = await getJSON('/api/email/failures');
     $('failuresBody').innerHTML = f.failures.length ? '<ul class="rows">' + f.failures.map((x) =>
-      '<li class="fail-row"><span class="mono">' + esc(x.path) + '</span><span class="why">' + esc(x.reason) + '</span></li>').join('') + '</ul>' +
+      '<li class="fail-row"><span class="mono">' + esc(winPath(x.path)) + '</span><span class="why">' + esc(x.reason) + '</span></li>').join('') + '</ul>' +
       (f.total > f.failures.length ? '<p class="rows-note">The newest ' + f.failures.length + ' of ' + fmtNum(f.total) + '.</p>' : '') +
       '<p class="rows-note">A file that failed is read again only once it changes.</p>'
       : '<p class="rows-note">No failed reads.</p>';

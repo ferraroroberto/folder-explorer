@@ -49,6 +49,9 @@ export function fmtDuration(seconds) {
   return m + ' min ' + Math.round(seconds - m * 60) + ' s';
 }
 
+/** A stored path as Windows shows it: every separator a backslash. Display only; the stored value stays. */
+export const winPath = (p) => String(p || '').replace(/\//g, '\\');
+
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export const glyph = (name, cls) => '<svg class="icon' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';

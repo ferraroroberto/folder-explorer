@@ -16,23 +16,31 @@ from tests.e2e._layout_lint import assert_layout_clean
 
 ROOT = "/archive/Mail"
 MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "2026-11-05T09:12:00",
-        "attachment_count": 1, "where": "Inbox", "message_id": "kick@example.invalid"}
+        "attachment_count": 1, "where": "Inbox", "message_id": "kick@example.invalid",
+        "preview": "Hi team, the kickoff agenda is attached. See you on Monday."}
 
 
-BELOW_FOLD = {"#archiveDialog #archMacro": "below the fold of the scrolling sheet on a phone"}
+# The sheet caps to the viewport and scrolls its card, so on a phone these sit below its fold by design.
+_FOLD = "below the fold of the scrolling sheet on a phone"
+BELOW_FOLD = {sel: _FOLD for sel in ("#archiveDialog #archMacro", "#archiveDialog .arch-row > button", "#archiveDialog #archSearch",
+                                     "#archiveDialog #archFound button", "#archiveDialog #archCat", "#archiveDialog #archDate > button")}
 
 
-def _suggestion(rel: str, label: str, tone: str, note: str, saved: str) -> dict[str, Any]:
-    return {"folder_path": ROOT + "/" + rel, "display_name": "/".join(rel.split("/")[-2:]),
-            "why": [{"label": label, "tone": tone}], "note": note, "saved_as": saved}
+def _suggestion(rel: str, label: str, tone: str, note: str, seq: str, score: float, folder_id: int) -> dict[str, Any]:
+    return {"folder_path": ROOT + "/" + rel, "display_name": "\\".join(rel.split("/")[-2:]),
+            "why": [{"label": label, "tone": tone}], "note": note, "score": score, "similar": folder_id,
+            "example": "Agenda for week %d" % folder_id,
+            "saved_as": {"auto": seq + " - Kickoff agenda.msg", "on": "2026-11-05 - " + seq + " - Kickoff agenda.msg",
+                         "off": seq + " - Kickoff agenda.msg"},
+            "location": {"root": "invented-root", "scan_id": 7, "id": folder_id}}
 
 
 PREPARED = {
     "ok": True, "token": "invented-token", "mail": MAIL, "already_archived": None, "category": "Archived", "roots": [ROOT],
     "suggestions": [
-        _suggestion("Clients/Project Alpha/2026", "Same subject", "accent", "This conversation is filed here", "004 - Kickoff agenda.msg"),
-        _suggestion("Clients/Project Alpha/2025", "Sender", "", "12 emails from leo@example.org", "031 - Kickoff agenda.msg"),
-        _suggestion("Internal/Meetings", "Topic", "", "5 similar emails", "118 - Kickoff agenda.msg"),
+        _suggestion("Clients/Project Alpha/2026", "Same subject", "accent", "This conversation is filed here", "004", 0.81, 21),
+        _suggestion("Clients/Project Alpha/2025", "Sender", "", "12 emails from leo@example.org", "031", 0.52, 22),
+        _suggestion("Internal/Meetings", "Topic", "", "", "118", 0.3, 23),
     ],
 }
 
@@ -69,7 +77,10 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     _archive_ready(page)
     page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
-    page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": [{"path": ROOT + "/Clients/Northwind/2026", "name": "2026"}]}))
+    page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": [{"path": ROOT + "/Clients/Northwind/2026", "name": "2026",
+                                                                           "location": {"root": "invented-root", "scan_id": 7, "id": 40}}]}))
+    opened: list[dict[str, Any]] = []
+    page.route("**/api/open", lambda r: opened.append(r.request.post_data_json) or _json(r, {"status": "opened"}))
 
     def file_mail(route: Route) -> None:
         filed.append(route.request.post_data_json)
@@ -88,18 +99,37 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     options = sheet.locator(".arch-opt")
     expect(options).to_have_count(3)
     expect(options.first).to_have_attribute("aria-checked", "true")
-    expect(options.first.locator(".ao-path")).to_have_text("Clients/Project Alpha/2026")
+    expect(options.first.locator(".ao-path")).to_have_text("Clients\\Project Alpha\\2026")
+    expect(sheet.locator(".ao-line .rank")).to_have_text(["1", "2", "3"])
+    expect(sheet.locator(".ao-score .chip")).to_have_text(["81%", "52%", "30%"])
+    expect(sheet.locator(".ao-score .chip.tone-attention")).to_have_count(1)
+    expect(options.nth(2).locator(".ao-similar")).to_have_text("23 similar emails · e.g. “Agenda for week 23”")
     expect(sheet.locator("#archiveGo")).to_have_text("Archive to Project Alpha\\2026")
+    preview = sheet.locator(".arch-preview")
+    expect(preview.locator("p")).to_be_hidden()
+    preview.locator("summary").click()
+    expect(preview.locator("p")).to_have_text(MAIL["preview"])
     options.nth(1).click()
     expect(options.nth(1)).to_have_attribute("aria-checked", "true")
-    expect(sheet.locator(".row-value.mono")).to_have_text("031 - Kickoff agenda.msg")
-    _lint_both_themes(page)
+    expect(preview.locator("p")).to_be_visible()
+    saved = sheet.locator(".row-value.mono")
+    expect(saved).to_have_text("031 - Kickoff agenda.msg")
+    sheet.locator('[data-date="on"]').click()
+    assert sheet.locator('[data-date="on"]').bounding_box()["width"] >= 44
+    expect(sheet.locator('[data-date="on"]')).to_have_attribute("aria-pressed", "true")
+    expect(saved).to_have_text("2026-11-05 - 031 - Kickoff agenda.msg")
+    sheet.locator(".ao-open").nth(1).click()
+    expect(page.locator(".toast")).to_contain_text("Opened in File Explorer")
+    assert opened == [{"root": "invented-root", "scan_id": 7, "kind": "folder", "id": 22, "verb": "explore"}]
+    # The clicks scrolled the sheet; the lint reads it from the top, as it opens.
+    sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
+    _lint_both_themes(page, allow=BELOW_FOLD)
     sheet.locator("#archSearch").fill("northwind")
     sheet.locator("#archFound button").click()
     expect(options.first.locator(".chip")).to_have_text("Chosen")
     sheet.locator("#archiveGo").click()
     expect(sheet).to_be_hidden()
-    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2026", "category": "Archived"}]
+    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2026", "category": "Archived", "date_prefix": "on"}]
     expect(page.locator(".toast")).to_contain_text("Archived to Northwind\\2026")
     expect(page.locator("#outlookMeta")).to_have_text("Last filed to Northwind\\2026")
     page.locator("#paneSearch .home-settings").click()
@@ -131,7 +161,7 @@ def test_an_archived_mail_is_filed_again_only_through_the_copy_switch(page: Page
     page.goto(app_url + "/")
     page.locator("#openArchive").click()
     sheet = page.locator("#archiveDialog")
-    expect(sheet.locator(".arch-filed")).to_contain_text("Already archived as")
+    expect(sheet.locator(".arch-filed")).to_have_text("Already archived as Clients\\Project Alpha\\2026\\003 - Kickoff agenda.msg")
     go, copy = sheet.locator("#archiveGo"), sheet.locator("#archCopy")
     expect(copy).to_have_attribute("aria-checked", "false")
     expect(go).to_be_disabled()
@@ -142,7 +172,8 @@ def test_an_archived_mail_is_filed_again_only_through_the_copy_switch(page: Page
     _lint_both_themes(page, allow=BELOW_FOLD)
     go.click()
     expect(sheet).to_be_hidden()
-    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived", "duplicate": True}]
+    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived",
+                      "date_prefix": "auto", "duplicate": True}]
     assert errors == []
 
 

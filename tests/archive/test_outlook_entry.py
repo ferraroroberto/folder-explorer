@@ -225,3 +225,23 @@ def test_the_fallback_window_lists_the_folders_and_the_mail_like_the_sheet() -> 
     assert option_lines(doc) == [("/archive/Mail/Clients/Alpha", "Clients/Alpha    Same subject · This conversation is filed here")]
     mail = {"sender": "leo@example.org", "date_sent": "2026-11-05T09:12:00", "attachment_count": 2, "where": "Inbox"}
     assert mail_line(mail) == "leo@example.org · 2026-11-05 09:12 · 2 attachments · Inbox"
+
+
+def test_the_date_prefix_choice_reaches_the_child_and_a_bad_one_never_does(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[list[str]] = []
+    monkeypatch.setattr(archive_routes, "bridge", lambda args, timeout: asked.append(args) or _in_process(args, timeout))
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        handed = c.get("/api/archive/pending").json()["mail"]
+        first = handed["suggestions"][0]
+        assert set(first["saved_as"]) == {"auto", "on", "off"} and "location" in first
+        dest = first["folder_path"]
+        for bad in ("sometimes", ["on"], 1):
+            refused = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "date_prefix": bad})
+            assert refused.status_code == 400
+        assert asked == []
+        filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "date_prefix": "on"}).json()
+    assert "--date-prefix=on" in asked[-1]
+    assert Path(filed["files"][0]).name == first["saved_as"]["on"]

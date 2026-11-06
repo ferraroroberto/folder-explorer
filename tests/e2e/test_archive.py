@@ -47,10 +47,10 @@ def _archive_ready(page: Page) -> None:
     page.route("**/api/search/status", status)
 
 
-def _lint_both_themes(page: Page) -> None:
+def _lint_both_themes(page: Page, **kwargs: Any) -> None:
     for theme in ("light", "dark"):
         page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
-        assert_layout_clean(page)
+        assert_layout_clean(page, **kwargs)
 
 
 def _errors(page: Page) -> list[str]:
@@ -103,8 +103,12 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     page.locator("#showMacro").click()
     macro = page.locator("#macroDialog")
     expect(macro).to_be_visible()
-    expect(macro.locator("pre")).to_contain_text("Sub ArchiveCurrentItem()")
-    _lint_both_themes(page)
+    expect(macro.locator("#setxText")).to_contain_text("setx FOLDER_EXPLORER_HOME")
+    expect(macro.locator("#homeState")).not_to_be_empty()
+    expect(macro.locator(".setup-step-title")).to_have_text(["Set the folder", "Import the macro", "Add it to the ribbon", "Restart Outlook"])
+    expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
+    # The sheet is capped to the viewport and scrolls its card, so the VBA's Copy sits below a phone's fold by design.
+    _lint_both_themes(page, allow={"#macroDialog #copyMacro": "below the fold of the scrolling sheet"})
     assert errors == []
 
 

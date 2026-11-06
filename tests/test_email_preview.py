@@ -47,6 +47,16 @@ def test_a_target_cut_off_by_the_old_500_character_limit_is_dropped() -> None:
     assert clean_preview("Order shipped. Track it <https://carrier.example/t/12345?lang=en&amp") == "Order shipped. Track it"
 
 
+def test_a_target_wrapped_over_lines_or_spaces_is_dropped_whole() -> None:
+    wrapped = "Track it <https://carrier.example/t/12345?lang=en\n&ref=abc def/9> now.\nThanks"
+    assert clean_preview(wrapped) == "Track it now.\nThanks"
+
+
+def test_an_unclosed_target_runs_to_the_end_of_a_cut_preview() -> None:
+    assert clean_preview("Hello Ana.\nOpen <https://carrier.example/t/12345?lang=en\n&ref=ab") == "Hello Ana.\nOpen"
+    assert clean_preview("Hello Ana. See <https") == "Hello Ana. See"
+
+
 def test_a_name_with_an_address_in_angle_brackets_stays() -> None:
     assert clean_preview("From: Ana <ana@example.com>") == "From: Ana <ana@example.com>"
 

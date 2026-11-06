@@ -23,6 +23,7 @@ const A = {
   choice: 0,
   extra: null, // a folder picked from "Another email folder"
   category: '',
+  copy: false, // the user asked for another copy of a mail that is already archived
   busy: false,
   opening: false,
   error: null,
@@ -101,7 +102,9 @@ function renderArchive() {
   const choice = opts[A.choice] || null;
   const filed = d.already_archived;
   $('archiveBody').innerHTML = source + mailHtml(d.mail) +
-    (filed ? '<p class="arch-filed tone-attention-text">Already archived as ' + esc(lastTwo(filed)) + '</p>' : '') +
+    (filed ? '<p class="arch-filed tone-attention-text">Already archived as ' + esc(lastTwo(filed)) + '</p>' +
+      '<div class="row"><span>Archive a copy anyway</span><button type="button" class="toggle' + (A.copy ? ' on' : '') + '" role="switch" aria-checked="' + A.copy +
+      '" id="archCopy" aria-label="Archive a copy anyway" data-track="archive-copy"><span class="knob"></span><span class="toggle-label">' + (A.copy ? 'ON' : 'OFF') + '</span></button></div>' : '') +
     '<div class="arch-head"><h3>Suggested folders</h3><button type="button" class="icon-button" id="rankInfo" aria-label="How folders are suggested" title="How folders are suggested" data-track="rank-info">' + glyph('info') + '</button></div>' +
     '<p class="row-note" id="rankNote" hidden>Each folder scores by its best match: the same subject first, then the sender and the topic. A big folder doesn\'t win by volume.</p>' +
     (opts.length ? '<ul class="arch-options" role="radiogroup" aria-label="Archive folder">' + opts.map(optionHtml).join('') + '</ul>'
@@ -117,8 +120,8 @@ function renderArchive() {
     '<button type="button" class="icon-button" id="archMacro" aria-label="About the Outlook macro" title="About the Outlook macro" data-track="macro-info">' + glyph('info') + '</button></div>' +
     (A.error ? errorBlock('Not archived', A.error.message, false) : '');
   $('archiveActions').innerHTML = '<button type="button" class="button-primary detail-save-btn" id="archiveGo" data-track="archive-go"' +
-    (choice && !filed && !A.busy ? '' : ' disabled') + '>' +
-    esc(A.busy ? 'Archiving…' : choice ? 'Archive to ' + lastTwo(choice.folder_path) : 'Pick a folder') + '</button>';
+    (choice && (!filed || A.copy) && !A.busy ? '' : ' disabled') + '>' +
+    esc(A.busy ? 'Archiving…' : choice ? (filed ? 'Archive a copy to ' : 'Archive to ') + lastTwo(choice.folder_path) : 'Pick a folder') + '</button>';
 }
 
 function showSheet(doc, fromMacro) {
@@ -127,6 +130,7 @@ function showSheet(doc, fromMacro) {
   A.choice = 0;
   A.extra = null;
   A.error = null;
+  A.copy = false;
   A.busy = false;
   A.category = doc.ok ? doc.category || '' : '';
   renderArchive();
@@ -155,7 +159,9 @@ async function doArchive() {
   renderArchive();
   let r;
   try {
-    r = await postJSON('/api/archive/file', { token: A.doc.token, folder: o.folder_path, category: A.category });
+    const payload = { token: A.doc.token, folder: o.folder_path, category: A.category };
+    if (A.doc.already_archived && A.copy) payload.duplicate = true;
+    r = await postJSON('/api/archive/file', payload);
   } catch (e) {
     r = { ok: false, error: { message: e.message } };
   }
@@ -266,6 +272,7 @@ export function initArchive() {
     const el = ev.target.closest('button');
     if (!el || el.disabled) return;
     if (el.classList.contains('arch-opt')) { A.choice = Number(el.dataset.choice); renderArchive(); }
+    else if (el.id === 'archCopy') { A.copy = !A.copy; renderArchive(); }
     else if (el.id === 'rankInfo') $('rankNote').hidden = !$('rankNote').hidden;
     else if (el.dataset.folder) pickFound(el.dataset.folder);
     else if (el.id === 'archRetry') { $('archiveDialog').close(); openArchive(); }

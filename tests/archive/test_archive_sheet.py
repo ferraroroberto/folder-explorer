@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.email import archive_sheet
+from src.email.repository import open_index
 from src.email.archive_sheet import ERR_ALREADY, ERR_NO_ROOT, ERR_OUTSIDE, SheetError
 from tests.archive.batch_support import FakeOutlookClient, _index_archived_file, _mail, _seed_index, archive_root, cfg  # noqa: F401
 
@@ -77,6 +78,27 @@ def test_a_mail_already_filed_is_not_filed_twice(cfg: dict, archive_root: Path) 
     with pytest.raises(SheetError) as exc:
         archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
     assert exc.value.code == ERR_ALREADY and "001 - Twice.msg" in str(exc.value)
+
+
+def test_an_explicit_duplicate_files_a_numbered_second_copy_and_overwrites_nothing(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Twice")
+    first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    _index_archived_file(cfg, first, message_id="kick@example.invalid", subject="Twice")
+    first_bytes = Path(first["files"][0]).read_bytes()
+    other = archive_root / "Elsewhere"
+    copy = archive_sheet.file_mail(client, cfg, item, str(other), None, duplicate=True)
+    again = archive_sheet.file_mail(client, cfg, item, str(archive_root), None, duplicate=True)
+    assert copy["ok"] and Path(copy["files"][0]).name == "001 - Twice.msg" and Path(copy["files"][0]).parent == other.resolve()
+    assert Path(again["files"][0]).name == "002 - Twice.msg" and Path(first["files"][0]).read_bytes() == first_bytes
+    _index_archived_file(cfg, copy, message_id="kick@example.invalid", subject="Twice")
+    _index_archived_file(cfg, again, message_id="kick@example.invalid", subject="Twice")
+    conn = open_index(cfg)
+    try:
+        rows = conn.execute("SELECT file_path FROM emails WHERE message_id = ?", ("kick@example.invalid",)).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 3
+    assert archive_sheet.suggest(client, cfg, item)["already_archived"] in {r["file_path"] for r in rows}
 
 
 def test_a_category_outlook_refuses_still_reports_the_files(cfg: dict, archive_root: Path) -> None:

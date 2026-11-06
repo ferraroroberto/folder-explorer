@@ -119,6 +119,8 @@ class FolderHits:
 
 # -------------------------------------------------------------- helpers -----
 
+OUTLOOK_NONE_YEAR = 4500
+
 
 def sent_datetime(mail_item: Any) -> datetime | None:
     """The mail's sent time as a stdlib datetime, or ``None``.
@@ -138,11 +140,14 @@ def sent_datetime(mail_item: Any) -> datetime | None:
 
 
 def _com_datetime(mail_item: Any, attr: str) -> datetime | None:
-    """One COM date property as a naive stdlib datetime, or ``None``."""
+    """One COM date property as a naive stdlib datetime, or ``None`` for no date."""
     value = safe_com(lambda: getattr(mail_item, attr), None)
     if value is None:
         return None
     try:
+        # Outlook reports "no date" (an unsent item) as 4501-01-01, never as an empty value.
+        if value.year >= OUTLOOK_NONE_YEAR:
+            return None
         return datetime(
             value.year, value.month, value.day,
             value.hour, value.minute, value.second,

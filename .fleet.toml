@@ -31,7 +31,7 @@ reason = "The snake_case text is the owner's own mail snippets and folder names,
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]
-base = { src = "app/webapp/static/_vendored/base", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/base" }
+base = { src = "app/webapp/static/_vendored/base", sha = "dedb86e0f212d66f247f4aacb6c15d13b1154651", dest = "app/webapp/static/_vendored/base" }
 nav = { src = "app/webapp/static/_vendored/nav", sha = "ea993a7aa7a8814749236621a5eac939e862bf4d", dest = "app/webapp/static/_vendored/nav" }
 icons = { src = "app/webapp/static/_vendored/icons", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/icons" }
 card = { src = "app/webapp/static/_vendored/card", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/card" }

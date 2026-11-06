@@ -1,0 +1,19 @@
+<!-- Fleet code listing — markup skeleton (copy and adapt).
+     The header is a title (a language, or "language · name") and the copy
+     control: the vendored icon-button, so it is a glyph on nothing and needs
+     an aria-label (and a title for the pointer tooltip). The status line
+     says "Copied" or "Copy failed" for a moment and is a polite live region.
+     Add data-track="<id>" to the button if the app logs usage.
+     Wire it once: import { bindCodeListing } from './code-listing.js';
+     bindCodeListing(); -->
+<div class="code-listing">
+  <div class="code-listing-head">
+    <span class="code-listing-title">PowerShell</span>
+    <span class="code-listing-status" role="status" aria-live="polite"></span>
+    <button type="button" class="icon-button code-listing-copy" aria-label="Copy" title="Copy">
+      <svg class="icon code-listing-copy-glyph" aria-hidden="true"><use href="#i-copy"></use></svg>
+      <svg class="icon code-listing-copied" aria-hidden="true"><use href="#i-circle-check"></use></svg>
+    </button>
+  </div>
+  <pre><code>setx ARCHIVE_ROOT D:\archive</code></pre>
+</div>

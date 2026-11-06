@@ -6,9 +6,10 @@
  */
 
 import { api, getJSON, postJSON } from './api.js';
-import { copyText, mailDate } from './search-state.js';
+import { mailDate } from './search-state.js';
 import { bar, esc, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { bindCodeListing } from './_vendored/code-listing/code-listing.js';
 
 const $ = (id) => document.getElementById(id);
 // How often a visible page on this PC asks whether the macro handed over a mail.
@@ -322,8 +323,7 @@ export function startArchivePoll() {
 export function initArchive() {
   $('openArchive').addEventListener('click', () => openArchive());
   $('showMacro').addEventListener('click', () => { $('settingsDialog').close(); openMacro(); });
-  $('copyMacro').addEventListener('click', async () => showToast((await copyText($('macroText').textContent)) ? 'Macro copied' : 'Copy isn\'t allowed here'));
-  $('copySetx').addEventListener('click', async () => showToast((await copyText($('setxText').textContent)) ? 'Command copied' : 'Copy isn\'t allowed here'));
+  bindCodeListing();
   const body = $('archiveBody');
   $('archiveActions').addEventListener('click', (ev) => {
     const el = ev.target.closest('button');

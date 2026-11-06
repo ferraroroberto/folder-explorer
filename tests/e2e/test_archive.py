@@ -71,7 +71,7 @@ def _errors(page: Page) -> list[str]:
     return errors
 
 
-def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, app_url: str) -> None:
+def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, app_url: str, browser_name: str) -> None:
     errors = _errors(page)
     filed: list[dict[str, Any]] = []
     _archive_ready(page)
@@ -140,6 +140,15 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     expect(macro.locator("#homeState")).not_to_be_empty()
     expect(macro.locator(".setup-step-title")).to_have_text(["Set the folder", "Import the macro", "Add it to the ribbon", "Restart Outlook"])
     expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
+    # The vendored code-listing: Copy is an unpainted icon button that puts the listing on the clipboard and says so.
+    if browser_name == "chromium":
+        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    macro.locator("#copyMacro").click()
+    expect(macro.locator(".code-listing-status").nth(1)).to_have_text("Copied")
+    if browser_name == "chromium":
+        assert "Sub ArchiveCurrentItem()" in page.evaluate("() => navigator.clipboard.readText()")
+    # The tap scrolled the sheet to the Copy; the lint below reads the sheet from its top.
+    macro.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
     # The sheet is capped to the viewport and scrolls its card, so the VBA's Copy sits below a phone's fold by design.
     _lint_both_themes(page, allow={"#macroDialog #copyMacro": "below the fold of the scrolling sheet"})
     assert errors == []

@@ -27,6 +27,8 @@ export function initPreview(opts) {
 const current = () => S.results[S.selected] || null;
 // Find in mailbox opens the live copy in Outlook, so it is the PC's alone, like the Archive card.
 const canFind = () => !!(S.status.pc && S.status.archive && S.status.archive.ready);
+// Open folder hands the mail's folder to File Explorer through /api/open, the folder view's own route: the PC only, and only for a folder the scan holds.
+const canOpenFolder = (d) => !!(S.status.pc && d.location);
 
 // ------------------------------------------------------------------ mail
 
@@ -119,6 +121,7 @@ function emailHtml(d) {
     (d.can_open ? '<button type="button" class="button-primary" data-act="outlook" data-track="open-outlook">' + glyph('external-link') + 'Open in Outlook</button>' : '') +
     '<div class="pv-utils">' +
     '<button type="button" class="button-surface" data-act="folder" data-track="show-folder">' + glyph('folder-open') + 'Show folder</button>' +
+    (canOpenFolder(d) ? '<button type="button" class="button-surface" data-act="openfolder" data-track="open-folder">' + glyph('folder-open') + 'Open folder</button>' : '') +
     '<button type="button" class="button-surface" data-act="copy" data-track="copy-path">' + glyph('copy') + 'Copy path</button>' +
     (canFind() ? '<button type="button" class="button-surface" data-act="mailbox" data-track="find-mailbox">' + glyph('search') + 'Find in mailbox</button>' : '') + '</div>' +
     (!S.status.pc ? '<p class="pv-note">Open in Outlook works on the PC.</p>' : (!d.can_open ? '<p class="pv-note">Outlook (classic) isn\'t installed on this PC.</p>' : '')) +
@@ -253,7 +256,10 @@ export async function previewAction(act) {
   else if (act === 'copy') showToast((await copyText(d.path)) ? 'Path copied' : 'Copy isn\'t allowed here');
   else if (act === 'outlook' && d.can_open) post('/api/emails/' + d.id + '/open', {}, 'Opening in Outlook');
   else if (act === 'mailbox' && canFind()) findInMailbox(d);
-  else if (act === 'folder') {
+  else if (act === 'openfolder' && canOpenFolder(d)) {
+    const { root, scan_id, folder } = d.location;
+    post('/api/open', { root, scan_id, kind: 'folder', id: folder, verb: 'explore' }, 'Opened in File Explorer');
+  } else if (act === 'folder') {
     if (d.location) showInExplore(d.location.root, d.location.folder);
     else showToast('This mail\'s folder isn\'t in a scanned root yet');
   }

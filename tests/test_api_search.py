@@ -71,6 +71,25 @@ def test_one_mail_carries_its_place_in_the_tree(setup: Path) -> None:
         assert c.get("/api/emails/999").status_code == 404
 
 
+def test_a_mails_folder_opens_through_the_folder_views_route(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src import desktop
+
+    launched: list[str] = []
+    monkeypatch.setattr(desktop, "_spawn", lambda command: launched.append(command[-1]))
+    with TestClient(app, client=LOCAL) as c:
+        first = c.get("/api/search/emails", params={"q": "invoice"}).json()["hits"][0]
+        loc = c.get("/api/emails/%d" % first["id"]).json()["location"]
+        ask = {"root": loc["root"], "scan_id": loc["scan_id"], "kind": "folder", "id": loc["folder"], "verb": "explore"}
+        assert c.post("/api/open", json=ask).json() == {"status": "opened"}
+        assert launched and launched[0].endswith("Kestrel")
+        # A folder the roots don't hold has no id to name: the root, then the id, are refused.
+        assert c.post("/api/open", json={**ask, "root": "outside-the-roots"}).status_code == 404
+        assert c.post("/api/open", json={**ask, "id": 999_999}).status_code == 404
+    with TestClient(app, client=REMOTE) as c:
+        assert c.post("/api/open", json=ask).status_code in (401, 403)
+    assert len(launched) == 1
+
+
 def test_show_all_reads_only_inside_the_email_folders(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     read: list[str] = []
     monkeypatch.setattr(search_routes, "fetch_body", lambda p: read.append(p) or Body(True, text="Full text"))

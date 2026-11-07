@@ -27,8 +27,8 @@ function runRow(r) {
   const warn = r.status === 'failed' || r.status === 'interrupted';
   const scope = r.scope === 'all' ? 'Every email folder' : shortPath(r.scope);
   return '<li class="run-row"><span class="mark' + (live ? ' is-live' : warn ? ' is-warn' : '') + '" aria-hidden="true"></span><span>' +
-    '<strong>' + esc(live ? 'Indexing now' : r.message || r.status) + '</strong>' +
-    esc(scope + ' · ' + fmtAgo(r.started_at) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) + '</span></li>';
+    '<strong>' + esc(scope + ' · ' + fmtAgo(r.started_at)) + '</strong>' +
+    esc((live ? 'Indexing now' : r.message || r.status) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) + '</span></li>';
 }
 
 function render() {

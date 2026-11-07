@@ -1,6 +1,6 @@
 /* The Scans tab's email index card: stats, one-folder indexing, recent runs and failed reads. */
 
-.email-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); margin: var(--space-sm) 0; }
+.email-stats { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); margin: var(--space-sm) 0; }
 @media (min-width: 600px) { .email-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 button.stat { font: inherit; line-height: normal; text-align: left; color: var(--ink); cursor: pointer; }
 .stat-value.tone-attention-text, .stat-value.tone-danger-text { font-weight: 700; }

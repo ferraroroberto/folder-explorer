@@ -196,7 +196,7 @@ kbd {
 .rr-meta .chip { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rr-meta .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 .rr-meta .is-flag { color: var(--attention-text); }
-.result-row[aria-selected="true"] .rr-when, .result-row[aria-selected="true"] .rr-snip { color: var(--ink); }
+.result-row[aria-selected="true"] .rr-when, .result-row[aria-selected="true"] .rr-snip, .result-row[aria-selected="true"] .rr-meta { color: var(--ink); }
 /* Folder results: name, then the trimmed path, then size. */
 .result-row.is-folder { grid-template-areas: "who when" "snip snip" "meta meta"; }
 .result-row.is-folder .rr-who { display: flex; align-items: center; gap: var(--space-sm); }

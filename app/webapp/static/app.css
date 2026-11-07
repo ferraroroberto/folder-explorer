@@ -429,8 +429,11 @@ button.list-row .lr-name { font-weight: 600; }
 .folder-empty { margin: 0; padding: var(--space-sm); }
 .folder-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); }
 .folder-add .input-native { width: 100%; min-width: 0; box-sizing: border-box; }
-/* The add form's submit is the sheet's commit, so it is the 48px button-primary beside the field, not a 36px utility button. */
-.folder-add .button-primary { padding: 0 var(--space-md); }
+/* The submit sits beside a 36px field, so it is the labelled utility button at that same control height; its glyph takes the inline size. */
+.folder-add .button-surface { display: inline-flex; align-items: center; gap: 6px; }
+.folder-add .button-surface .icon { width: var(--icon-inline); height: var(--icon-inline); }
+/* A coarse pointer gives the field a real 44px box (select-native), so the button keeps lockstep with it. */
+@media (pointer: coarse) { .folder-add .button-surface { height: var(--row-sm); } }
 .folder-error { color: var(--danger-text); overflow-wrap: anywhere; }
 .folder-budget .select-native { max-width: 50%; }
 .folder-remove-path { overflow-wrap: anywhere; }

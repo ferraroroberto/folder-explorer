@@ -60,6 +60,11 @@ def test_folder_lists_add_remove_and_refuse(page: Page, app_url: str, tmp_path: 
     roots = sheet.locator("#rootsEditor")
     emails = sheet.locator("#emailRootsEditor")
     expect(roots).to_be_visible()
+    field, add = (roots.locator(".folder-add " + sel).bounding_box() for sel in ("input", "button"))
+    # A fine pointer's 44px field box holds a 36px visible control (transparent hit inset); a coarse pointer's field is a real 44px.
+    visible = 44 if page.evaluate("matchMedia('(pointer: coarse)').matches") else 36
+    assert field and add and abs(add["height"] - visible) <= 1, "Add matches the field's visible height, not the 48px primary"
+    assert abs((field["y"] + field["height"] / 2) - (add["y"] + add["height"] / 2)) <= 1
     before = roots.locator(".action-row").count()
 
     _add(roots, str(tmp_path / "Not there"))

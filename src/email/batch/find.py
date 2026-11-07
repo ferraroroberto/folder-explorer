@@ -27,11 +27,11 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from src.email.batch.common import header
 from src.email.archive_settings import BODY_PREVIEW_LENGTH, get_mailbox_archive_folder
+from src.email.batch.common import header
+from src.email.batch.mail_filter import mail_matches
 from src.email.mailboxes import Mailbox
 from src.email.repository import EmailRepository, open_index
-from src.email.batch.mail_filter import mail_matches
 from src.outlook.client import FIND_ARCHIVE, FIND_INBOX, FIND_SENT
 from src.outlook.mapi import words_filter
 

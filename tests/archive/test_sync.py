@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from src.email.batch import sync
 from app.cli import email_batch as main_batch
+from src.email.batch import sync
 from src.email.mailboxes import load_mailbox_registry, parse_mailbox_registry
 from src.outlook import process, syncing
 from src.outlook.mapi import (

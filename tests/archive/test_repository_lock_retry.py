@@ -11,9 +11,13 @@ import sqlite3
 
 import pytest
 
-from tests.archive.index_support import get_connection, init_db
 from src.email.repository import LOCK_RETRIES
-from tests.archive.index_support import EmailRecord, EmailRepository
+from tests.archive.index_support import (
+    EmailRecord,
+    EmailRepository,
+    get_connection,
+    init_db,
+)
 
 
 def _rec(name: str) -> EmailRecord:

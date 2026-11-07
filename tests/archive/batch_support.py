@@ -11,16 +11,14 @@ from pathlib import Path
 
 import pytest
 
-from src.email.batch import verbs as batch
 from src.email.batch import move as batch_move
-from tests.archive.index_support import open_index
-from tests.archive.index_support import EmailRecord, EmailRepository
+from src.email.batch import verbs as batch
 from src.outlook.client import InboxMail
 from src.outlook.mapi import (
     with_category,
     without_category,
 )
-
+from tests.archive.index_support import EmailRecord, EmailRepository, open_index
 
 # --------------------------------------------------------------- fake COM ---
 

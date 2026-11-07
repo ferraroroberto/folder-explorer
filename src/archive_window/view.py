@@ -12,9 +12,27 @@ import tkinter as tk
 from tkinter import filedialog
 from typing import Any, Callable, Optional
 
-from src.archive_window.model import DATE_CHOICES, NO_CATEGORY, RANK_NOTE, ModelView, Option, mail_line, under_root
-from src.archive_window.theme import FONT, MONO, SIZE_BODY, SIZE_CAPTION, SIZE_SMALL, SIZE_TITLE, SPACE_MD, SPACE_SM, Palette
 from src import desktop
+from src.archive_window.model import (
+    DATE_CHOICES,
+    NO_CATEGORY,
+    RANK_NOTE,
+    ModelView,
+    Option,
+    mail_line,
+    under_root,
+)
+from src.archive_window.theme import (
+    FONT,
+    MONO,
+    SIZE_BODY,
+    SIZE_CAPTION,
+    SIZE_SMALL,
+    SIZE_TITLE,
+    SPACE_MD,
+    SPACE_SM,
+    Palette,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -15,7 +15,12 @@ from typing import Any
 from src.email.archive_paths import archive_roots as _archive_roots
 from src.email.archive_paths import resolve_under_roots as _resolve_under_roots
 from src.email.archive_settings import get_mailbox_archive_folder, get_outlook_category
-from src.email.batch.common import ERROR_BAD_DECISION, envelope, renumber_folders, unique_folders
+from src.email.batch.common import (
+    ERROR_BAD_DECISION,
+    envelope,
+    renumber_folders,
+    unique_folders,
+)
 from src.email.batch.move import ERROR_MOVE_FAILED
 from src.email.mailboxes import Mailbox
 from src.email.naming import normalize_message_id

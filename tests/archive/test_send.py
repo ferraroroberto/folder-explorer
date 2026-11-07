@@ -24,8 +24,7 @@ from pathlib import Path
 import pytest
 
 from app.cli import email_batch as main_batch
-from src.email.batch import draft
-from src.email.batch import send
+from src.email.batch import draft, send
 from src.outlook import mapi, process
 from src.outlook.client import OutlookClient
 from src.outlook.drafts import DraftUpdateError

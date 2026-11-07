@@ -30,15 +30,14 @@ from src.outlook.mapi import (
     replace_marked_body_html,
 )
 from tests.archive.draft_support import (
-    FakeDraftClient,
     SELF,
+    FakeDraftClient,
     _FakeApplication,
     _FakeComMail,
     _FakePropertyAccessor,
     _spec,
+    batch_process,  # noqa: F401 - fixtures are used by name
 )
-from tests.archive.draft_support import batch_process  # noqa: F401 - fixtures are used by name
-
 
 # ------------------------------------------------------------ update (#80) ---
 

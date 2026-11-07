@@ -21,7 +21,12 @@ from typing import Any, Iterator, Optional
 
 from src import config
 from src.email import indexer
-from src.email.archive import fit_msg_filename, legacy_ascii_filename, sanitize_filename, split_sequence_prefix
+from src.email.archive import (
+    fit_msg_filename,
+    legacy_ascii_filename,
+    sanitize_filename,
+    split_sequence_prefix,
+)
 from src.email.archive_settings import DEFAULT_MAX_PATH_LENGTH, get_max_path_length
 from src.email.manifest import Manifest
 from src.email.reader import ReadError, read_facts

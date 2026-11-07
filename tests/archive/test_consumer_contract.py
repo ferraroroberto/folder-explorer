@@ -29,8 +29,8 @@ from tests.archive.batch_support import _mail, _seed_index, archive_root, cfg  #
 from tests.archive.draft_support import FakeDraftClient
 from tests.archive.test_batch_sent import SentFakeClient, _sent_mail
 from tests.archive.test_mailboxes import _registry_doc
-from tests.archive.test_send import _client as _draft_client
 from tests.archive.test_send import OTHER, _FakeDraft
+from tests.archive.test_send import _client as _draft_client
 from tests.archive.test_sync import FakeHandle, _ended
 
 TASK_OS, LIFE_OS = "task-os", "life-os"

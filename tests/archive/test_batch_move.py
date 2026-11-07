@@ -4,28 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 from src.email.batch import verbs as batch
-from tests.archive.index_support import open_index
-from tests.archive.index_support import EmailRecord, EmailRepository
 from src.outlook.mapi import (
     is_message_changed_error,
 )
-from tests.archive.batch_support import (
+from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     FAKE_STORE_ID,
     FakeOutlookClient,
     HeldByReferenceClient,
     _FakeComError,
     _mail,
     _message_changed_error,
-    _stuck_move,
-)
-from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     _no_retry_pauses,
+    _stuck_move,
     archive_root,
     cfg,
 )
-
+from tests.archive.index_support import EmailRecord, EmailRepository, open_index
 
 # ----------------------------------------------------- selection hold (#111) ---
 

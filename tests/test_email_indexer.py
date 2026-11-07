@@ -17,8 +17,8 @@ from app.webapp.state import EMAILS
 from src import scan_runner, store
 from src.email import indexer, manifest
 from src.email.schema import own_index_path
-from src.scanner import exclude_keys, scan_to_index
 from src.index import Index, open_index
+from src.scanner import exclude_keys, scan_to_index
 from tests.conftest import write_config
 from tests.test_email_stage import FakeReader
 

@@ -11,11 +11,11 @@ from typing import Any
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse
 
+from app.webapp.state import EMAILS
 from src import config, store
 from src.email import indexer
 from src.email.settings import EmailPart, email_part, is_under
 from src.roots import resolve_roots
-from app.webapp.state import EMAILS
 
 router = APIRouter(prefix="/api/email")
 

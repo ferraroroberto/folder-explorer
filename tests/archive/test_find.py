@@ -25,9 +25,9 @@ from src.outlook.client import (
     OutlookClient,
 )
 from tests.archive.batch_support import _seed_index, archive_root, cfg  # noqa: F401 - fixtures are used by name
+from tests.archive.fakes import win32com_client
 from tests.archive.test_batch_targeted import TargetedFakeClient
 from tests.archive.test_mailboxes import batch_process  # noqa: F401 - fixture is used by name
-from tests.archive.fakes import win32com_client
 
 MUTATIONS = ("Move", "Save", "Delete", "Send", "Display", "Close", "Add")
 

@@ -5,7 +5,6 @@ import os
 
 from src.email.archive import EmailArchiver, resolve_date_prefix_for_folder
 from src.email.archive_settings import get_date_prefix_mode
-
 from tests.archive.fakes import _FakeAttachments, _FakeMailItem
 
 

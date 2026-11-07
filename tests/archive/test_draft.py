@@ -32,19 +32,16 @@ from src.outlook.mapi import (
     insert_body_html,
     mark_body_html,
 )
-from tests.archive.draft_support import (
-    FakeDraftClient,
+from tests.archive.draft_support import (  # noqa: F401 - fixtures are used by name
     REPO_ROOT,
     SELF,
+    FakeDraftClient,
     _FakeApplication,
     _FakeComMail,
     _spec,
-)
-from tests.archive.draft_support import (  # noqa: F401 - fixtures are used by name
-    batch_process,
     attachment,
+    batch_process,
 )
-
 
 # ------------------------------------------------------------------- spec ---
 

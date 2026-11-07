@@ -19,7 +19,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
-from src.email.query import FLAG_FLAGGED, FTS_PREVIEW, FTS_SENDER, FTS_SUBJECT, Compiled, compile_query
+from src.email.query import (
+    FLAG_FLAGGED,
+    FTS_PREVIEW,
+    FTS_SENDER,
+    FTS_SUBJECT,
+    Compiled,
+    compile_query,
+)
 
 MARK_START, MARK_END = chr(0xE000), chr(0xE001)
 SORTS = ("relevance", "newest")

@@ -19,13 +19,12 @@ import pytest
 
 from app.cli import email_batch as main_batch
 from src.email.batch import verbs as batch
-from tests.archive.index_support import open_index
-from tests.archive.index_support import EmailRecord, EmailRepository
 from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     _mail,
     archive_root,
     cfg,
 )
+from tests.archive.index_support import EmailRecord, EmailRepository, open_index
 from tests.archive.test_batch_targeted import TargetedFakeClient
 
 SENT = "__sent__"

@@ -22,14 +22,14 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
 
-from src import config, scan_runner, store
-from src.compression import StreamSafeGZipMiddleware
-from src.roots import resolve_roots
-from src.usage_log import usage_router
 from app.webapp import auth
 from app.webapp.build import BUILD_INFO, STATIC_DIR
 from app.webapp.routers import archive, browse, emails, scans, search, settings
 from app.webapp.state import EMAILS, POOL, refresh_pool
+from src import config, scan_runner, store
+from src.compression import StreamSafeGZipMiddleware
+from src.roots import resolve_roots
+from src.usage_log import usage_router
 
 logger = logging.getLogger(__name__)
 

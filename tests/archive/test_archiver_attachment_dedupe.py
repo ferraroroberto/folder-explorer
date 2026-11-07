@@ -21,10 +21,9 @@ import threading
 
 from src.email.archive import (
     _MAX_DEDUPE_ATTEMPTS,
-    _fit_filename_to_path,
     EmailArchiver,
+    _fit_filename_to_path,
 )
-
 from tests.archive.fakes import _FakeMailItem
 
 

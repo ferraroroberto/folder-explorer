@@ -28,6 +28,8 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
+from app.webapp.auth import is_pc_itself
+from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits, locate_folder
 from src import config, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
@@ -36,8 +38,6 @@ from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_sheet import ERR_FAILED, ERR_TIMEOUT, error_document
 from src.outlook.bridge import pywin32_installed
 from src.roots import resolve_roots
-from app.webapp.auth import is_pc_itself
-from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits, locate_folder
 
 logger = logging.getLogger(__name__)
 

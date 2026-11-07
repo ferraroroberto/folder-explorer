@@ -15,12 +15,12 @@ import os
 import subprocess
 import sys
 
-from src import config
-from src.config import PROJECT_ROOT
-from src.no_window import NO_WINDOW
 from app.webapp.bind import resolve_bind
 from app.webapp.routers.settings import EFFECTIVE_BIND_ENV
 from app.webapp.serve import run
+from src import config
+from src.config import PROJECT_ROOT
+from src.no_window import NO_WINDOW
 
 logger = logging.getLogger("app.webapp")
 

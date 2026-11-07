@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 import pytest
 
+from app import outlook
 from src.archive_window import theme
 from src.archive_window.model import (
     NO_NAME,
@@ -20,7 +21,6 @@ from src.archive_window.model import (
     under_root,
 )
 from src.archive_window.view import ArchiveView
-from app import outlook
 
 SAVED = {"auto": "001 - Plan.msg", "on": "2026-11-05 - 001 - Plan.msg", "off": "001 - Plan.msg"}
 

@@ -8,10 +8,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 
+from app.webapp.state import refresh_pool
 from src import config, scan_runner, store
 from src.roots import Root, resolve_roots
 from src.scan_lock import ScanBusy, is_locked
-from app.webapp.state import refresh_pool
 
 router = APIRouter(prefix="/api")
 

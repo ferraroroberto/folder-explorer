@@ -25,25 +25,21 @@ from pathlib import Path
 
 import pytest
 
-from src.email.batch import verbs as batch
-from src.email.batch import common as batch_common
 from src.email import archive as archiver_module
-from tests.archive.index_support import open_index
-from tests.archive.index_support import EmailRecord, EmailRepository
-from tests.archive.batch_support import (
+from src.email.batch import common as batch_common
+from src.email.batch import verbs as batch
+from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     FAKE_STORE_ID,
     FakeOutlookClient,
     _FakeAttachment,
     _mail,
+    _no_retry_pauses,
     _seed_index,
     _stuck_move,
-)
-from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
-    _no_retry_pauses,
     archive_root,
     cfg,
 )
-
+from tests.archive.index_support import EmailRecord, EmailRepository, open_index
 
 # ------------------------------------------------------------------- plan ---
 

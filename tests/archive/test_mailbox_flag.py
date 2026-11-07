@@ -13,8 +13,7 @@ import types
 
 import pytest
 
-from src.email.batch import draft
-from src.email.batch import send
+from src.email.batch import draft, send
 from src.email.mailboxes import Mailbox, parse_mailbox_registry
 from src.outlook import mapi, process
 from src.outlook.client import OutlookClient
@@ -25,8 +24,8 @@ from src.outlook.drafts import (
 )
 from src.outlook.mapi import AccountNotInOutlookError
 from tests.archive.batch_support import _mail, archive_root, cfg  # noqa: F401 - fixtures are used by name
-from tests.archive.test_batch_targeted import TargetedFakeClient
 from tests.archive.draft_support import FakeDraftClient, _FakeApplication, _FakeComMail
+from tests.archive.test_batch_targeted import TargetedFakeClient
 from tests.archive.test_mailboxes import batch_process  # noqa: F401 - fixture is used by name
 from tests.archive.test_send import _FakeDraft
 

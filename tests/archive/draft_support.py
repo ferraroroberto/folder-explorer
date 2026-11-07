@@ -12,13 +12,11 @@ from pathlib import Path
 import pytest
 
 from app.cli import email_batch as main_batch
-
 from src.outlook.drafts import (
     CreatedDraft,
     DraftUpdateError,
     ReplySourceError,
 )
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SELF = "me@example.invalid"

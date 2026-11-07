@@ -32,6 +32,8 @@ from typing import Any, Optional
 import requests
 import urllib3
 
+from app.webapp.bind import resolve_bind
+from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits
 from src import config, store
 from src.email import archive_sheet, indexer
 from src.email.archive import DATE_PREFIX_CHOICES
@@ -50,8 +52,6 @@ from src.email.mailboxes import MailboxRegistryError, load_mailbox_registry
 from src.outlook import bridge
 from src.outlook.client import OutlookClient
 from src.outlook.mapi import MailboxNotInOutlookError, OutlookUnavailableError
-from app.webapp.bind import resolve_bind
-from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits
 
 logger = logging.getLogger("app.outlook")
 

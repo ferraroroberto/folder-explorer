@@ -14,10 +14,23 @@ from fastapi.testclient import TestClient
 from app.webapp.server import app
 from src import winfs
 from src.index import Index, open_index
-from src.scanner import HIDDEN_INSIDE, HIDDEN_ITSELF, VISIBLE, hidden_state, scan_to_index
+from src.scanner import (
+    HIDDEN_INSIDE,
+    HIDDEN_ITSELF,
+    VISIBLE,
+    hidden_state,
+    scan_to_index,
+)
 from tests.conftest import write_config
-from tests.fixture_tree import (HIDDEN_BYTES, HIDDEN_FILE, HIDDEN_FOLDER, HIDDEN_FOLDER_FILE, TOTAL_BYTES, add_hidden,
-                                build_tree)
+from tests.fixture_tree import (
+    HIDDEN_BYTES,
+    HIDDEN_FILE,
+    HIDDEN_FOLDER,
+    HIDDEN_FOLDER_FILE,
+    TOTAL_BYTES,
+    add_hidden,
+    build_tree,
+)
 from tests.test_winfs import _record
 
 windows_only = pytest.mark.skipif(sys.platform != "win32", reason="the hidden attribute is a Windows file attribute")

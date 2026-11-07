@@ -27,13 +27,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.email.batch.common import ERROR_CATEGORY_FAILED, ERROR_NOT_IN_INBOX, envelope
-from src.email.batch.move import move_failure_error, move_out_of_inbox
-from src.email.mailboxes import Mailbox
 from src.email.archive_settings import (
     get_mailbox_archive_folder,
     get_outlook_dismiss_category,
 )
+from src.email.batch.common import ERROR_CATEGORY_FAILED, ERROR_NOT_IN_INBOX, envelope
+from src.email.batch.move import move_failure_error, move_out_of_inbox
+from src.email.mailboxes import Mailbox
 from src.email.naming import normalize_message_id
 
 logger = logging.getLogger(__name__)

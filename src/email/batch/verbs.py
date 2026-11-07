@@ -58,17 +58,24 @@ from pathlib import Path
 from typing import Any
 
 from src.email.archive import EmailArchiver, resolve_date_prefix_for_folder
+from src.email.archive_paths import (
+    REFUSED_OUTSIDE_ROOTS as REFUSED_OUTSIDE_ROOTS,
+)
+from src.email.archive_paths import (
+    REFUSED_UNRESOLVABLE as REFUSED_UNRESOLVABLE,
+)
+from src.email.archive_paths import (
+    archive_roots as _archive_roots,
+)
+from src.email.archive_paths import (
+    resolve_under_roots as _resolve_under_roots,
+)
 from src.email.archive_settings import (
     BODY_PREVIEW_LENGTH,
     DATE_PREFIX_AUTO,
     get_mailbox_archive_folder,
     get_outlook_category,
 )
-from src.email.mailboxes import Mailbox, MailboxRegistry
-from src.email.repository import EmailRepository, open_index
-from src.email.suggester import SuggestionEngine
-from src.email.batch.mail_filter import mail_matches
-from src.email.suggester import EmailData
 from src.email.batch.common import (
     ERROR_BAD_DECISION,
     ERROR_CATEGORY_FAILED,
@@ -78,26 +85,36 @@ from src.email.batch.common import (
     renumber_folders,
     unique_folders,
 )
+from src.email.batch.mail_filter import mail_matches
 from src.email.batch.move import (
     ERROR_MESSAGE_CHANGED as ERROR_MESSAGE_CHANGED,
+)
+from src.email.batch.move import (
     ERROR_MOVE_FAILED as ERROR_MOVE_FAILED,
+)
+from src.email.batch.move import (
     MOVE_VIA_FOLDER_SWITCH as MOVE_VIA_FOLDER_SWITCH,
+)
+from src.email.batch.move import (
     MOVE_VIA_KEPT_IN_SENT,
-    MOVE_VIA_ORIGINAL as MOVE_VIA_ORIGINAL,
-    MOVE_VIA_REFETCHED as MOVE_VIA_REFETCHED,
-    MOVE_VIA_RELEASED_RETRY as MOVE_VIA_RELEASED_RETRY,
     move_failure_error,
     move_out_of_inbox,
 )
-from src.outlook.mapi import MailboxNotInOutlookError
-from src.email.archive_paths import (
-    REFUSED_OUTSIDE_ROOTS as REFUSED_OUTSIDE_ROOTS,
-    REFUSED_UNRESOLVABLE as REFUSED_UNRESOLVABLE,
-    archive_roots as _archive_roots,
-    resolve_under_roots as _resolve_under_roots,
+from src.email.batch.move import (
+    MOVE_VIA_ORIGINAL as MOVE_VIA_ORIGINAL,
 )
-from src.email.renumber import RenumberResult, renumber_folder
+from src.email.batch.move import (
+    MOVE_VIA_REFETCHED as MOVE_VIA_REFETCHED,
+)
+from src.email.batch.move import (
+    MOVE_VIA_RELEASED_RETRY as MOVE_VIA_RELEASED_RETRY,
+)
+from src.email.mailboxes import Mailbox, MailboxRegistry
 from src.email.naming import normalize_message_id
+from src.email.renumber import RenumberResult, renumber_folder
+from src.email.repository import EmailRepository, open_index
+from src.email.suggester import EmailData, SuggestionEngine
+from src.outlook.mapi import MailboxNotInOutlookError
 
 logger = logging.getLogger(__name__)
 

@@ -25,12 +25,12 @@ for _name in ("stdout", "stderr"):
 import pystray  # noqa: E402 -- after the stream rebind above
 from PIL import Image  # noqa: E402
 
-from src import scan_runner, store  # noqa: E402
-from src.scan_lock import ScanBusy  # noqa: E402
 from app.tray.single_instance import SingleInstance  # noqa: E402
 from app.tray.watchdog import BreadcrumbLog, HealthWatchdog, retry_with_backoff  # noqa: E402
-from src.config import PROJECT_ROOT  # noqa: E402
 from app.webapp.manager import WebappManager  # noqa: E402
+from src import scan_runner, store  # noqa: E402
+from src.config import PROJECT_ROOT  # noqa: E402
+from src.scan_lock import ScanBusy  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

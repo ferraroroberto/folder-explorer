@@ -19,12 +19,12 @@ from typing import IO, Optional
 
 import requests
 
+from app.tray.single_instance import cross_process_lock
+from app.webapp.bind import resolve_bind
 from src import config, store
 from src.config import PROJECT_ROOT
 from src.no_window import NO_WINDOW
 from src.pooled_http import build_session, pooled_request
-from app.tray.single_instance import cross_process_lock
-from app.webapp.bind import resolve_bind
 
 logger = logging.getLogger(__name__)
 

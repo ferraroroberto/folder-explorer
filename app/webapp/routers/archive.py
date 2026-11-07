@@ -24,22 +24,20 @@ import sys
 import threading
 import time
 import uuid
-from contextlib import ExitStack
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from src import config, folder_search, macro_home, store
+from src import config, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
 from src.email import body as child
 from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_sheet import ERR_FAILED, ERR_TIMEOUT, error_document
-from src.email.settings import under_any
 from src.outlook.bridge import pywin32_installed
 from src.roots import resolve_roots
 from app.webapp.auth import is_pc_itself
-from app.webapp.state import POOL, locate_folder
+from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits, locate_folder
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +58,6 @@ PREPARED_TTL_S = 30 * 60.0
 PREPARED_MAX = 20
 # A hand-off no page picked up within this long is dropped; the macro opened its own window.
 HANDOFF_TTL_S = 60.0
-# Folders offered when the sheet's "Another email folder" box is searched.
-FOLDER_HITS = 8
 # ``off`` keeps this process from ever starting the Outlook bridge: the e2e suite's
 # disposable instance sets it, so no test can reach this PC's Outlook.
 OUTLOOK_ENV = "FOLDER_EXPLORER_OUTLOOK"
@@ -226,24 +222,7 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
 def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, Any]:
     """Folders inside the email folders whose path holds every word, for "Another email folder"."""
     _pc_only(request)
-    cfg = config.load()
-    email_roots = list((cfg.get("email") or {}).get("roots") or [])
-    roots = resolve_roots(cfg["roots"])
-    entries = []
-    scan_ids = {}
-    for root in roots:
-        scan = store.current_index(root.key)
-        if scan is not None:
-            entries.append((root, POOL.get(store.index_dir() / scan["index_file"])))
-            scan_ids[root.key] = scan["id"]
-    with ExitStack() as stack:
-        for _, (_, lock) in entries:
-            stack.enter_context(lock)
-        found = folder_search.search([(root, ix) for root, (ix, _) in entries], q, False, 0, limit=200)
-    hits = [{"path": r["path"], "name": r["name"],
-             "location": {"root": r["root"], "scan_id": scan_ids[r["root"]], "id": r["id"]}}
-            for r in found["results"] if under_any(r["path"], email_roots)]
-    return {"folders": hits[:FOLDER_HITS]}
+    return {"folders": email_folder_hits(config.load(), q, EMAIL_FOLDER_HITS)}
 
 
 @router.get("/archive/macro")

@@ -10,7 +10,6 @@ folder-explorer/
 │   ├── cli/folders.py          # `folders search --json`: folder search for another app, one JSON document
 │   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
 │   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
-│   ├── archive_window.py       # the macro's fallback Archive window (Tk) when no page is open on this PC
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
 │   │   ├── tray.py             # menu, adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
@@ -22,7 +21,7 @@ folder-explorer/
 │       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
-│       ├── state.py            # the open-index pool and its housekeeping
+│       ├── state.py            # the open-index pool, its housekeeping and the email-folder search
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off)
@@ -32,6 +31,8 @@ folder-explorer/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
+│   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
+│   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,

@@ -34,6 +34,9 @@ from itertools import islice
 from typing import Any
 
 from src.email.mailboxes import Mailbox
+from src.email.naming import clean_subject as _clean_subject
+from src.email.naming import normalize_message_id
+from src.email.preview import clean_preview
 from src.outlook import process, syncing
 from src.outlook.drafts import DraftSurface
 from src.outlook.mapi import (
@@ -57,9 +60,6 @@ from src.outlook.mapi import (
 )
 from src.outlook.process import DEFAULT_START_TIMEOUT_SECONDS
 from src.outlook.stores import resolve_store
-from src.email.naming import clean_subject as _clean_subject
-from src.email.naming import normalize_message_id
-from src.email.preview import clean_preview
 
 logger = logging.getLogger(__name__)
 

@@ -18,12 +18,9 @@ from pathlib import Path
 import pytest
 
 from src.email import renumber as renumber_module
-from tests.archive.index_support import init_db
-from tests.archive.index_support import EmailRecord, EmailRepository
 from src.email.archive_paths import REFUSED_OUTSIDE_ROOTS
-from src.email.renumber import renumber_folder
-from src.email.renumber import MsgFacts
-
+from src.email.renumber import MsgFacts, renumber_folder
+from tests.archive.index_support import EmailRecord, EmailRepository, init_db
 
 # -------------------------------------------------------------- fixtures ----
 

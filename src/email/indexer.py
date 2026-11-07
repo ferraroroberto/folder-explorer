@@ -25,8 +25,8 @@ from src.email.schema import open_writer
 from src.email.settings import EmailPart, email_part, is_under
 from src.email.stage import Reader, Stage
 from src.index import Index, open_index
-from src.roots import Root, resolve_roots
 from src.no_window import NO_WINDOW
+from src.roots import Root, resolve_roots
 from src.scan_lock import ScanBusy, ScanLock, is_locked
 from src.scanner import exclude_keys
 

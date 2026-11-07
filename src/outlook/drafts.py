@@ -19,9 +19,9 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from src.email.naming import normalize_message_id
 from src.outlook import process
 from src.outlook.mapi import (
-    AccountNotInOutlookError,
     DASL_IN_REPLY_TO_ID,
     DASL_INTERNET_MESSAGE_ID,
     DASL_X_ARCHIVE_REF,
@@ -34,6 +34,7 @@ from src.outlook.mapi import (
     OL_MAIL_ITEM,
     OL_SAVE,
     OL_TO,
+    AccountNotInOutlookError,
     OutlookUnavailableError,
     insert_body_html,
     mark_body_html,
@@ -43,7 +44,6 @@ from src.outlook.mapi import (
     safe_com,
 )
 from src.outlook.stores import find_account
-from src.email.naming import normalize_message_id
 
 logger = logging.getLogger(__name__)
 

@@ -4,28 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
+from src.email.batch import common as batch_common
 from src.email.batch import revert as revert_verb
 from src.email.batch import verbs as batch
-from src.email.batch import common as batch_common
-from tests.archive.index_support import open_index
-from tests.archive.index_support import EmailRecord, EmailRepository
 from src.outlook.mapi import (
     with_category,
     without_category,
 )
-from tests.archive.batch_support import (
+from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     FakeOutlookClient,
     _FakeAttachment,
     _index_archived_file,
     _mail,
-)
-from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     _no_retry_pauses,
     archive_root,
     cfg,
 )
-
+from tests.archive.index_support import EmailRecord, EmailRepository, open_index
 
 # ----------------------------------------------------------------- revert ---
 

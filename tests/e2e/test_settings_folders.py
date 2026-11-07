@@ -8,8 +8,8 @@ from typing import Iterator
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
-from tests.e2e.conftest import LIVE_PORT
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e.conftest import LIVE_PORT
 
 # The sheet scrolls, so its controls above or below the visible part sit outside
 # the viewport; the rows' and lists' own overflow is still linted.

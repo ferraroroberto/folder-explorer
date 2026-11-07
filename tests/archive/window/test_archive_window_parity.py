@@ -11,7 +11,13 @@ import pytest
 from src.archive_window import model
 from src.archive_window.model import ModelView, Option
 from src.email import archive_sheet
-from tests.archive.batch_support import FakeOutlookClient, _mail, _seed_index, archive_root, cfg  # noqa: F401
+from tests.archive.batch_support import (  # noqa: F401
+    FakeOutlookClient,
+    _mail,
+    _seed_index,
+    archive_root,
+    cfg,
+)
 
 ARCHIVE_JS = Path(__file__).resolve().parents[3] / "app" / "webapp" / "static" / "archive.js"
 # A quote inside a single-quoted JS string.

@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 from app.cli import email_batch as main_batch
-from src.email.batch import verbs as batch
 from src.email import mailboxes as config
 from src.email.archive_settings import get_mailbox_archive_folder
+from src.email.batch import verbs as batch
 from src.email.mailboxes import (
     Mailbox,
     MailboxRegistryError,

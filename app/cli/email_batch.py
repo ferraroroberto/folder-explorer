@@ -84,9 +84,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from app.cli import cut_names
 from src import config, store
 from src.email.batch import common as batch_common
-from app.cli import cut_names
 from src.email.batch import dismiss, draft, find, send, sync
 from src.email.batch import revert as revert_verb
 from src.email.batch import verbs as batch
@@ -97,6 +97,7 @@ from src.email.mailboxes import (
     MailboxUnknownError,
     load_mailbox_registry,
 )
+from src.email.naming import normalize_message_id
 from src.outlook import process
 from src.outlook.client import OutlookClient
 from src.outlook.drafts import DraftAccountError, DraftUpdateError, ReplySourceError
@@ -106,7 +107,6 @@ from src.outlook.mapi import (
     OutlookUnavailableError,
 )
 from src.outlook.process import DEFAULT_START_TIMEOUT_SECONDS
-from src.email.naming import normalize_message_id
 
 logger = logging.getLogger(__name__)
 

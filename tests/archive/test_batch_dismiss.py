@@ -9,10 +9,15 @@ from pathlib import Path
 
 import pytest
 
+from src.email.archive_settings import (
+    DEFAULT_ARCHIVED_CATEGORY,
+    DEFAULT_DISMISSED_CATEGORY,
+    index_path,
+)
 from src.email.batch import dismiss
-from src.email.archive_settings import DEFAULT_ARCHIVED_CATEGORY, DEFAULT_DISMISSED_CATEGORY, index_path
-from tests.archive.batch_support import FakeOutlookClient, _mail
 from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
+    FakeOutlookClient,
+    _mail,
     _no_retry_pauses,
     archive_root,
     cfg,

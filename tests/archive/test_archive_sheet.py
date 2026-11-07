@@ -7,9 +7,16 @@ from pathlib import Path
 import pytest
 
 from src.email import archive_sheet
-from src.email.repository import open_index
 from src.email.archive_sheet import ERR_ALREADY, ERR_NO_ROOT, ERR_OUTSIDE, SheetError
-from tests.archive.batch_support import FakeOutlookClient, _index_archived_file, _mail, _seed_index, archive_root, cfg  # noqa: F401
+from src.email.repository import open_index
+from tests.archive.batch_support import (  # noqa: F401
+    FakeOutlookClient,
+    _index_archived_file,
+    _mail,
+    _seed_index,
+    archive_root,
+    cfg,
+)
 
 
 def _client_with(subject: str, sender: str = "lead@example.invalid") -> tuple[FakeOutlookClient, object]:

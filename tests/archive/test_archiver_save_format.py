@@ -6,7 +6,6 @@ code page into the permanent copy; ``olMSGUnicode`` (9) keeps it.
 from __future__ import annotations
 
 from src.email.archive import EmailArchiver
-
 from tests.archive.fakes import _FakeMailItem
 
 OL_MSG_UNICODE = 9

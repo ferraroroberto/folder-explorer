@@ -22,9 +22,22 @@ from app.webapp.routers import archive as archive_routes
 from app.webapp.server import app
 from src import config
 from src.email import body as child
-from src.email.archive_sheet import ERR_GONE, ERR_NO_COM, ERR_NO_ROOT, ERR_OUTLOOK, ERR_TIMEOUT, MESSAGES
+from src.email.archive_sheet import (
+    ERR_GONE,
+    ERR_NO_COM,
+    ERR_NO_ROOT,
+    ERR_OUTLOOK,
+    ERR_TIMEOUT,
+    MESSAGES,
+)
 from src.outlook.mapi import OutlookUnavailableError
-from tests.archive.batch_support import FAKE_STORE_ID, FakeOutlookClient, _index_archived_file, _mail, _seed_index
+from tests.archive.batch_support import (
+    FAKE_STORE_ID,
+    FakeOutlookClient,
+    _index_archived_file,
+    _mail,
+    _seed_index,
+)
 from tests.conftest import write_config
 
 LOCAL = ("127.0.0.1", 50000)

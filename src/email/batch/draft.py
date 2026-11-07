@@ -41,15 +41,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.email.batch.common import header
 from src.email.archive_settings import get_outlook_self_address
+from src.email.batch.common import header
 from src.email.mailboxes import Mailbox
+from src.email.naming import normalize_message_id
 from src.outlook.drafts import (
     REPLY_BY_MESSAGE_ID,
     REPLY_BY_MSG_PATH,
     ReplyTarget,
 )
-from src.email.naming import normalize_message_id
 
 VERB = "draft"
 

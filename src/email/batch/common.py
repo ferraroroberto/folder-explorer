@@ -13,14 +13,14 @@ import os
 from datetime import datetime
 from typing import Any
 
-from src.email.mailboxes import Mailbox
+from src.email.archive_paths import archive_roots as _archive_roots
 from src.email.archive_settings import (
     get_mailbox_archive_folder,
     get_outlook_category,
 )
-from src.email.repository import EmailRepository
-from src.email.archive_paths import archive_roots as _archive_roots
+from src.email.mailboxes import Mailbox
 from src.email.renumber import renumber_folder
+from src.email.repository import EmailRepository
 
 logger = logging.getLogger(__name__)
 

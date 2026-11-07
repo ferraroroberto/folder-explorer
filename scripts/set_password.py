@@ -19,7 +19,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, env_path, read_env_file, write_secrets  # noqa: E402
+from src.secrets_env import (  # noqa: E402
+    PASSWORD_VAR,
+    TOKEN_VAR,
+    env_path,
+    read_env_file,
+    write_secrets,
+)
 
 logger = logging.getLogger("set_password")
 

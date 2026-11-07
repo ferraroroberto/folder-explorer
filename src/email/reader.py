@@ -117,7 +117,10 @@ def _read(path: str, take: Callable[[Any, int], dict[str, Any]], preview_chars: 
     """Open ``path`` and apply ``take``; one Windows-1252 retry on ``UnicodeDecodeError`` only."""
     try:
         import extract_msg
-        from extract_msg.exceptions import InvalidFileFormatError, UnrecognizedMSGTypeError
+        from extract_msg.exceptions import (
+            InvalidFileFormatError,
+            UnrecognizedMSGTypeError,
+        )
     except ImportError as exc:
         raise ReadError(ERR_NOT_SET_UP, "extract-msg isn't installed") from exc
     try:

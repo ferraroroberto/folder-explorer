@@ -19,12 +19,12 @@ from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
+from app.webapp.auth import is_pc_itself
+from app.webapp.state import POOL
 from src import config, desktop, store
 from src.folder_search import item_path
 from src.index import BASES, Index
 from src.roots import resolve_roots
-from app.webapp.auth import is_pc_itself
-from app.webapp.state import POOL
 
 router = APIRouter(prefix="/api")
 

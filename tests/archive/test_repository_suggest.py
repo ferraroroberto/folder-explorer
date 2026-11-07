@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from tests.archive.index_support import init_db
 from src.email.repository import FOLDER_POOL_CAP
-from tests.archive.index_support import EmailRecord, EmailRepository
+from tests.archive.index_support import EmailRecord, EmailRepository, init_db
 
 _FOLDERS = FOLDER_POOL_CAP + 5
 

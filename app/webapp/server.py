@@ -8,6 +8,7 @@ never moves or deletes a file. The one file it reads is a mail's ``.msg`` for
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import mimetypes
 import os
@@ -15,7 +16,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
@@ -39,6 +40,19 @@ _LONG_CACHE = "public, max-age=31536000, immutable"
 _DAY_CACHE = "public, max-age=86400"
 _SHELL_CACHE = "no-cache, must-revalidate"
 _DAILY_SUFFIXES = frozenset({".webmanifest", ".png", ".ico", ".svg"})
+
+
+def _shell_etag(html: str) -> str:
+    """A weak validator: the gzip layer re-encodes the body, so the sent bytes differ from the hashed text."""
+    return 'W/"' + hashlib.sha256(html.encode("utf-8")).hexdigest()[:32] + '"'
+
+
+def _etag_matches(if_none_match: str, etag: str) -> bool:
+    """Weak comparison over an ``If-None-Match`` list, as RFC 9110 prescribes for GET."""
+    if if_none_match.strip() == "*":
+        return True
+    bare = etag.removeprefix("W/")
+    return any(tag.strip().removeprefix("W/") == bare for tag in if_none_match.split(","))
 
 
 class CachingStaticFiles(StaticFiles):
@@ -90,9 +104,13 @@ def create_app() -> FastAPI:
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
 
     @app.get("/", include_in_schema=False)
-    def index() -> HTMLResponse:
+    def index(request: Request) -> Response:
         html = BUILD_INFO.stamp_html((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
-        return HTMLResponse(html, headers={"Cache-Control": _SHELL_CACHE})
+        headers = {"Cache-Control": _SHELL_CACHE, "ETag": _shell_etag(html)}
+        # The shell revalidates on every launch; an unchanged build answers with no body.
+        if _etag_matches(request.headers.get("if-none-match", ""), headers["ETag"]):
+            return Response(status_code=304, headers=headers)
+        return HTMLResponse(html, headers=headers)
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> FileResponse:

@@ -98,6 +98,19 @@ def test_shell_and_assets_carry_cache_rules(isolated: Path) -> None:
         assert c.get("/favicon.ico").status_code == 200
 
 
+def test_shell_answers_a_repeat_with_304(isolated: Path) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        first = c.get("/")
+        etag = first.headers["etag"]
+        repeat = c.get("/", headers={"If-None-Match": etag})
+        assert repeat.status_code == 304 and repeat.content == b""
+        assert repeat.headers["etag"] == etag
+        assert repeat.headers["cache-control"] == "no-cache, must-revalidate"
+        assert c.get("/", headers={"If-None-Match": f'"other", {etag}'}).status_code == 304
+        stale = c.get("/", headers={"If-None-Match": 'W/"stale"'})
+        assert stale.status_code == 200 and "/static/main.js?v=" in stale.text
+
+
 def test_bind_follows_the_remote_access_setting(tmp_path: Path) -> None:
     cfg = {"port": 8453, "remote_access": False}
     assert resolve_bind(cfg, tmp_path).state == STATE_OFF

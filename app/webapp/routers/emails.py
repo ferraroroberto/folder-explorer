@@ -54,7 +54,7 @@ def status() -> dict[str, Any]:
     failed, _ = _failures(part, 0)
     return {
         "ready": part.ready, "problem": part.problem, "own": part.own, "stage_problem": part.stage_problem,
-        "roots": part.roots, "folders": cfg["email"]["roots"], "running": indexer.is_running(),
+        "budget_mb": cfg["email"]["download_budget_mb"], "roots": part.roots, "folders": cfg["email"]["roots"], "running": indexer.is_running(),
         "indexed": indexed, "failed": failed, "runs": store.email_runs(10),
     }
 

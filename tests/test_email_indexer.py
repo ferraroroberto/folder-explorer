@@ -137,3 +137,31 @@ def test_the_api_starts_runs_and_reports_them(setup: Path, monkeypatch: pytest.M
             held.release()
         status = c.get("/api/search/status").json()
         assert status["emails"]["ready"] and status["emails"]["count"] == 2
+
+
+def test_a_running_row_carries_live_progress_through_the_api(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scan_runner.run_scans()
+    monkeypatch.setattr("src.email.stage.PROGRESS_EVERY_S", 0.0)
+    live: list[dict[str, Any]] = []
+    with TestClient(app, client=LOCAL) as c:
+        inner = FakeReader()
+
+        def read(path: str, preview: int) -> dict[str, Any]:
+            if len(inner.reads) == 1:
+                live.append(c.get("/api/email/status").json())
+            return inner(path, preview)
+
+        result = indexer.run(read=read)
+        done = c.get("/api/email/status").json()
+    assert result["counts"]["to_index"] == 3
+    during = live[0]["runs"][0]
+    assert during["status"] == "running" and during["counts"]["to_index"] == 3 and during["counts"]["done"] == 1
+    assert done["runs"][0]["status"] == "ok" and done["runs"][0]["counts"]["done"] == 3
+    # A saved cap is reported as the card needs it; the fixture saved 1 MB.
+    assert during and done["budget_mb"] == 1
+
+
+def test_a_config_without_a_budget_has_no_limit_in_the_status(isolated: Path, setup: Path) -> None:
+    write_config(isolated, roots=[str(setup)], email={"roots": [str(setup / "Mail")]})
+    with TestClient(app, client=LOCAL) as c:
+        assert c.get("/api/email/status").json()["budget_mb"] is None

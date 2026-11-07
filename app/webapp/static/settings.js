@@ -56,13 +56,17 @@ function render(body) {
   setBasis(readPref('basis', 'size'));
 }
 
+// The menu value for a budget: '' is no limit (null in config.json), else the MB as text.
+const budgetValue = (mb) => (mb === null ? '' : String(mb));
+
 function renderBudget(mb) {
   const sel = $('emailBudget');
   // A budget set in config.json to a value the menu doesn't offer still shows as itself.
-  if (![...sel.options].some((o) => o.value === String(mb))) sel.add(new Option(mb + ' MB', String(mb)));
-  sel.value = String(mb);
-  $('emailBudgetNote').textContent = mb ? 'Each email run downloads up to this much online-only mail; the rest waits for the next run.'
-    : 'Online-only mail is left in the cloud.';
+  if (![...sel.options].some((o) => o.value === budgetValue(mb))) sel.add(new Option(mb + ' MB', String(mb)));
+  sel.value = budgetValue(mb);
+  $('emailBudgetNote').textContent = mb === null ? 'One run downloads all the online-only mail it needs to index.'
+    : mb ? 'Each email run downloads up to this much online-only mail; the rest waits for the next run. Choose No limit to index everything in one run.'
+    : 'Online-only mail is left in the cloud. Choose No limit to index everything in one run.';
 }
 
 /** Save one setting from a folder list: null when saved, else the server's sentence. */
@@ -130,7 +134,7 @@ export function initSettings(opts) {
     name: 'email-exclude', label: 'Add a folder to leave out of the email index', empty: 'Nothing is left out.',
     onSave: (exclude) => saveList(withEmail({ exclude }), 'Saved: the next email run leaves them out'),
   });
-  $('emailBudget').addEventListener('change', (e) => save(withEmail({ download_budget_mb: Number(e.target.value) })));
+  $('emailBudget').addEventListener('change', (e) => save(withEmail({ download_budget_mb: e.target.value === '' ? null : Number(e.target.value) })));
   $('scheduleSelect').addEventListener('change', (e) => save({ schedule: e.target.value }));
   $('scheduleTime').addEventListener('change', (e) => { if (e.target.value) save({ schedule_time: e.target.value }); });
   $('defaultBasisSeg').addEventListener('click', (e) => {

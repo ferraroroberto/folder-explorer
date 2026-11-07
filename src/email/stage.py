@@ -8,9 +8,14 @@ For each ``.msg`` the manifest lists, by path:
   and size were read): read it once more, the one forced re-read;
 - new or changed and on this PC: read it;
 - new or changed and online-only: read it (which downloads it) while this
-  run's download budget lasts, else count it "waiting for budget";
+  run's download budget lasts (no budget: always), else count it "waiting for
+  budget";
 - it failed before with the same size and modified time: skip it, so one bad
   file never downloads every night.
+
+The run first decides every file's verdict (no file is opened), so it knows
+how many files need a read (``to_index``) before the first read and can report
+``done`` against it while it works.
 
 Before any of that, a stored preview that still carries Outlook's link or image
 markup is cleaned from its own text, without opening a file.
@@ -25,6 +30,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -39,10 +45,14 @@ logger = logging.getLogger(__name__)
 PREVIEW_CHARS = 500
 # Rows written per commit, so a long run shows progress and a crash loses little.
 COMMIT_EVERY = 200
+# The fewest seconds between two progress reports, so a fast run is not one write per file.
+PROGRESS_EVERY_S = 1.0
 # Listing mtimes are whole seconds, the older scanner stored stat()'s float.
 _MTIME_SLACK_S = 1.0
 
 Reader = Callable[[str, int], dict[str, Any]]
+# Told the run's counts so far while the stage works (see ``Stage.on_progress``).
+Progress = Callable[[dict[str, int]], None]
 
 _FIELDS = ("subject", "sender", "recipients", "to_addrs", "cc_addrs", "date_sent", "body_preview", "flag_status",
            "message_id", "attachment_names", "has_attachments")
@@ -53,6 +63,10 @@ class Counts:
     """One run's outcome, each figure on its own so the Scans tab can show them apart."""
 
     files: int = 0
+    # Files that need a read (new, changed, re-read) and how many of those are settled
+    # (read, failed or waiting for the budget): the progress bar is done / to_index.
+    to_index: int = 0
+    done: int = 0
     new: int = 0
     changed: int = 0
     reread: int = 0
@@ -77,12 +91,17 @@ def _same(stored: float, listed: int) -> bool:
 class Stage:
     """One run over an open writer connection."""
 
-    def __init__(self, conn: sqlite3.Connection, budget_bytes: int, read: Reader = read_facts) -> None:
+    def __init__(self, conn: sqlite3.Connection, budget_bytes: Optional[int], read: Reader = read_facts,
+                 on_progress: Optional[Progress] = None) -> None:
         self.conn = conn
+        # None: no limit on what one run downloads.
         self.budget = budget_bytes
         self.read = read
+        # Called with the counts so far at most every PROGRESS_EVERY_S, and at the start and end of the reads.
+        self.on_progress = on_progress
         self.counts = Counts()
         self._pending = 0
+        self._last_report = 0.0
 
     def _known(self) -> dict[str, tuple[float, Optional[int], bool]]:
         return {r["file_path"]: (float(r["file_mtime"]), r["size"], r["to_addrs"] is not None)
@@ -133,7 +152,7 @@ class Stage:
             self._pending = 0
 
     def _one(self, f: MsgFile, why: str) -> None:
-        if f.online and self.counts.downloaded_bytes + f.size > self.budget:
+        if f.online and self.budget is not None and self.counts.downloaded_bytes + f.size > self.budget:
             self.counts.waiting += 1
             self.counts.waiting_bytes += f.size
             return
@@ -168,10 +187,18 @@ class Stage:
         if self.counts.cleaned:
             logger.info("ℹ️ email stage: cleaned the stored preview of %d mail(s), no file opened", self.counts.cleaned)
 
+    def _report(self, force: bool = False) -> None:
+        now = time.monotonic()
+        if self.on_progress is None or not (force or now - self._last_report >= PROGRESS_EVERY_S):
+            return
+        self._last_report = now
+        self.on_progress(self.counts.as_dict())
+
     def run(self, manifests: list[Manifest]) -> Counts:
         self._tidy_stored()
         known, failures = self._known(), self._failures()
         listed: set[str] = set()
+        todo: list[tuple[MsgFile, str]] = []
         for m in manifests:
             for f in m.files:
                 self.counts.files += 1
@@ -180,7 +207,14 @@ class Stage:
                 if why is None:
                     self.counts.unchanged += f.path in known
                     continue
-                self._one(f, why)
+                todo.append((f, why))
+        self.counts.to_index = len(todo)
+        self._report(force=True)
+        for f, why in todo:
+            self._one(f, why)
+            self.counts.done += 1
+            self._report()
+        self._report(force=True)
         for m in manifests:
             if m.complete:
                 self._purge(m.folder, known, listed)

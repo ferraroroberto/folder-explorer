@@ -162,3 +162,38 @@ def test_only_a_unicode_error_gets_the_windows_1252_retry(monkeypatch: pytest.Mo
     with pytest.raises(ReadError) as err:
         reader.read_facts("invented.msg", 500)
     assert err.value.code == ERR_PARSE and _FakeMsg.opened == [None]
+
+
+def test_no_budget_downloads_every_online_file_in_one_run(conn: sqlite3.Connection) -> None:
+    files = [msg("a.msg", size=900 * MB, online=True), msg("b.msg", size=900 * MB, online=True)]
+    counts = Stage(conn, None, FakeReader()).run([Manifest(FOLDER, files, True)]).as_dict()
+    assert counts["downloaded"] == 2 and counts["waiting"] == 0
+    capped = Stage(conn, 0, FakeReader()).run([Manifest(FOLDER, [msg("c.msg", size=MB, online=True)], True)]).as_dict()
+    assert capped["downloaded"] == 0 and capped["waiting"] == 1
+
+
+def test_progress_reports_the_total_before_the_first_read_then_done(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None:
+    run(conn, [msg("old.msg")], FakeReader())
+    files = [msg("old.msg"), msg("a.msg"), msg("b.msg", online=True, size=2 * MB), msg("bad.msg")]
+    seen: list[dict[str, int]] = []
+    inner = FakeReader(fail=("bad.msg",))
+
+    def read(path: str, preview: int) -> dict[str, Any]:
+        # The total is known and nothing is done when the first read starts.
+        if not inner.reads:
+            assert seen[0]["to_index"] == 3 and seen[0]["done"] == 0
+        return inner(path, preview)
+
+    monkeypatch.setattr("src.email.stage.PROGRESS_EVERY_S", 0.0)
+    counts = Stage(conn, None, read, seen.append).run([Manifest(FOLDER, files, True)]).as_dict()
+    assert counts["to_index"] == 3 and counts["done"] == 3 and counts["unchanged"] == 1 and counts["files"] == 4
+    assert [s["done"] for s in seen] == sorted(s["done"] for s in seen) and seen[-1] == counts
+    assert any(s["downloaded"] == 1 and s["downloaded_bytes"] == 2 * MB for s in seen) and seen[-1]["failed"] == 1
+
+
+def test_progress_is_throttled_to_one_report_per_interval(conn: sqlite3.Connection) -> None:
+    seen: list[dict[str, int]] = []
+    files = [msg("f%d.msg" % n) for n in range(30)]
+    Stage(conn, None, FakeReader(), seen.append).run([Manifest(FOLDER, files, True)])
+    # The start, and the end: a fast run is not one write per file.
+    assert len(seen) == 2 and seen[0]["done"] == 0 and seen[1]["done"] == 30

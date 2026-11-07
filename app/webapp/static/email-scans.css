@@ -13,6 +13,8 @@ button.stat { font: inherit; line-height: normal; text-align: left; color: var(-
 .run-row .mark { width: 6px; height: 6px; border-radius: 50%; margin: 7px 3px 0; background: var(--muted); }
 .run-row .mark.is-live { background: var(--accent); }
 .run-row .mark.is-warn { background: var(--attention); }
+.run-row .share-bar { margin: 6px 0 4px; }
+.run-counts { display: block; font-variant-numeric: tabular-nums; }
 .run-row strong { display: block; font-size: var(--font-body); color: var(--ink); }
 .fail-row { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line-muted); }
 .rows > li:first-child.fail-row { border-top: 0; }

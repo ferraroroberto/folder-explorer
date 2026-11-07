@@ -249,6 +249,13 @@ def begin_email_run(trigger: str, scope: str) -> int:
         return int(cur.lastrowid or 0)
 
 
+def update_email_run_counts(run_id: int, counts: dict[str, int]) -> None:
+    """Store a running email run's counts so far; only a run still ``running`` is touched."""
+    with connect() as conn:
+        conn.execute("UPDATE email_runs SET counts = ? WHERE id = ? AND status = ?",
+                     (json.dumps(counts), run_id, STATUS_RUNNING))
+
+
 def finish_email_run(run_id: int, status: str, counts: dict[str, int], message: str = "") -> None:
     with connect() as conn:
         conn.execute("UPDATE email_runs SET status = ?, finished_at = ?, counts = ?, message = ? WHERE id = ?",

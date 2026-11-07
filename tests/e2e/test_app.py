@@ -121,4 +121,7 @@ def test_settings_show_remote_access_and_the_schedule(page: Page, app_url: str) 
     expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#remoteNote")).to_contain_text("this PC only")
     expect(sheet.locator("#scheduleSelect")).to_have_value("off")
+    # A config that never set a download budget has no limit, and the menu offers that first.
+    expect(sheet.locator("#emailBudget")).to_have_value("")
+    expect(sheet.locator("#emailBudget option").first).to_have_text("No limit (recommended)")
     assert_layout_clean(page, allow=BELOW_FOLD)

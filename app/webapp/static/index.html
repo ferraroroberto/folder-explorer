@@ -701,6 +701,7 @@
       <div class="row-line folder-budget">
         <span>OneDrive downloads per run</span>
         <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
+          <option value="">No limit (recommended)</option>
           <option value="0">None (local only)</option>
           <option value="512">512 MB</option>
           <option value="2048">2 GB</option>
@@ -751,7 +752,7 @@
     </div>
     <div class="prose">
       <p>Only <code class="code-chip">.msg</code> files inside the email folders, and only the ones that are new or changed since the last run. An unchanged file is never touched.</p>
-      <p>Reading an online-only file downloads it from OneDrive. Each run stops downloading at its budget and picks up the rest next run. Downloaded files stay on disk until OneDrive frees them.</p>
+      <p>Reading an online-only file downloads it from OneDrive. By default one run downloads everything it needs. With a download limit set in Settings, a run stops at it and picks up the rest next run. Downloaded files stay on disk until OneDrive frees them.</p>
       <p>Files are opened read-only. Nothing changes a file, its attributes or its pin state. A file that fails isn't read again until it changes.</p>
       <p>The disk scan and the email index each have their own lock, so indexing one folder takes seconds even while a disk scan runs.</p>
     </div>

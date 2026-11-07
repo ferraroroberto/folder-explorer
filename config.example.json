@@ -10,7 +10,7 @@
     "index_path": null,
     "roots": [],
     "exclude": [],
-    "download_budget_mb": 2048
+    "download_budget_mb": null
   },
   "folder_search": {
     "skip_levels": 0,

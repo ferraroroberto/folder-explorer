@@ -43,10 +43,11 @@ DEFAULTS: dict[str, Any] = {
     # the email stage indexes their .msg files and "Show all" reads one.
     # index_path null means this app's own index in the runtime-data folder;
     # a path names another app's index, read-only, and the stage stays off.
-    # download_budget_mb caps what one run downloads from OneDrive (0: never).
+    # download_budget_mb caps what one run downloads from OneDrive: null is no limit (one run
+    # downloads everything it needs), a whole number is a cap in MB, 0 never downloads.
     # exclude names folders inside the email folders that only the email
     # index leaves out; the global exclude above still applies to it too.
-    "email": {"index_path": None, "roots": [], "exclude": [], "download_budget_mb": 2048},
+    "email": {"index_path": None, "roots": [], "exclude": [], "download_budget_mb": None},
     # Folder search: how many leading path components a result hides (display
     # only) and whether a folder of per-person subfolders shows as one result.
     "folder_search": {"skip_levels": 0, "prune_people": True},
@@ -143,6 +144,11 @@ def _clean_paths(raw: Any) -> list[str]:
     return [r.strip() for r in raw if isinstance(r, str) and r.strip()] if isinstance(raw, list) else []
 
 
+def _budget_ok(value: Any) -> bool:
+    """None (no limit) or a whole number of MB from 0 to ``MAX_BUDGET_MB``."""
+    return value is None or (isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= MAX_BUDGET_MB)
+
+
 def _clean_email(raw: Any) -> dict[str, Any]:
     out: dict[str, Any] = dict(DEFAULTS["email"])
     if not isinstance(raw, dict):
@@ -153,7 +159,7 @@ def _clean_email(raw: Any) -> dict[str, Any]:
     out["roots"] = _clean_paths(raw.get("roots"))
     out["exclude"] = _clean_paths(raw.get("exclude"))
     budget = raw.get("download_budget_mb")
-    if isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB:
+    if _budget_ok(budget):
         out["download_budget_mb"] = budget
     return out
 
@@ -234,8 +240,8 @@ def _validate_email(value: Any) -> dict[str, Any]:
     if not (isinstance(excluded, list) and all(isinstance(r, str) for r in excluded)):
         raise ValueError("email.exclude must be a list of folder paths")
     budget = value.get("download_budget_mb", DEFAULTS["email"]["download_budget_mb"])
-    if not (isinstance(budget, int) and not isinstance(budget, bool) and 0 <= budget <= MAX_BUDGET_MB):
-        raise ValueError("email.download_budget_mb must be a whole number of MB, 0 or more")
+    if not _budget_ok(budget):
+        raise ValueError("email.download_budget_mb must be null (no limit) or a whole number of MB, 0 or more")
     return _clean_email(value)
 
 

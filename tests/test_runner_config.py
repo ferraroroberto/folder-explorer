@@ -136,3 +136,17 @@ def test_server_defaults_to_hypercorn_and_ignores_unknown_values(isolated: Path)
     assert config.load()["server"] == "hypercorn"
     with pytest.raises(ValueError):
         config.validate_update({"server": "uvicorn"})
+
+
+def test_the_download_budget_defaults_to_no_limit_and_keeps_a_saved_number(isolated: Path) -> None:
+    assert config.load()["email"]["download_budget_mb"] is None
+    write_config(isolated, email={"roots": []})
+    assert config.load()["email"]["download_budget_mb"] is None
+    for saved in (0, 512, 2048):
+        write_config(isolated, email={"roots": [], "download_budget_mb": saved})
+        assert config.load()["email"]["download_budget_mb"] == saved
+    assert config.validate_update({"email": {"download_budget_mb": None}})["email"]["download_budget_mb"] is None
+    assert config.validate_update({"email": {"download_budget_mb": 0}})["email"]["download_budget_mb"] == 0
+    for bad in (-1, True, "unlimited", 1.5, config.MAX_BUDGET_MB + 1):
+        with pytest.raises(ValueError):
+            config.validate_update({"email": {"download_budget_mb": bad}})

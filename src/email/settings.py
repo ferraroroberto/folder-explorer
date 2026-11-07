@@ -35,7 +35,8 @@ class EmailPart:
     reader_problem: Optional[str] = None
     # True when the index is this app's own, which the email stage writes.
     own: bool = True
-    budget_bytes: int = 0
+    # Bytes one run may download from OneDrive; None is no limit, 0 never downloads.
+    budget_bytes: Optional[int] = None
     # Why the email stage cannot run, or None when it can.
     stage_problem: Optional[str] = None
 
@@ -77,5 +78,6 @@ def email_part(cfg: dict[str, Any], scan_roots: list[Root]) -> EmailPart:
     else:
         problem = "the email index was not found: " + path.name
     stage = ("email.index_path names another app's index, which this app never writes" if not own else reader)
+    budget_mb = email.get("download_budget_mb")
     return EmailPart(path, roots if not outside else [], problem, reader, own,
-                     int(email.get("download_budget_mb") or 0) * MB, stage)
+                     None if budget_mb is None else int(budget_mb) * MB, stage)

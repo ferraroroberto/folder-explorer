@@ -119,7 +119,8 @@ def test_cli_exit_codes(setup: Path, isolated: Path, capsys: pytest.CaptureFixtu
 
 def test_the_api_starts_runs_and_reports_them(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     started: list[Any] = []
-    monkeypatch.setattr(email_routes.indexer, "spawn", lambda trigger, scope=None: started.append(scope))
+    monkeypatch.setattr(email_routes.indexer, "spawn",
+                        lambda trigger, scope=None, fresh=False: started.append((scope, fresh)))
     indexer.run(read=FakeReader(fail=("002 - Budget.msg",)))
     with TestClient(app, client=LOCAL) as c:
         body = c.get("/api/email/status").json()
@@ -128,7 +129,8 @@ def test_the_api_starts_runs_and_reports_them(setup: Path, monkeypatch: pytest.M
         assert c.post("/api/email/index", json={}).status_code == 202
         assert c.post("/api/email/index", json={"root": str(setup / "Mail" / "Clients")}).status_code == 202
         assert c.post("/api/email/index", json={"root": str(setup / "Photos")}).status_code == 400
-        assert started == [None, str(setup / "Mail" / "Clients")]
+        # "Index emails now" lists the folders afresh, so a mail filed since the last scan is read too.
+        assert started == [(None, True), (str(setup / "Mail" / "Clients"), False)]
         held = indexer.lock()
         held.acquire()
         try:
@@ -165,3 +167,11 @@ def test_a_config_without_a_budget_has_no_limit_in_the_status(isolated: Path, se
     write_config(isolated, roots=[str(setup)], email={"roots": [str(setup / "Mail")]})
     with TestClient(app, client=LOCAL) as c:
         assert c.get("/api/email/status").json()["budget_mb"] is None
+
+
+def test_spawn_passes_fresh_to_the_child(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[list[str]] = []
+    monkeypatch.setattr(indexer.subprocess, "Popen", lambda cmd, **kw: seen.append(cmd))
+    indexer.spawn("app", fresh=True)
+    indexer.spawn("app", "X")
+    assert seen[0][-1] == "--fresh" and "--fresh" not in seen[1]

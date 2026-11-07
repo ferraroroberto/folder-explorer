@@ -124,14 +124,17 @@ def is_running() -> bool:
     return is_locked(store.data_dir() / "email.lock")
 
 
-def spawn(trigger: str, scope: Optional[str] = None) -> "subprocess.Popen[bytes]":
+def spawn(trigger: str, scope: Optional[str] = None, fresh: bool = False) -> "subprocess.Popen[bytes]":
     """Start ``python -m app.cli email index`` in its own windowless process, logging to ``email.log``.
 
     The web server never reads a mail itself: a download can stall for minutes.
+    ``fresh`` lists every email folder now rather than reading the last scan's index.
     """
     cmd = [sys.executable, "-m", "app.cli", "email", "index", "--trigger", trigger]
     if scope:
         cmd += ["--root", scope]
+    if fresh:
+        cmd.append("--fresh")
     env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
     # runtime-write-exempt: email.log sits in the runtime-data folder
     log = open(store.data_dir() / "email.log", "ab")

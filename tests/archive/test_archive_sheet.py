@@ -132,3 +132,31 @@ def test_an_unknown_date_prefix_choice_writes_nothing(cfg: dict, archive_root: P
     with pytest.raises(ValueError):
         archive_sheet.file_mail(client, cfg, item, str(archive_root), None, date_prefix="sometimes")
     assert item.saved_as == []
+
+
+def test_reopening_a_filed_mail_offers_its_folder_as_the_same_email(cfg: dict, archive_root: Path) -> None:
+    """File, index the copy as the email stage would, reopen: already archived, and its folder leads at 100%."""
+    _seed_index(cfg, archive_root, {"Elsewhere": ["Quarterly figures draft"]})
+    client, item = _client_with("Quarterly figures")
+    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root / "Finance"), None)
+    _index_archived_file(cfg, filed, message_id="kick@example.invalid", subject="Quarterly figures")
+
+    doc = archive_sheet.suggest(client, cfg, item)
+
+    first = doc["suggestions"][0]
+    assert doc["already_archived"] == filed["files"][0]
+    assert Path(first["folder_path"]) == Path(filed["folder_path"]) and first["score"] == 1.0
+    assert [c["label"] for c in first["why"]][:2] == ["Same email", "Same subject"]
+    assert first["note"] == "This email is already filed here" and first["example"] == "Quarterly figures"
+
+
+def test_another_mail_with_the_same_subject_is_only_the_same_subject(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Quarterly figures")
+    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root / "Finance"), None)
+    _index_archived_file(cfg, filed, message_id="other@example.invalid", subject="Quarterly figures")
+
+    doc = archive_sheet.suggest(client, cfg, item)
+
+    first = doc["suggestions"][0]
+    assert doc["already_archived"] is None and first["score"] < 1.0
+    assert [c["label"] for c in first["why"]][0] == "Same subject" and first["note"] == "This conversation is filed here"

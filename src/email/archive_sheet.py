@@ -95,13 +95,17 @@ def _why(repo: EmailRepository, s: RankedSuggestion, sender: str) -> tuple[list[
     """
     from_sender = repo.count_from_sender(s.folder_path, sender)
     chips = []
+    if s.same_email:
+        chips.append({"label": "Same email", "tone": "accent"})
     if s.exact_subject:
         chips.append({"label": "Same subject", "tone": "accent"})
     if from_sender:
         chips.append({"label": "Sender", "tone": ""})
     if not chips:
         chips.append({"label": "Topic", "tone": ""})
-    if s.exact_subject:
+    if s.same_email:
+        note = "This email is already filed here"
+    elif s.exact_subject:
         note = "This conversation is filed here"
     elif from_sender:
         note = _plural(from_sender, "email") + " from " + sender
@@ -114,8 +118,8 @@ def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dic
     """The sheet's opening document for one live mail: the mail, where it is already filed, and the folders to offer."""
     roots = mounted_roots(cfg)
     mail = client.read_mail(item, PREVIEW_CHARS)
-    ranked = SuggestionEngine(cfg).suggest(EmailData(subject=mail.subject, sender=mail.sender,
-                                                     recipients=mail.recipients, date_sent=mail.date_sent))
+    ranked = SuggestionEngine(cfg).suggest(EmailData(subject=mail.subject, sender=mail.sender, recipients=mail.recipients,
+                                                     date_sent=mail.date_sent, message_id=mail.message_id))
     conn = open_index(cfg)
     try:
         repo = EmailRepository(conn)

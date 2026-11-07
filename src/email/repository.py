@@ -128,12 +128,21 @@ class EmailRepository:
         return [EmailRecord(file_path=r["file_path"], folder_path=r["folder_path"], filename=r["filename"],
                             date_sent=r["date_sent"] or "", message_id=r["message_id"] or "") for r in rows]
 
-    def folders_with_subject(self, subject: str) -> set[str]:
-        """The folders holding a mail whose stored (cleaned) subject is exactly ``subject``, case-blind."""
+    def exact_subject_counts(self, subject: str) -> dict[str, int]:
+        """Per folder, how many mails have a stored (cleaned) subject of exactly ``subject``, case-blind."""
         if not subject:
+            return {}
+        rows = self._conn.execute(
+            "SELECT folder_path, COUNT(*) AS n FROM emails WHERE subject = ? COLLATE NOCASE GROUP BY folder_path",
+            (subject,)).fetchall()
+        return {r["folder_path"]: int(r["n"]) for r in rows}
+
+    def folders_with_message_id(self, message_id: str) -> set[str]:
+        """The folders holding a copy of the mail with this normalised Message-ID; "" never matches."""
+        if not message_id:
             return set()
         rows = self._conn.execute(
-            "SELECT DISTINCT folder_path FROM emails WHERE subject = ? COLLATE NOCASE", (subject,)).fetchall()
+            "SELECT DISTINCT folder_path FROM emails WHERE message_id = ?", (message_id,)).fetchall()
         return {r["folder_path"] for r in rows}
 
     def suggest_folders(self, subject: str, sender: str, recipients: str, max_results: int = 3,

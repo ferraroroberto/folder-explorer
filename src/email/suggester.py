@@ -7,10 +7,18 @@ Each candidate folder gets one blended score:
   + 0.30 x thread continuity (the subject against the folder's newest subjects)
   + 0.25 x the subject against the folder's own name (helps a new, near-empty folder)
 
-Then exact-subject priority: a folder already holding a mail with this very
-(cleaned) subject ranks ahead of every folder that does not, because the same
-thread is the strongest signal there is. The behaviour tests on invented
-folders (``tests/test_email_suggester.py``) hold the weights to that order.
+These are email-archiver's weights. Then two priorities, strongest first:
+
+- same email: a folder already holding a copy with this mail's Message-ID
+  scores 1.0 and leads, since it is this very mail;
+- exact subject: a folder holding a mail with this very (cleaned) subject is
+  a full thread match (thread share 1.0, whatever its newest subjects are),
+  keeps its exact-match count and the subject as its first sample, and ranks
+  ahead of every folder that does not.
+
+Both are looked up apart from FTS, so a folder its pool truncates still
+competes. The behaviour tests on invented folders
+(``tests/archive/test_suggester_ranking.py``) hold the weights to that order.
 An empty index gives no suggestions, never a guess.
 """
 
@@ -23,7 +31,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src.email.archive_settings import get_suggestion_limits
-from src.email.naming import clean_subject
+from src.email.naming import clean_subject, normalize_message_id
 from src.email.repository import EmailRepository, FolderSuggestion, open_index
 
 logger = logging.getLogger(__name__)
@@ -41,6 +49,7 @@ class EmailData:
     sender: str = ""
     recipients: str = ""
     date_sent: Optional[datetime] = None
+    message_id: str = ""
 
 
 @dataclass
@@ -51,6 +60,7 @@ class RankedSuggestion:
     match_count: int         # matching mails in this folder
     sample_subjects: list[str]
     exact_subject: bool = False
+    same_email: bool = False     # a copy with this mail's Message-ID is filed here
 
 
 def folder_display_name(path: str) -> str:
@@ -84,24 +94,25 @@ class SuggestionEngine:
         self._max = top if max_suggestions is None else max_suggestions
 
     def suggest(self, email: EmailData) -> list[RankedSuggestion]:
-        """Up to ``max_suggestions`` folders, exact-subject folders first, then by blended score."""
+        """Up to ``max_suggestions`` folders: same-email first, then exact-subject, then by blended score."""
         subject = clean_subject(email.subject)
         conn = open_index(self._cfg)
         repo = EmailRepository(conn)
         try:
             # Extra candidates for re-ranking; min_score applies after blending.
             raw = repo.suggest_folders(subject, email.sender, email.recipients, self._max * 3, 0.0)
-            exact = repo.folders_with_subject(subject)
-            missing = exact - {s.folder_path for s in raw}
+            exact = repo.exact_subject_counts(subject)
+            same = repo.folders_with_message_id(normalize_message_id(email.message_id))
+            missing = (set(exact) | same) - {s.folder_path for s in raw}
             raw += [FolderSuggestion(f, 0.0, 0, repo.sample_subjects(f)) for f in sorted(missing)]
         finally:
             conn.close()
         if not raw:
             logger.info("ℹ️ no folder matches for subject %r", subject)
             return []
-        ranked = [self._blend(subject, s, s.folder_path in exact) for s in raw]
-        ranked = [r for r in ranked if r.exact_subject or r.score >= self._min_score]
-        ranked.sort(key=lambda r: (r.exact_subject, r.score), reverse=True)
+        ranked = [self._blend(subject, s, exact.get(s.folder_path, 0), s.folder_path in same) for s in raw]
+        ranked = [r for r in ranked if r.same_email or r.exact_subject or r.score >= self._min_score]
+        ranked.sort(key=lambda r: (r.same_email, r.exact_subject, r.score), reverse=True)
         unique: dict[str, RankedSuggestion] = {}
         for r in ranked:
             unique.setdefault(r.folder_path, r)
@@ -110,8 +121,14 @@ class SuggestionEngine:
         return top
 
     @staticmethod
-    def _blend(subject: str, s: FolderSuggestion, exact: bool) -> RankedSuggestion:
-        score = (W_FTS * s.score + W_THREAD * _thread_score(subject, s.sample_subjects)
-                 + W_NAME * _name_score(subject, s.folder_path))
-        return RankedSuggestion(s.folder_path, folder_display_name(s.folder_path), score, s.match_count,
-                                s.sample_subjects, exact)
+    def _blend(subject: str, s: FolderSuggestion, exact_count: int, same_email: bool) -> RankedSuggestion:
+        """One folder's score; ``exact_count`` is how many of its mails carry this very subject."""
+        samples, count = s.sample_subjects, s.match_count
+        if exact_count:
+            samples = [subject] + [x for x in samples if x.casefold() != subject.casefold()]
+            count = max(count, exact_count)
+        thread = 1.0 if exact_count else _thread_score(subject, samples)
+        score = 1.0 if same_email else min(1.0, W_FTS * s.score + W_THREAD * thread
+                                           + W_NAME * _name_score(subject, s.folder_path))
+        return RankedSuggestion(s.folder_path, folder_display_name(s.folder_path), score, count,
+                                samples, bool(exact_count), same_email)

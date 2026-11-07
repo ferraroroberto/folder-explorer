@@ -106,3 +106,86 @@ def test_the_ranking_and_its_percentages_are_pinned(cfg, archive_root):
     # Every invented mail shares one sender, so the unrelated folders still score a little.
     assert [(_leaf(s), s.exact_subject, round(s.score * 100)) for s in ranked] == [
         ("Car purchase", False, 85), ("Deliveries", False, 23), ("Newsletters", False, 14), ("Garden", False, 11)]
+
+
+def test_an_exact_subject_older_than_the_recent_samples_keeps_its_count_and_sample(cfg, archive_root):
+    """Five newer subjects push the thread out of the folder's recent samples; it still leads, scored as the thread."""
+    folders = {"Harbour": ["Berth renewal"] + ["Harbour note %d" % n for n in range(6)], "Marina": ["Berth prices"]}
+    _seed_index(cfg, archive_root, folders)
+    _date_by_order(cfg)
+
+    first = _ranked(cfg, "Berth renewal")[0]
+
+    assert _leaf(first) == "Harbour" and first.exact_subject
+    assert first.match_count >= 1 and first.sample_subjects[0] == "Berth renewal"
+
+
+def test_an_exact_subject_the_fts_pool_leaves_out_still_leads_with_its_count_and_sample(cfg, archive_root, monkeypatch):
+    _seed_index(cfg, archive_root, {
+        "Lighthouse": ["Lamp"] + ["Lighthouse log %d" % n for n in range(6)],
+        **{"Shop %d" % n: ["Lamp oil order %d" % n] for n in range(3)},
+    })
+    _date_by_order(cfg)
+    _fts_without(monkeypatch, "Lighthouse")
+
+    first = _ranked(cfg, "Lamp")[0]
+
+    assert _leaf(first) == "Lighthouse" and first.exact_subject
+    assert first.match_count == 1 and first.sample_subjects[0] == "Lamp"
+
+
+def test_the_exact_thread_scores_as_a_full_thread_match(cfg, archive_root):
+    """An exact folder's thread share is the whole 30%, whatever its recent samples hold."""
+    _seed_index(cfg, archive_root, {"Quay": ["Mooring fee"] + ["Quay bulletin %d" % n for n in range(6)]})
+    _date_by_order(cfg)
+
+    first = _ranked(cfg, "Mooring fee")[0]
+
+    assert first.score >= 0.30 + 0.45 * 0.5
+
+
+def test_a_matching_message_id_is_the_same_email_at_full_score(cfg, archive_root, monkeypatch):
+    """The copy already in the index is offered first at 100%, even when FTS drops its folder."""
+    _seed_index(cfg, archive_root, {
+        "Shop 0": ["Lamp oil order"], "Shop 1": ["Lamp oil invoice"], "Filed": ["Unrelated words entirely"],
+    })
+    _fts_without(monkeypatch, "Filed")
+    seeded_id = "seed-3@example.invalid"  # the third seeded mail, the one in "Filed"
+
+    ranked = SuggestionEngine(cfg, max_suggestions=2).suggest(
+        EmailData(subject="Lamp oil", sender="x@example.invalid", message_id="<" + seeded_id + ">"))
+
+    assert _leaf(ranked[0]) == "Filed" and ranked[0].same_email and ranked[0].score == 1.0
+    assert all(not s.same_email for s in ranked[1:])
+
+
+def test_the_same_subject_with_another_message_id_is_not_the_same_email(cfg, archive_root):
+    _seed_index(cfg, archive_root, {"Northwind": ["Site visit"], "Photos": ["Site visit photos"]})
+
+    ranked = SuggestionEngine(cfg).suggest(
+        EmailData(subject="Site visit", sender="sender@example.invalid", message_id="other@example.invalid"))
+
+    assert _leaf(ranked[0]) == "Northwind" and ranked[0].exact_subject
+    assert not any(s.same_email for s in ranked) and ranked[0].score < 1.0
+
+
+def _date_by_order(cfg: dict) -> None:
+    """Date each seeded mail by its seed order, so later seeds are the folder's newest subjects."""
+    from src.email.repository import open_index
+
+    conn = open_index(cfg)
+    conn.execute("UPDATE emails SET date_sent = printf('2026-01-01T00:%02d:00', id)")
+    conn.commit()
+    conn.close()
+
+
+def _fts_without(monkeypatch, leaf: str) -> None:
+    """Make the FTS pool drop one folder, as truncation does when stronger matches crowd it out."""
+    from src.email.repository import EmailRepository
+
+    real = EmailRepository.suggest_folders
+
+    def dropped(self, *args, **kwargs):
+        return [s for s in real(self, *args, **kwargs) if _leaf(s) != leaf]
+
+    monkeypatch.setattr(EmailRepository, "suggest_folders", dropped)

@@ -75,5 +75,6 @@ def index_now(body: dict[str, Any] = Body(default={})) -> JSONResponse:
         raise HTTPException(status_code=400, detail="that folder is not inside an email folder")
     if indexer.is_running():
         raise HTTPException(status_code=409, detail="the email index is already being updated")
-    indexer.spawn("app", scope)
+    # A whole-index run lists the folders now: a mail filed since the last scan is not in its index.
+    indexer.spawn("app", scope, fresh=scope is None)
     return JSONResponse({"started": True, "scope": scope or "all"}, status_code=202)

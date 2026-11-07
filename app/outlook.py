@@ -51,6 +51,7 @@ from src.outlook import bridge
 from src.outlook.client import OutlookClient
 from src.outlook.mapi import MailboxNotInOutlookError, OutlookUnavailableError
 from app.webapp.bind import resolve_bind
+from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits
 
 logger = logging.getLogger("app.outlook")
 
@@ -184,9 +185,11 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str) -> int:
         doc = _guarded(lambda: prepare(cfg, entry_id, store_id))
         if hand_to_page(dict(doc, from_macro=True), cfg):
             return EXIT_OK
-        from app.archive_window import show_window  # noqa: PLC0415 - tkinter only when no page is open
+        from src.archive_window import show_window  # noqa: PLC0415 - tkinter only when no page is open
 
-        show_window(doc, lambda folder, category: _guarded(lambda: file_one(cfg, entry_id, store_id, folder, category)))
+        show_window(doc, lambda folder, category, duplicate, date_prefix: _guarded(
+            lambda: file_one(cfg, entry_id, store_id, folder, category, duplicate, date_prefix)),
+                    lambda query: email_folder_hits(cfg, query, EMAIL_FOLDER_HITS))
     return EXIT_OK
 
 

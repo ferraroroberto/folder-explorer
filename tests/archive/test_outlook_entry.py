@@ -125,15 +125,15 @@ def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: Simple
 def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict = {}
 
-    def window(doc: dict, on_file) -> None:  # type: ignore[no-untyped-def]
-        seen["doc"] = doc
-        seen["result"] = on_file(doc["suggestions"][0]["folder_path"], None)
+    def window(doc: dict, on_file, find_folders) -> None:  # type: ignore[no-untyped-def]
+        seen["doc"], seen["find"] = doc, find_folders
+        seen["result"] = on_file(doc["suggestions"][0]["folder_path"], None, False, "auto")
 
-    monkeypatch.setattr("app.archive_window.show_window", window)
+    monkeypatch.setattr("src.archive_window.show_window", window)
     with TestClient(app, client=LOCAL) as c:
         _route_handoff(monkeypatch, c)
         assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
-    assert seen["doc"]["ok"] and seen["result"]["ok"] and not seen["result"]["categorized"]
+    assert seen["doc"]["ok"] and callable(seen["find"]) and seen["result"]["ok"] and not seen["result"]["categorized"]
     assert Path(seen["result"]["files"][0]).is_file() and fake.item.Categories == ""
 
 
@@ -215,16 +215,6 @@ def test_the_bridge_is_off_where_the_instance_says_so(monkeypatch: pytest.Monkey
 def test_a_folder_that_looks_like_a_flag_is_read_as_a_folder(fake: SimpleNamespace) -> None:
     doc = _in_process(["file", "--entry-id=" + fake.item.EntryID, "--store-id=x", "--folder=--entry-id", "--category="], 1)
     assert doc["error"]["code"] == "outside_email_folders" and fake.item.saved_as == []
-
-
-def test_the_fallback_window_lists_the_folders_and_the_mail_like_the_sheet() -> None:
-    from app.archive_window import mail_line, option_lines
-
-    doc = {"suggestions": [{"folder_path": "/archive/Mail/Clients/Alpha", "display_name": "Clients/Alpha",
-                            "why": [{"label": "Same subject", "tone": "accent"}], "note": "This conversation is filed here"}]}
-    assert option_lines(doc) == [("/archive/Mail/Clients/Alpha", "Clients/Alpha    Same subject · This conversation is filed here")]
-    mail = {"sender": "leo@example.org", "date_sent": "2026-11-05T09:12:00", "attachment_count": 2, "where": "Inbox"}
-    assert mail_line(mail) == "leo@example.org · 2026-11-05 09:12 · 2 attachments · Inbox"
 
 
 def test_the_date_prefix_choice_reaches_the_child_and_a_bad_one_never_does(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:

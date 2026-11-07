@@ -28,6 +28,19 @@ wide_views = ["search", "explore"]
 rule   = "COMP-11"
 reason = "The snake_case text is the owner's own mail snippets and folder names, shown verbatim; the app's own copy carries no raw identifier"
 
+# The Settings sheet has no commit: each folder list saves as soon as a path is added,
+# and the Add button beside its path field is the labelled utility button at that
+# field's height. The review reads any submit button as the view's primary action and
+# the dialog's commit, so it measures Add against button-primary and against the
+# larger "Show macro" button, which does not describe this sheet.
+[[design.accepted]]
+rule   = "TOUCH-03"
+reason = "Add beside a folder path field is a utility button at the field's height; the Settings sheet has no primary action, and a 48px button would stand taller than its 36px field"
+
+[[design.accepted]]
+rule   = "COMP-16"
+reason = "The Settings sheet has no footer commit: Add saves a folder as it is added, and it stays the same height as the field beside it, so the larger Show macro button is not a rival to a commit"
+
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]

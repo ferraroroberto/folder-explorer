@@ -105,7 +105,7 @@ body {
 /* ---------------------------------------------------------------- summary */
 .summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gap);
 }
 .stat {
@@ -117,6 +117,10 @@ body {
 }
 .stat-value { font-size: var(--font-heading-md); font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: var(--font-body-sm); color: var(--muted); }
+/* At phone width the tiles stack in one column, each a label-and-value row, so no two cards sit side by side. */
+@media (max-width: 599px) {
+  .summary .stat, .email-stats .stat { display: flex; flex-direction: row-reverse; align-items: baseline; justify-content: space-between; gap: var(--space-sm); }
+}
 @media (min-width: 600px) { .summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 /* ------------------------------------------------------------- share bars */

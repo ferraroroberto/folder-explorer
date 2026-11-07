@@ -1,12 +1,12 @@
 /* Scans: the email index card: what the last run did, failed files, "Index emails now" and one folder. */
 
 import { getJSON, postJSON, ApiError } from './api.js';
-import { esc, fmtAgo, fmtNum, winPath } from './fmt.js';
+import { bar, esc, fmtAgo, fmtNum, pct, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
-// How often the card re-reads the run history while a run is going.
-const POLL_MS = 3000;
+// How often the card re-reads the run history while a run is going; the same cadence as the folder scans.
+const POLL_MS = 2000;
 
 let body = null;
 let timer = null;
@@ -22,13 +22,28 @@ function stat(value, label, tone, act) {
 // The last two folders of a path: an email folder as a select or a run names it.
 const shortPath = (p) => p.split(/[\\/]/).filter(Boolean).slice(-2).join('\\');
 
+// A live run's progress: a bar over the files that need a read, then what the run has done so far.
+// The counts are the stage's own, stored on the running row (an empty row means it is still listing files).
+function progress(c) {
+  if (c.to_index === undefined) return '<span class="run-counts">Counting files…</span>';
+  const unchanged = fmtNum(c.unchanged || 0) + ' unchanged';
+  if (!c.to_index) return '<span class="run-counts">Nothing new to index · ' + unchanged + '</span>';
+  const parts = [fmtNum(c.done || 0) + ' of ' + fmtNum(c.to_index) + ' indexed (' + Math.floor(pct(c.done || 0, c.to_index)) + '%)',
+    fmtNum(c.downloaded || 0) + ' downloaded · ' + Math.round((c.downloaded_bytes || 0) / MB) + ' MB'];
+  if (c.failed) parts.push(fmtNum(c.failed) + ' failed');
+  if (c.waiting) parts.push(fmtNum(c.waiting) + ' waiting for budget');
+  parts.push(unchanged);
+  return bar(pct(c.done || 0, c.to_index)) + '<span class="run-counts">' + esc(parts.join(' · ')) + '</span>';
+}
+
 function runRow(r) {
   const live = r.status === 'running';
   const warn = r.status === 'failed' || r.status === 'interrupted';
   const scope = r.scope === 'all' ? 'Every email folder' : shortPath(r.scope);
   return '<li class="run-row"><span class="mark' + (live ? ' is-live' : warn ? ' is-warn' : '') + '" aria-hidden="true"></span><span>' +
     '<strong>' + esc(scope + ' · ' + fmtAgo(r.started_at)) + '</strong>' +
-    esc((live ? 'Indexing now' : r.message || r.status) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) + '</span></li>';
+    esc((live ? 'Indexing now' : r.message || r.status) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) +
+    (live ? progress(r.counts || {}) : '') + '</span></li>';
 }
 
 function render() {
@@ -42,7 +57,7 @@ function render() {
     stat(fmtNum(body.indexed), 'Indexed') +
     stat(fmtNum((c.new || 0) + (c.changed || 0) + (c.reread || 0)), 'New or changed, last run') +
     stat(fmtNum(c.downloaded || 0) + ' · ' + Math.round((c.downloaded_bytes || 0) / MB) + ' MB', 'Downloaded, last run') +
-    stat(fmtNum(c.waiting || 0), 'Waiting for budget', c.waiting ? 'tone-attention-text' : '') +
+    (body.budget_mb !== null || c.waiting ? stat(fmtNum(c.waiting || 0), 'Waiting for budget', c.waiting ? 'tone-attention-text' : '') : '') +
     stat(fmtNum(body.failed), 'Failed reads', body.failed ? 'tone-danger-text' : '', body.failed ? 'failures' : '');
   $('emailScope').innerHTML = body.roots.map((r) => '<option value="' + esc(r) + '" title="' + esc(r) + '">' + esc(shortPath(r)) + '</option>').join('');
   const off = body.stage_problem;
@@ -51,7 +66,7 @@ function render() {
   $('indexEmails').textContent = body.running ? 'Indexing…' : 'Index emails now';
   $('emailNote').textContent = !body.folders.length ? 'No email folders yet: add one in Settings, Email folders.'
     : !body.ready ? 'Not set up here: ' + body.problem + '.' : off ? 'Indexing is off here: ' + off + '.'
-    : 'Folders, exclusions and the download budget are in Settings.';
+    : 'Folders, exclusions and the download limit are in Settings.';
   $('emailRuns').innerHTML = body.runs.length ? body.runs.map(runRow).join('') : '<li class="rows-note">No runs yet.</li>';
 }
 

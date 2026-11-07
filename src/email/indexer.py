@@ -142,6 +142,14 @@ def spawn(trigger: str, scope: Optional[str] = None) -> "subprocess.Popen[bytes]
         log.close()
 
 
+def _publish(run_id: int, counts: dict[str, int]) -> None:
+    """Store the run's counts so far, for the Scans tab; a failed write never stops the run."""
+    try:
+        store.update_email_run_counts(run_id, counts)
+    except Exception as exc:  # noqa: BLE001 -- progress is only for display
+        logger.warning("⚠️ email run %d: progress not stored: %s", run_id, exc)
+
+
 def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, read: Optional[Reader] = None,
         fresh: bool = False) -> dict[str, Any]:
     """One email run; raises ``NotSetUp``, ``UnknownFolder`` or ``EmailBusy`` before touching anything."""
@@ -164,7 +172,8 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
             lists = manifests(part, scope, roots, exclude_for(cfg), fresh)
             conn = open_writer(part.index_path)
             try:
-                counts = Stage(conn, part.budget_bytes, read or read_facts).run(lists).as_dict()
+                counts = Stage(conn, part.budget_bytes, read or read_facts,
+                               lambda c: _publish(run_id, c)).run(lists).as_dict()
             finally:
                 conn.close()
         except Exception as exc:  # noqa: BLE001 -- a failed run is recorded and reported, never left "running"

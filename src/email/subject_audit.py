@@ -96,7 +96,7 @@ def cut_name(filename: str, subject: str, max_path: int = DEFAULT_MAX_PATH_LENGT
     return fit_msg_filename(folder, parsed.number, subject, parsed.date_prefix or None, max_path)
 
 
-def audit(manifests: list[Manifest], budget_bytes: int, read: Reader = read_facts,
+def audit(manifests: list[Manifest], budget_bytes: Optional[int], read: Reader = read_facts,
           max_path: int = DEFAULT_MAX_PATH_LENGTH) -> AuditResult:
     """Read every listed ``.msg`` the budget allows and list the cut names."""
     out = AuditResult()
@@ -104,7 +104,7 @@ def audit(manifests: list[Manifest], budget_bytes: int, read: Reader = read_fact
     for manifest in manifests:
         for f in manifest.files:
             out.files += 1
-            if f.online and downloaded + f.size > budget_bytes:
+            if f.online and budget_bytes is not None and downloaded + f.size > budget_bytes:
                 out.not_checked_waiting += 1
                 continue
             try:

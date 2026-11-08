@@ -55,6 +55,9 @@ DEFAULTS: dict[str, Any] = {
     # Explore: whether hidden and system items are listed. Off by default, as
     # in File Explorer; the totals count them either way.
     "explore": {"show_hidden": False},
+    # Opening a folder on this PC: whether it shows in the foremost open File Explorer window
+    # (faster, but that window loses what it showed) instead of a new one. Off by default.
+    "desktop": {"reuse_explorer_window": False},
     # The archive verbs (python -m app.cli email batch): the file-name form
     # (date_prefix true, false or "auto" to follow the destination folder),
     # the longest path the archiver writes, and the folder suggester's limits.
@@ -104,6 +107,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
     cfg["explore"] = _clean_explore(raw.get("explore"))
+    cfg["desktop"] = _clean_desktop(raw.get("desktop"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
@@ -186,6 +190,13 @@ def _clean_explore(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_desktop(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["desktop"])
+    if isinstance(raw, dict) and isinstance(raw.get("reuse_explorer_window"), bool):
+        out["reuse_explorer_window"] = raw["reuse_explorer_window"]
+    return out
+
+
 def load() -> dict[str, Any]:
     """The effective settings: the file's valid keys over the defaults."""
     path = config_path()
@@ -226,6 +237,10 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "explore":
             if not (isinstance(value, dict) and set(value) == {"show_hidden"} and isinstance(value["show_hidden"], bool)):
                 raise ValueError("explore takes show_hidden, true or false")
+        if key == "desktop":
+            if not (isinstance(value, dict) and set(value) == {"reuse_explorer_window"}
+                    and isinstance(value["reuse_explorer_window"], bool)):
+                raise ValueError("desktop takes reuse_explorer_window, true or false")
         out[key] = value
     return out
 

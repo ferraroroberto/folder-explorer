@@ -75,7 +75,7 @@ def test_a_mails_folder_opens_through_the_folder_views_route(setup: Path, monkey
     from src import desktop
 
     launched: list[str] = []
-    monkeypatch.setattr(desktop, "_spawn", lambda command: launched.append(command[-1]))
+    monkeypatch.setattr(desktop, "_shell", lambda path, verb: launched.append(path))
     with TestClient(app, client=LOCAL) as c:
         first = c.get("/api/search/emails", params={"q": "invoice"}).json()["hits"][0]
         loc = c.get("/api/emails/%d" % first["id"]).json()["location"]

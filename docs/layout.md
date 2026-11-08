@@ -36,6 +36,7 @@ folder-explorer/
 │   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
+│   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
 │   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window (the Archive sheet and window offer it)
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
 │   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),

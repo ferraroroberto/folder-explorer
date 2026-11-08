@@ -41,6 +41,15 @@ def isolated_secrets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_window_watch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test lists this PC's Explorer windows or starts the thread that waits for one."""
+    from src import window_front
+
+    monkeypatch.setattr(window_front, "explorer_hwnds", set)
+    monkeypatch.setattr(window_front, "follow_in_background", lambda *_a, **_k: None)
+
+
+@pytest.fixture(autouse=True)
 def fresh_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
     """A new lock-out per test, and no real notifier, so no test sends a Telegram message."""
     from app.webapp import auth

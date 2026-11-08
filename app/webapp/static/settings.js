@@ -1,4 +1,4 @@
-/* Settings: text size, default basis, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, default basis, how File Explorer opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -9,6 +9,7 @@ import { folderList } from './folder-list.js';
 
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
+let reuseSwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
 // The four folder lists, built once in initSettings.
@@ -24,6 +25,10 @@ const REMOTE_TEXT = {
 function render(body) {
   const cfg = body.config;
   const remote = body.remote;
+  setSwitch(reuseSwitch, cfg.desktop.reuse_explorer_window);
+  $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
+    ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
+    : 'Off: each Open starts a new File Explorer window. Turn on for a faster open that reuses the window you used last.';
   setSwitch(remoteSwitch, cfg.remote_access);
   remoteSwitch.setAttribute('aria-label', 'Remote access');
   let note = REMOTE_TEXT[remote.running] || '';
@@ -100,6 +105,11 @@ async function save(update) {
 
 export function initSettings(opts) {
   onRootsChanged = opts.onRootsChanged;
+  reuseSwitch = switchEl(false, {
+    label: 'Reuse an open Explorer window',
+    onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
+  });
+  $('reuseExplorerSlot').appendChild(reuseSwitch);
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);
   autoSwitch = switchEl(true, {

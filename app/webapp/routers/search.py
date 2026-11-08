@@ -21,7 +21,13 @@ from app.webapp.auth import is_pc_itself
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.state import EMAILS, POOL
 from src import config, folder_search, store
-from src.desktop import GoneError, ensure_there, open_in_explorer, open_in_outlook, outlook_exe
+from src.desktop import (
+    GoneError,
+    ensure_there,
+    open_in_explorer,
+    open_in_outlook,
+    outlook_exe,
+)
 from src.email.body import ERR_NOT_SET_UP, ERR_OUTSIDE, failed, fetch_body
 from src.email.search import PAGE, SORTS, EmailIndex
 from src.email.settings import EmailPart, email_part, is_under, under_any

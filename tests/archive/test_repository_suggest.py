@@ -49,3 +49,11 @@ def test_pool_grows_past_the_floor_to_the_request(repo):
 
 def test_small_request_still_returns_only_what_was_asked(repo):
     assert len(_suggest(repo, 3)) == 3
+
+
+def test_the_exact_subject_lookup_reads_the_case_blind_subject_index(repo):
+    plan = " ".join(str(r[-1]) for r in repo._conn.execute(
+        "EXPLAIN QUERY PLAN SELECT folder_path, COUNT(*) AS n FROM emails WHERE subject = ? COLLATE NOCASE GROUP BY folder_path",
+        ("Quarterly Invoice",)))
+    assert "idx_emails_subject_nocase" in plan
+    assert repo.exact_subject_counts("Quarterly Invoice") == {f"folder-{n:02d}": 1 for n in range(_FOLDERS)}

@@ -75,7 +75,7 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     errors = _errors(page)
     filed: list[dict[str, Any]] = []
     _archive_ready(page)
-    page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
     page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": [{"path": ROOT + "/Clients/Northwind/2026", "name": "2026",
                                                                            "location": {"root": "invented-root", "scan_id": 7, "id": 40}}]}))
@@ -158,7 +158,7 @@ def test_an_archived_mail_is_filed_again_only_through_the_copy_switch(page: Page
     errors = _errors(page)
     filed: list[dict[str, Any]] = []
     _archive_ready(page)
-    page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, dict(PREPARED, already_archived=ROOT + "/Clients/Project Alpha/2026/003 - Kickoff agenda.msg")))
 
     def file_mail(route: Route) -> None:
@@ -190,7 +190,7 @@ def test_the_macro_hand_off_opens_the_sheet_and_a_failure_says_why(page: Page, a
     errors = _errors(page)
     handed = [{"mail": dict(PREPARED, from_macro=True)}]
     _archive_ready(page)
-    page.route("**/api/archive/pending", lambda r: _json(r, handed.pop() if handed else {"mail": None}))
+    page.route("**/api/archive/pending*", lambda r: _json(r, handed.pop() if handed else {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, {"ok": False, "error": {
         "code": "outlook_unreachable", "message": "Outlook isn't reachable: open Outlook (classic) and try again."}}))
     page.route("**/api/emails/*/find", lambda r: _json(r, {"ok": True, "folder": "Archive", "mailbox": "default"}))
@@ -223,7 +223,7 @@ def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_s
     ]
     asked: list[int] = []
     _archive_ready(page)
-    page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
     page.route("**/api/archive/explorer", lambda r: asked.append(1) or _json(r, answers[len(asked) - 1]))
 
@@ -261,3 +261,34 @@ def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_s
     expect(sheet).to_be_hidden()
     assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2026", "category": "Archived", "date_prefix": "auto"}]
     assert asked == [1, 1, 1, 1] and errors == []
+
+
+def test_the_macro_hand_off_shows_the_mail_first_and_fills_its_folders_in(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    asked: list[str] = []
+    queue = [{"mail": dict(PREPARED, from_macro=True, suggestions=[], ranking=True)}]
+    _archive_ready(page)
+
+    def pending(route: Route) -> None:
+        asked.append(route.request.url)
+        _json(route, queue.pop(0) if queue else {"mail": None})
+
+    page.route("**/api/archive/pending*", pending)
+    page.goto(app_url + "/")
+    sheet = page.locator("#archiveDialog")
+    expect(sheet.locator(".arch-mail strong")).to_have_text("Kickoff agenda")
+    expect(sheet.locator("#archRanking")).to_have_text("Finding folders…")
+    expect(sheet.locator("#archiveGo")).to_be_disabled()
+    assert all("wait=" in url for url in asked), "the page asks the server to hold its poll open"
+    sheet.locator("#archSearch").fill("meet")
+    queue.append({"mail": dict(PREPARED, from_macro=True, ranking=False)})
+    expect(sheet.locator(".arch-options .arch-opt")).to_have_count(3, timeout=8000)
+    expect(sheet.locator("#archRanking")).to_have_count(0)
+    expect(sheet.locator("#archiveGo")).to_contain_text("Archive to")
+    expect(sheet.locator("#archSearch")).to_have_value("meet")
+    sheet.locator("[data-close]").click()
+    # The same hand-off ranked again after the sheet closed leaves it closed.
+    queue.append({"mail": dict(PREPARED, from_macro=True, ranking=False)})
+    page.wait_for_timeout(4000)
+    expect(sheet).not_to_be_visible()
+    assert errors == []

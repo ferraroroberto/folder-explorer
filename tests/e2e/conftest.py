@@ -69,6 +69,17 @@ def _bounded_timeouts(context: BrowserContext) -> None:
     context.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
 
 
+@pytest.fixture(autouse=True)
+def _no_held_handoff_poll(context: BrowserContext) -> None:
+    """Answer the page's hand-off poll at once with no mail, so a held poll never keeps the network busy.
+
+    The server holds that poll open for up to 25 s, and screenshot settling waits for an idle
+    network. A test that hands a mail over routes the poll on its page, which takes precedence.
+    """
+    context.route("**/api/archive/pending*", lambda route: route.fulfill(status=200, content_type="application/json",
+                                                                         body='{"mail": null}'))
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))

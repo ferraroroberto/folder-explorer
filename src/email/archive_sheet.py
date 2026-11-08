@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -22,6 +23,7 @@ from src.email.archive_settings import get_outlook_category
 from src.email.repository import EmailRepository, open_index
 from src.email.suggester import EmailData, RankedSuggestion, SuggestionEngine
 from src.explorer_window import ExplorerUnavailableError, get_current_explorer_folder
+from src.stage_timer import StageTimer
 
 logger = logging.getLogger(__name__)
 
@@ -140,38 +142,98 @@ def explorer_folder(cfg: dict[str, Any], current: Optional[Callable[[], Optional
     return {"ok": True, "folder_path": str(folder)}
 
 
-def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dict[str, Any]:
-    """The sheet's opening document for one live mail: the mail, where it is already filed, and the folders to offer."""
+def opening(client: Any, cfg: dict[str, Any], item: Any, where: str = "",
+            timer: Optional[StageTimer] = None) -> tuple[dict[str, Any], EmailData]:
+    """The sheet's document before ranking (``ranking`` true, no suggestions yet) and what ranking reads.
+
+    It needs one COM read and one index lookup, so the sheet or the window can show the mail at
+    once and fill the folders in when ``rank`` answers.
+    """
     roots = mounted_roots(cfg)
     mail = client.read_mail(item, PREVIEW_CHARS)
-    ranked = SuggestionEngine(cfg).suggest(EmailData(subject=mail.subject, sender=mail.sender, recipients=mail.recipients,
-                                                     date_sent=mail.date_sent, message_id=mail.message_id))
+    if timer:
+        timer.mark("read_mail")
     conn = open_index(cfg)
     try:
-        repo = EmailRepository(conn)
-        filed = _filed_as(repo, mail.message_id)
-        suggestions = []
-        for s in ranked:
-            if not any(is_within(Path(s.folder_path), r) for r in roots):
-                continue
-            chips, note = _why(repo, s, mail.sender)
-            suggestions.append({"folder_path": s.folder_path, "display_name": s.display_name.replace("/", "\\"),
-                                "why": chips, "note": note, "score": round(s.score, 3), "similar": s.match_count,
-                                "example": s.sample_subjects[0] if s.sample_subjects else "",
-                                "saved_as": planned_names(cfg, s.folder_path, mail.subject, mail.date_sent)})
+        filed = _filed_as(EmailRepository(conn), mail.message_id)
     finally:
         conn.close()
-    logger.info("ℹ️ archive sheet: %d folder(s) suggested%s", len(suggestions), ", already filed" if filed else "")
-    return {
+    if timer:
+        timer.mark("filed_lookup")
+    data = EmailData(subject=mail.subject, sender=mail.sender, recipients=mail.recipients,
+                     date_sent=mail.date_sent, message_id=mail.message_id)
+    doc = {
         "ok": True,
         "mail": {"message_id": mail.message_id, "subject": mail.subject, "sender": mail.sender,
                  "date_sent": mail.date_sent.isoformat() if mail.date_sent else "",
                  "attachment_count": mail.attachment_count, "where": where, "preview": mail.body_preview},
         "already_archived": filed,
-        "suggestions": suggestions,
+        "suggestions": [],
+        "ranking": True,
         "category": get_outlook_category(cfg),
         "roots": [str(r) for r in roots],
     }
+    return doc, data
+
+
+def rank(cfg: dict[str, Any], data: EmailData, roots: list[str]) -> list[dict[str, Any]]:
+    """The folders to offer for one mail, best first, each with why it is offered and the name it would get.
+
+    Logs one timing line (milliseconds and counts only) for the ranking and the folder details.
+    """
+    timer = StageTimer("archive ranking")
+    root_paths = [Path(r) for r in roots]
+    conn = open_index(cfg)
+    try:
+        repo = EmailRepository(conn)
+        found = SuggestionEngine(cfg).suggest(data, repo, timer)
+        suggestions = []
+        for s in found:
+            if not any(is_within(Path(s.folder_path), r) for r in root_paths):
+                continue
+            chips, note = _why(repo, s, data.sender)
+            suggestions.append({"folder_path": s.folder_path, "display_name": s.display_name.replace("/", "\\"),
+                                "why": chips, "note": note, "score": round(s.score, 3), "similar": s.match_count,
+                                "example": s.sample_subjects[0] if s.sample_subjects else "",
+                                "saved_as": planned_names(cfg, s.folder_path, data.subject, data.date_sent)})
+    finally:
+        conn.close()
+    timer.mark("details")
+    timer.count("suggested", len(suggestions))
+    timer.log(logger)
+    return suggestions
+
+
+def ranked(cfg: dict[str, Any], doc: dict[str, Any], data: EmailData) -> dict[str, Any]:
+    """``doc`` from ``opening`` with its folders filled in."""
+    suggestions = rank(cfg, data, doc["roots"])
+    logger.info("ℹ️ archive sheet: %d folder(s) suggested%s", len(suggestions), ", already filed" if doc["already_archived"] else "")
+    return dict(doc, suggestions=suggestions, ranking=False)
+
+
+def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dict[str, Any]:
+    """The sheet's whole document for one live mail: the mail, where it is already filed, and the folders to offer."""
+    doc, data = opening(client, cfg, item, where)
+    return ranked(cfg, doc, data)
+
+
+def rank_input(data: EmailData) -> dict[str, str]:
+    """What ``rank`` reads, as JSON the bridge hands the server with an opening document."""
+    return {"subject": data.subject, "sender": data.sender, "recipients": data.recipients,
+            "date_sent": data.date_sent.isoformat() if data.date_sent else "", "message_id": data.message_id}
+
+
+def rank_data(raw: Any) -> Optional[EmailData]:
+    """``rank_input``'s JSON back as ``EmailData``; None when it isn't that shape."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        sent = datetime.fromisoformat(raw["date_sent"]) if raw.get("date_sent") else None
+        return EmailData(subject=str(raw.get("subject") or ""), sender=str(raw.get("sender") or ""),
+                         recipients=str(raw.get("recipients") or ""), date_sent=sent,
+                         message_id=str(raw.get("message_id") or ""))
+    except (TypeError, ValueError):
+        return None
 
 
 def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],

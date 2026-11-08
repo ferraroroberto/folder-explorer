@@ -80,7 +80,12 @@ ADDED_COLUMNS = {
     "flag_status": "INTEGER", "message_id": "TEXT", "to_addrs": "TEXT", "cc_addrs": "TEXT",
     "attachment_names": "TEXT", "has_attachments": "INTEGER", "size": "INTEGER",
 }
-_POST_MIGRATION = "CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);"
+# The message-id index answers "already filed?"; the case-blind subject index answers the
+# suggester's exact-subject lookup, which is otherwise a scan of every row.
+_POST_MIGRATION = """
+CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id);
+CREATE INDEX IF NOT EXISTS idx_emails_subject_nocase ON emails(subject COLLATE NOCASE);
+"""
 
 
 def own_index_path() -> Path:

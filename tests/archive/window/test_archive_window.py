@@ -258,11 +258,12 @@ def test_an_unreadable_mail_shows_its_error_and_only_closes(tk_root: tk.Tk) -> N
 def test_the_entry_hands_the_window_a_search_and_a_filer_that_takes_every_option(monkeypatch: pytest.MonkeyPatch) -> None:
     got: dict[str, Any] = {}
     monkeypatch.setattr(outlook, "hand_to_page", lambda doc, cfg: False)
-    monkeypatch.setattr(outlook, "prepare", lambda cfg, e, s: {"ok": True})
+    monkeypatch.setattr(outlook, "prepare", lambda cfg, e, s, defer_ranking=False, timer=None: {"ok": True})
     monkeypatch.setattr(outlook, "file_one", lambda cfg, e, s, folder, cat, dup, dp: got.update(args=(folder, cat, dup, dp)) or {"ok": True})
     monkeypatch.setattr(outlook, "_apartment", __import__("contextlib").nullcontext)
     monkeypatch.setattr(outlook, "_guarded", lambda work: work())
-    monkeypatch.setattr("src.archive_window.show_window", lambda doc, on_file, find, current_explorer=None: on_file("F", "Filed", True, "off"))
+    monkeypatch.setattr("src.archive_window.show_window",
+                        lambda doc, on_file, find, current_explorer=None, rank=None, progress=None: on_file("F", "Filed", True, "off"))
     outlook.archive({"c": 1}, "e", "s")
     assert got["args"] == ("F", "Filed", True, "off")
 
@@ -313,3 +314,41 @@ def test_the_page_and_the_window_word_the_explorer_choice_alike() -> None:
     js = ARCHIVE_JS.read_text(encoding="utf-8")
     assert "label: '%s'" % EXPLORER_CHIP in js and "'open in File Explorer: '" in js
     assert explorer_note("C:/Mail/Alpha") == "open in File Explorer: C:\\Mail\\Alpha"
+
+
+# ------------------------------------------------------------------ showing first, ranking after
+
+def test_the_window_shows_the_mail_first_and_fills_the_folders_in_from_a_worker(root: Path, tk_root: tk.Tk) -> None:
+    full = _doc(root)
+    view = _build(ArchiveView(_doc(root, suggestions=[], ranking=True), lambda *_a: {}, None, theme.palette(False), tk_root))
+    shown = "\n".join(_texts(view.root))
+    assert "Plan" in shown and "Finding folders…" in shown and "Pick a folder" in shown
+    heard: list[str] = []
+    view.fill_in_background(lambda: full["suggestions"], heard.append)
+    for _ in range(200):
+        view.root.update()
+        if heard:
+            break
+        view.root.after(10)
+    shown = "\n".join(_texts(view.root))
+    assert heard == ["suggestions_shown"] and "Finding folders…" not in shown
+    assert "Clients\\Northwind" in shown and "Archive to Clients\\Northwind" in shown
+    view.frame.destroy()
+
+
+def test_a_ranking_that_fails_offers_no_folder_and_says_so(root: Path, tk_root: tk.Tk) -> None:
+    view = _build(ArchiveView(_doc(root, suggestions=[], ranking=True), lambda *_a: {}, None, theme.palette(False), tk_root))
+
+    def broken() -> list[dict[str, Any]]:
+        raise RuntimeError("the index is busy")
+
+    heard: list[str] = []
+    view.fill_in_background(broken, heard.append)
+    for _ in range(200):
+        view.root.update()
+        if heard:
+            break
+        view.root.after(10)
+    shown = "\n".join(_texts(view.root))
+    assert "Couldn't rank the folders. Find one below." in shown and "No folder matches this mail yet. Find one below." in shown
+    view.frame.destroy()

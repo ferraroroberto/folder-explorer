@@ -143,6 +143,68 @@ def test_folder_card_keys_run_the_buttons_actions(page: Page, app_url: str, brow
     assert errors == []
 
 
+@pytest.mark.desktop_only
+def test_email_card_keys_run_the_buttons_actions(page: Page, app_url: str, browser_name: str) -> None:
+    errors = _errors(page)
+    opened_folder: list[dict] = []
+    opened_mail: list[str] = []
+
+    def fake_open(route: Route) -> None:
+        opened_folder.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
+
+    def fake_open_mail(route: Route) -> None:
+        opened_mail.append(route.request.url)
+        route.fulfill(status=200, content_type="application/json", body="{}")
+
+    def outlook_ready(route: Route) -> None:
+        # The e2e instance has no Outlook; the keys only need the detail to say the mail can be opened.
+        fetched = route.fetch()
+        route.fulfill(response=fetched, json={**fetched.json(), "can_open": True})
+
+    page.route("**/api/open", fake_open)
+    page.route(re.compile(r"/api/emails/\d+/open$"), fake_open_mail)
+    page.route(re.compile(r"/api/emails/\d+\?"), outlook_ready)
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    page.goto(app_url + "/")
+    page.locator("#q").fill("budget")
+    page.locator("#results .result-row").first.click()
+    preview = _preview(page, browser_name)
+    expect(preview.locator('[data-act="outlook"]')).to_be_visible()
+    for label in ("open folder", "show folder", "copy path"):
+        expect(page.locator("#keysLine")).to_contain_text(label)
+
+    # Typing in the box, or a held modifier, runs nothing.
+    page.locator("#q").press("e")
+    page.locator("#q").press("o")
+    page.locator("#q").fill("budget")
+    page.locator("#results .result-row").first.focus()
+    page.keyboard.press("Control+e")
+    page.keyboard.press("Control+c")
+    page.wait_for_timeout(300)
+    assert opened_folder == [] and opened_mail == []
+    expect(page.locator(".toast")).to_have_count(0)
+
+    page.keyboard.press("o")
+    expect(page.locator(".toast", has_text="Opening in Outlook")).to_be_visible()
+    assert len(opened_mail) == 1
+
+    page.keyboard.press("e")
+    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
+    assert len(opened_folder) == 1
+    assert opened_folder[0]["kind"] == "folder" and opened_folder[0]["verb"] == "explore" and opened_folder[0]["id"] > 0
+    assert "path" not in opened_folder[0]
+
+    page.keyboard.press("c")
+    expect(page.locator(".toast", has_text="Path copied")).to_be_visible()
+    shown = preview.locator(".pv-path").inner_text().strip()
+    assert page.evaluate("() => navigator.clipboard.readText()").replace("/", "\\") == shown
+
+    page.keyboard.press("f")
+    expect(page.locator("#paneExplore")).to_be_visible()
+    assert errors == []
+
+
 _PIXEL = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000100000000376ef9240000000a49444154789c6360000000020001e221bc330000000049454e44ae426082")
 # An invented newsletter with its own colours and a remote logo, then what a sanitizer bypass would leave behind.
 _NEWSLETTER = ('<table width="100%" bgcolor="#ffffff"><tr><td bgcolor="#e8f0fe" style="color:#1a3a6b;padding:12px">'

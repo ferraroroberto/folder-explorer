@@ -92,3 +92,44 @@ def test_find_folder_and_file_by_path(tmp_path: Path) -> None:
     assert fid is not None and ix.folder(fid)["name"] == "Budget"
     assert ix.find_file(fid, "MODEL.xlsx")["size"] == 500
     assert ix.find_folder(["Projects", "Missing"]) is None
+
+
+def synced_pair(tmp_path: Path) -> tuple[tuple[Root, Index], tuple[Root, Index]]:
+    """An invented drive holding a OneDrive library, and the library scanned as its own synced root."""
+    drive = tmp_path / "Invented drive"
+    library = drive / "Users" / "ana" / "OneDrive - Contoso"
+    for rel in ("Shared/Budget", "Shared/Notes", "Archive/2025/Budget"):
+        (library / rel).mkdir(parents=True)
+    (library / "Shared/Budget/model.xlsx").write_bytes(b"x" * 100)
+    (drive / "Users/ana/Documents/Budget").mkdir(parents=True)
+    drive_ix, lib_ix = tmp_path / "drive.sqlite3", tmp_path / "library.sqlite3"
+    scan_to_index(str(drive), drive_ix, root_name="Invented drive")
+    scan_to_index(str(library), lib_ix, root_name="OneDrive")
+    return ((Root("d", "Invented drive", str(drive), "local"), Index(open_index(drive_ix))),
+            (Root("od", "OneDrive", str(library), "synced"), Index(open_index(lib_ix))))
+
+
+def test_a_onedrive_folder_is_listed_once_when_onedrive_prevails(tmp_path: Path) -> None:
+    drive, library = synced_pair(tmp_path)
+    both = search([drive, library], "budget", prune=False, skip=0)
+    assert sorted(r["root"] for r in both["results"]) == ["d", "d", "d", "od", "od"] and both["total"] == 5
+    once = search([drive, library], "budget", prune=False, skip=0, onedrive_prevails=True)
+    assert once["total"] == 3 and len(once["results"]) == 3
+    assert sorted((r["root"], r["path"].replace("\\", "/").split("/Users/")[-1]) for r in once["results"]) == [
+        ("d", "ana/Documents/Budget"),
+        ("od", "ana/OneDrive - Contoso/Archive/2025/Budget"),
+        ("od", "ana/OneDrive - Contoso/Shared/Budget"),
+    ]
+
+
+def test_the_drives_copy_of_the_library_folder_itself_is_hidden_too(tmp_path: Path) -> None:
+    drive, library = synced_pair(tmp_path)
+    assert {r["root"] for r in search([drive, library], "contoso", prune=False, skip=0)["results"]} == {"d", "od"}
+    once = search([drive, library], "contoso", prune=False, skip=0, onedrive_prevails=True)
+    assert {r["root"] for r in once["results"]} == {"od"} and once["total"] == 7
+
+
+def test_a_library_that_was_never_scanned_keeps_the_drives_copy(tmp_path: Path) -> None:
+    drive, _ = synced_pair(tmp_path)
+    once = search([drive], "budget", prune=False, skip=0, onedrive_prevails=True)
+    assert once["total"] == 3 and {r["root"] for r in once["results"]} == {"d"}

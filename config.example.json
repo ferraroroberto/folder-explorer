@@ -14,7 +14,8 @@
   },
   "folder_search": {
     "skip_levels": 0,
-    "prune_people": true
+    "prune_people": true,
+    "onedrive_prevails": true
   },
   "explore": {
     "show_hidden": false

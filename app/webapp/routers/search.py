@@ -89,7 +89,8 @@ def status(request: Request) -> dict[str, Any]:
 
 
 @router.get("/search/folders")
-def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int] = Query(None, ge=0, le=config.MAX_SKIP_LEVELS)) -> dict[str, Any]:
+def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int] = Query(None, ge=0, le=config.MAX_SKIP_LEVELS),
+                   onedrive: Optional[bool] = None) -> dict[str, Any]:
     opts = config.load()["folder_search"]
     entries = [(root, POOL.get(store.index_dir() / scan["index_file"])) for root, scan in _scanned(_roots())]
     with ExitStack() as stack:
@@ -97,7 +98,8 @@ def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int
             stack.enter_context(lock)
         return folder_search.search([(root, ix) for root, (ix, _) in entries], q,
                                     opts["prune_people"] if prune is None else prune,
-                                    opts["skip_levels"] if skip is None else skip)
+                                    opts["skip_levels"] if skip is None else skip,
+                                    onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
 
 
 @router.get("/search/emails")

@@ -39,6 +39,14 @@ def normalize(path: str) -> str:
     return os.path.normcase(os.path.realpath(os.path.expandvars(os.path.expanduser(path)))).rstrip("\\/") or path
 
 
+def relative_parts(inner: str, outer: str) -> Optional[list[str]]:
+    """The folder names from ``outer`` down to ``inner``, or ``None`` when ``inner`` is not strictly inside ``outer``."""
+    a, b = normalize(inner), normalize(outer)
+    if a == b or not a.startswith(b.rstrip("\\/") + os.sep):
+        return None
+    return [p for p in a[len(b.rstrip("\\/")):].split(os.sep) if p]
+
+
 def fixed_drives() -> list[str]:
     """Root paths of the local fixed drives (``C:\\``), never network or removable ones."""
     if sys.platform != "win32":

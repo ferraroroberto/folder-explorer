@@ -47,6 +47,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src import runtime_files
 from src.email.archive_settings import (
     DATE_PREFIX_AUTO,
     DEFAULT_MAX_PATH_LENGTH,
@@ -454,8 +455,7 @@ class EmailArchiver:
         dest = Path(folder_path)
         if not dest.exists():
             logger.info("Creating destination folder: %s", dest)
-            # runtime-write-exempt: the destination is inside an email folder (the batch checks resolve_under_roots first)
-            dest.mkdir(parents=True, exist_ok=True)
+            runtime_files.make_dirs(dest)
 
         # One listing pass covers both the next sequence number and (when the
         # config mode is "auto") the per-folder date-prefix inference.

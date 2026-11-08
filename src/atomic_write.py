@@ -29,4 +29,9 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
-__all__ = ["atomic_write_text"]
+def swap_in(built: Path, dest: Path) -> None:
+    """Rename a file that was built and closed beside ``dest`` onto it; there is no text to write."""
+    os.replace(built, dest)
+
+
+__all__ = ["atomic_write_text", "swap_in"]

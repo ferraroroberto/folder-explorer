@@ -57,7 +57,8 @@ folder-explorer/
 │   ├── scan_lock.py            # the cross-process scan lock
 │   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
 │   ├── config.py               # config.json with defaults and validation
-│   ├── atomic_write.py         # the one atomic text writer (config.json, .env): unique temp, cleanup on failure
+│   ├── atomic_write.py         # the one atomic text writer (config.json, .env): unique temp, cleanup on failure; swap_in renames a built file
+│   ├── runtime_files.py        # mkdir, lock-file open and SQLite connects for a path a caller names; raises on a path under a code folder
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison
 │   ├── login_alert.py          # the guessing alert's text and Telegram notifier

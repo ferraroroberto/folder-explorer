@@ -257,7 +257,6 @@ def _setup_logging() -> None:
     """Log to ``outlook.log`` in the runtime-data folder, and to stderr when there is one (pythonw has none)."""
     handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)] if sys.stderr is not None else []
     try:
-        # runtime-write-exempt: outlook.log sits in the runtime-data folder
         handlers.append(logging.FileHandler(store.data_dir() / "outlook.log", encoding="utf-8"))
     except OSError:
         pass

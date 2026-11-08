@@ -15,10 +15,12 @@ from typing import Any, Callable, Optional
 from src import desktop
 from src.archive_window.model import (
     DATE_CHOICES,
+    EXPLORER_CHIP,
     NO_CATEGORY,
     RANK_NOTE,
     ModelView,
     Option,
+    explorer_note,
     mail_line,
     under_root,
 )
@@ -43,9 +45,11 @@ DEBOUNCE_MS = 200
 WIDTH = 640
 _WRAP = WIDTH - 2 * SPACE_MD - 24
 PLACEHOLDER = "Another email folder"
+EXPLORER_BUTTON = "Current Explorer folder"
 
 OnFile = Callable[[str, Optional[str], bool, str], dict[str, Any]]
 FindFolders = Callable[[str], list[dict[str, Any]]]
+CurrentExplorer = Callable[[], dict[str, Any]]
 
 
 def _font(size: int = SIZE_BODY, bold: bool = False, mono: bool = False) -> tuple[str, int, str]:
@@ -77,8 +81,9 @@ class Segmented(tk.Frame):
 
 class ArchiveView:
     def __init__(self, doc: dict[str, Any], on_file: OnFile, find_folders: Optional[FindFolders], pal: Palette,
-                 root: Optional[tk.Tk] = None) -> None:
+                 root: Optional[tk.Tk] = None, current_explorer: Optional[CurrentExplorer] = None) -> None:
         self.doc, self.on_file, self.find_folders, self.pal = doc, on_file, find_folders, pal
+        self.current_explorer = current_explorer
         self.model = ModelView(doc) if doc.get("ok") else None
         # A caller that opens many windows in one process (the tests) passes the one root it owns.
         self.root = root or tk.Tk()
@@ -256,6 +261,8 @@ class ArchiveView:
         row = tk.Frame(self.frame, bg=pal.card)
         row.pack(fill="x", pady=(SPACE_SM, 0))
         self._button(row, "Browse…", self._pick).pack(side="right", padx=(SPACE_SM, 0))
+        if self.current_explorer is not None:
+            self._button(row, EXPLORER_BUTTON, self._use_explorer).pack(side="right", padx=(SPACE_SM, 0))
         self.placeholder = True
         self.query = tk.StringVar(value=PLACEHOLDER)
         self.entry = tk.Entry(row, textvariable=self.query, font=_font(SIZE_BODY), relief="flat", bg=pal.card_off, fg=pal.muted,
@@ -341,9 +348,21 @@ class ArchiveView:
         if folder:
             self._take(folder.replace("/", "\\"))
 
-    def _take(self, path: str) -> None:
+    def _use_explorer(self) -> None:
+        """Offer the folder open in the foremost File Explorer window; the user still presses Archive."""
+        assert self.model is not None and self.current_explorer is not None
+        self._say("Reading File Explorer…", self.pal.muted)
+        self.root.update_idletasks()
+        answer = self.current_explorer()
+        if not answer.get("ok"):
+            self._say((answer.get("error") or {}).get("message") or "File Explorer couldn't be read", self.pal.danger_text)
+            return
+        self._say("", self.pal.muted)
+        self._take(answer["folder_path"], EXPLORER_CHIP, explorer_note(answer["folder_path"]))
+
+    def _take(self, path: str, chip: str = "Chosen", note: str = "picked from the folder index") -> None:
         assert self.model is not None
-        self.model.pick_extra(path)
+        self.model.pick_extra(path, chip, note)
         for child in self.found.winfo_children():
             child.destroy()
         self._paint_options()

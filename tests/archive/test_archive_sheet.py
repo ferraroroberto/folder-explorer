@@ -9,6 +9,7 @@ import pytest
 from src.email import archive_sheet
 from src.email.archive_sheet import ERR_ALREADY, ERR_NO_ROOT, ERR_OUTSIDE, SheetError
 from src.email.repository import open_index
+from src.explorer_window import ExplorerUnavailableError
 from tests.archive.batch_support import (  # noqa: F401
     FakeOutlookClient,
     _index_archived_file,
@@ -167,3 +168,39 @@ def test_another_mail_with_the_same_subject_is_only_the_same_subject(cfg: dict, 
     first = doc["suggestions"][0]
     assert doc["already_archived"] is None and first["score"] < 1.0
     assert [c["label"] for c in first["why"]][0] == "Same subject" and first["note"] == "This conversation is filed here"
+
+
+# ---------------------------------------------------------------- the folder open in File Explorer
+
+def test_the_explorer_folder_inside_the_email_folders_is_offered(cfg: dict, archive_root: Path) -> None:
+    (archive_root / "Project Alpha").mkdir()
+    doc = archive_sheet.explorer_folder(cfg, lambda: str(archive_root / "Project Alpha"))
+    assert doc == {"ok": True, "folder_path": str((archive_root / "Project Alpha").resolve())}
+
+
+def test_no_explorer_folder_open_and_an_unreadable_shell_are_different_errors(cfg: dict) -> None:
+    with pytest.raises(SheetError) as nothing:
+        archive_sheet.explorer_folder(cfg, lambda: None)
+    assert nothing.value.code == archive_sheet.ERR_NO_EXPLORER
+
+    def unreachable() -> str:
+        raise ExplorerUnavailableError("COM server unavailable")
+
+    with pytest.raises(SheetError) as cannot:
+        archive_sheet.explorer_folder(cfg, unreachable)
+    assert cannot.value.code == archive_sheet.ERR_EXPLORER_UNAVAILABLE
+    assert str(nothing.value) != str(cannot.value)
+    assert str(cannot.value).startswith("Cannot read Explorer windows") and str(nothing.value).startswith("No Explorer folder")
+
+
+def test_an_explorer_folder_outside_the_email_folders_is_refused_like_any_other(cfg: dict, tmp_path: Path) -> None:
+    elsewhere = tmp_path / "Elsewhere"
+    elsewhere.mkdir()
+    with pytest.raises(SheetError) as refused:
+        archive_sheet.explorer_folder(cfg, lambda: str(elsewhere))
+    assert refused.value.code == ERR_OUTSIDE
+
+
+def test_the_explorer_folder_asks_the_shell_module_by_default(cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(archive_sheet, "get_current_explorer_folder", lambda: str(archive_root))
+    assert archive_sheet.explorer_folder(cfg)["folder_path"] == str(archive_root.resolve())

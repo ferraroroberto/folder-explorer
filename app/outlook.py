@@ -12,8 +12,11 @@
         save that mail into an email folder, tag it, and start indexing the folder
     python -m app.outlook show --message-id <id>
         Find in mailbox: open the live copy of an archived mail in Outlook
+    python -m app.outlook explorer
+        the folder open in the foremost File Explorer window, when it is inside an email folder
+        (no mail and no Outlook involved: it asks the Windows shell)
 
-``prepare``, ``file`` and ``show`` print one JSON document, ``{"ok": true, ...}`` or
+``prepare``, ``file``, ``show`` and ``explorer`` print one JSON document, ``{"ok": true, ...}`` or
 ``{"ok": false, "error": {"code", "message"}}``, and exit 0 or 2. No verb starts Outlook:
 each attaches to the one the user has open. The web server runs them as children with a
 timeout, so a COM modal hangs the child, never the server.
@@ -189,7 +192,8 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str) -> int:
 
         show_window(doc, lambda folder, category, duplicate, date_prefix: _guarded(
             lambda: file_one(cfg, entry_id, store_id, folder, category, duplicate, date_prefix)),
-                    lambda query: email_folder_hits(cfg, query, EMAIL_FOLDER_HITS))
+                    lambda query: email_folder_hits(cfg, query, EMAIL_FOLDER_HITS),
+                    current_explorer=lambda: _guarded(lambda: archive_sheet.explorer_folder(cfg)))
     return EXIT_OK
 
 
@@ -221,6 +225,7 @@ def _parser() -> argparse.ArgumentParser:
             p.add_argument("--date-prefix", choices=sorted(DATE_PREFIX_CHOICES), default="auto",
                            help="date the file name: auto (the folder's own form), on or off")
     sub.add_parser("show").add_argument("--message-id", required=True)
+    sub.add_parser("explorer")
     return parser
 
 
@@ -240,6 +245,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         with _apartment():
             doc = _guarded(lambda: file_one(cfg, args.entry_id, args.store_id, args.folder, args.category or None, args.duplicate,
                                              args.date_prefix))
+    elif args.verb == "explorer":
+        with _apartment():
+            doc = _guarded(lambda: archive_sheet.explorer_folder(cfg))
     else:
         with _apartment():
             doc = _guarded(lambda: show(cfg, args.message_id))

@@ -11,9 +11,11 @@ import pytest
 from app import outlook
 from src.archive_window import theme
 from src.archive_window.model import (
+    EXPLORER_CHIP,
     NO_NAME,
     WEAK_SCORE,
     ModelView,
+    explorer_note,
     last_two,
     mail_date,
     mail_line,
@@ -22,6 +24,7 @@ from src.archive_window.model import (
 )
 from src.archive_window.view import ArchiveView
 
+ARCHIVE_JS = Path(__file__).resolve().parents[3] / "app" / "webapp" / "static" / "archive.js"
 SAVED = {"auto": "001 - Plan.msg", "on": "2026-11-05 - 001 - Plan.msg", "off": "001 - Plan.msg"}
 
 
@@ -259,6 +262,54 @@ def test_the_entry_hands_the_window_a_search_and_a_filer_that_takes_every_option
     monkeypatch.setattr(outlook, "file_one", lambda cfg, e, s, folder, cat, dup, dp: got.update(args=(folder, cat, dup, dp)) or {"ok": True})
     monkeypatch.setattr(outlook, "_apartment", __import__("contextlib").nullcontext)
     monkeypatch.setattr(outlook, "_guarded", lambda work: work())
-    monkeypatch.setattr("src.archive_window.show_window", lambda doc, on_file, find: on_file("F", "Filed", True, "off"))
+    monkeypatch.setattr("src.archive_window.show_window", lambda doc, on_file, find, current_explorer=None: on_file("F", "Filed", True, "off"))
     outlook.archive({"c": 1}, "e", "s")
     assert got["args"] == ("F", "Filed", True, "off")
+
+
+# ------------------------------------------------------------------ the folder open in File Explorer
+
+def _explorer_window(root: Path, tk_root: tk.Tk, answer: dict[str, Any]) -> ArchiveView:
+    return _build(ArchiveView(_doc(root), lambda *_a: {}, None, theme.palette(False), tk_root, current_explorer=lambda: answer))
+
+
+def _button_texts(widget: tk.Misc) -> list[str]:
+    found = [str(widget.cget("text"))] if widget.winfo_class() == "Button" else []
+    for child in widget.winfo_children():
+        found.extend(_button_texts(child))
+    return found
+
+
+def test_the_explorer_button_is_offered_only_when_the_caller_can_read_explorer(root: Path, tk_root: tk.Tk) -> None:
+    without = _build(ArchiveView(_doc(root), lambda *_a: {}, None, theme.palette(False), tk_root))
+    assert "Current Explorer folder" not in _button_texts(without.root)
+    without.frame.destroy()
+    with_it = _explorer_window(root, tk_root, {"ok": True, "folder_path": str(root / "Internal")})
+    assert "Current Explorer folder" in _button_texts(with_it.root)
+    with_it.frame.destroy()
+
+
+def test_the_explorer_folder_leads_the_list_with_its_whole_path_and_waits_for_archive(root: Path, tk_root: tk.Tk) -> None:
+    view = _explorer_window(root, tk_root, {"ok": True, "folder_path": str(root / "Internal")})
+    view._use_explorer()
+    picked = view.model.options()[0]
+    assert view.model.extra == str(root / "Internal") and picked.chips == (("Explorer window", ""),)
+    assert picked.note == "open in File Explorer: " + str(root / "Internal").replace("/", "\\")
+    assert view.model.go_label() == "Archive to Mail\\Internal"
+    view.frame.destroy()
+
+
+@pytest.mark.parametrize("code", ["explorer_unavailable", "no_explorer_folder", "outside_email_folders"])
+def test_each_explorer_failure_is_said_in_its_own_words_and_picks_nothing(root: Path, tk_root: tk.Tk, code: str) -> None:
+    from src.email.archive_sheet import MESSAGES
+
+    view = _explorer_window(root, tk_root, {"ok": False, "error": {"code": code, "message": MESSAGES[code]}})
+    view._use_explorer()
+    assert view.status.cget("text") == MESSAGES[code] and view.model.extra is None
+    view.frame.destroy()
+
+
+def test_the_page_and_the_window_word_the_explorer_choice_alike() -> None:
+    js = ARCHIVE_JS.read_text(encoding="utf-8")
+    assert "label: '%s'" % EXPLORER_CHIP in js and "'open in File Explorer: '" in js
+    assert explorer_note("C:/Mail/Alpha") == "open in File Explorer: C:\\Mail\\Alpha"

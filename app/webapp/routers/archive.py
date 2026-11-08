@@ -50,6 +50,8 @@ PREPARE_TIMEOUT_S = 45.0
 # Saving the .msg and its attachments into a OneDrive folder can take a while.
 FILE_TIMEOUT_S = 90.0
 SHOW_TIMEOUT_S = 30.0
+# Listing the shell's open windows is quick; a longer wait means the shell is stuck.
+EXPLORER_TIMEOUT_S = 15.0
 # A page that polled within this many seconds is open to show a mail from the macro
 # (it polls every 3 s while it is visible).
 PAGE_LIVE_S = 8.0
@@ -215,6 +217,20 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
     doc = bridge(args, FILE_TIMEOUT_S)
     if doc.get("files"):
         PREPARED.drop(str(body["token"]))
+    return doc
+
+
+@router.post("/archive/explorer")
+def explorer(request: Request) -> dict[str, Any]:
+    """The folder open in the foremost File Explorer window on this PC, when it is inside an email folder.
+
+    Answers the sheet's document shape: ``folder_path`` and its place in the scan, or an error whose code says
+    whether Windows couldn't be asked, no Explorer folder is open, or the folder is outside the email folders.
+    """
+    _pc_only(request)
+    doc = bridge(["explorer"], EXPLORER_TIMEOUT_S)
+    if doc.get("ok"):
+        doc["location"] = locate_folder(resolve_roots(config.load()["roots"]), str(doc["folder_path"]))
     return doc
 
 

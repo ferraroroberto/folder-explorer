@@ -16,11 +16,10 @@ opens the file ``mode=ro``.
 from __future__ import annotations
 
 import logging
-import os
 import sqlite3
 from pathlib import Path
 
-from src import store
+from src import atomic_write, runtime_files, store
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +108,8 @@ def migrate(conn: sqlite3.Connection) -> list[str]:
 
 def open_writer(path: Path) -> sqlite3.Connection:
     """The one writer's connection: WAL, a busy wait, the schema made current."""
-    # runtime-write-exempt: path is own_index_path() (the runtime-data folder) or a test's temp folder
-    path.parent.mkdir(parents=True, exist_ok=True)
-    # runtime-write-exempt: the email index lives in the runtime-data folder (own_index_path)
-    conn = sqlite3.connect(str(path), timeout=BUSY_TIMEOUT_S, check_same_thread=False)
+    runtime_files.make_dirs(path.parent)
+    conn = runtime_files.connect(path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
@@ -130,15 +127,12 @@ def import_index(source: Path, dest: Path) -> int:
         raise FileExistsError("the email index already exists: " + dest.name)
     part = dest.with_name(dest.name + ".part")
     part.unlink(missing_ok=True)
-    # runtime-write-exempt: opened read-only (mode=ro); the source belongs to the app that wrote it
-    src = sqlite3.connect(source.resolve().as_uri() + "?mode=ro", uri=True, timeout=BUSY_TIMEOUT_S)
+    src = runtime_files.connect_read_only(source, timeout=BUSY_TIMEOUT_S)
     try:
         if not {"emails", "emails_fts"} <= {r[0] for r in src.execute("SELECT name FROM sqlite_master")}:
             raise ValueError("not an email index: " + source.name)
-        # runtime-write-exempt: dest is own_index_path() (the runtime-data folder) or a test's temp folder
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        # runtime-write-exempt: the .part sits beside dest, in the runtime-data folder
-        out = sqlite3.connect(str(part))
+        runtime_files.make_dirs(dest.parent)
+        out = runtime_files.connect(part)
         try:
             src.backup(out)
             migrate(out)
@@ -147,7 +141,6 @@ def import_index(source: Path, dest: Path) -> int:
             out.close()
     finally:
         src.close()
-    # must-use-exempt: renames a database SQLite built and closed in place; there is no text to write
-    os.replace(part, dest)
+    atomic_write.swap_in(part, dest)
     logger.info("✅ imported %d emails into %s", rows, dest.name)
     return rows

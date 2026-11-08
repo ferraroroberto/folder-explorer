@@ -19,6 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
+from src import runtime_files
 from src.email.query import (
     FLAG_FLAGGED,
     FTS_PREVIEW,
@@ -46,8 +47,7 @@ _OPTIONAL = ("to_addrs", "cc_addrs", "attachment_names", "has_attachments", "siz
 
 
 def open_ro(path: Path) -> sqlite3.Connection:
-    # runtime-write-exempt: opened read-only (mode=ro); the email index belongs to whichever app writes it
-    conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, check_same_thread=False, timeout=10)
+    conn = runtime_files.connect_read_only(path, check_same_thread=False, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
 

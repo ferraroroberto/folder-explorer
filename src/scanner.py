@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from src import winfs
+from src import atomic_write, runtime_files, winfs
 from src.folder_match import IDS_TYPE, fold, name_words
 
 logger = logging.getLogger(__name__)
@@ -165,8 +165,7 @@ Lister = Callable[[str], Iterator[winfs.Entry]]
 def _open_index(path: Path) -> sqlite3.Connection:
     if path.exists():
         path.unlink()
-    # runtime-write-exempt: the caller passes an index path under store.index_dir(), in the runtime-data folder
-    conn = sqlite3.connect(str(path))
+    conn = runtime_files.connect(path)
     # The file is private until it is renamed into place, so durability
     # mid-build buys nothing; a crash just leaves a .part to delete.
     conn.execute("PRAGMA journal_mode=OFF")
@@ -340,6 +339,5 @@ def scan_to_index(
         part.unlink(missing_ok=True)
         raise
     conn.close()
-    # must-use-exempt: renames an index SQLite built and closed in place; there is no text to write
-    os.replace(part, index_path)
+    atomic_write.swap_in(part, index_path)
     return walk.counters

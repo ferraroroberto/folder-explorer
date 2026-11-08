@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
 
+from src import runtime_files
 from src.folder_match import edits, unpack_ids
 from src.winfs import ONLINE_ONLY_ATTRS
 
@@ -44,8 +45,7 @@ def column(basis: str) -> str:
 
 def open_index(path: Path) -> sqlite3.Connection:
     """A read-only connection; an index file never changes once written."""
-    # runtime-write-exempt: opened read-only (mode=ro); the path is an index file in the runtime-data folder
-    conn = sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True, check_same_thread=False)
+    conn = runtime_files.connect_read_only(path, immutable=True, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 

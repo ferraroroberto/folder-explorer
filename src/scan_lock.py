@@ -13,6 +13,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO, Optional
 
+from src import runtime_files
+
 
 class ScanBusy(RuntimeError):
     """Another scan holds the lock."""
@@ -26,10 +28,8 @@ class ScanLock:
         self._fh: Optional[IO[bytes]] = None
 
     def acquire(self) -> None:
-        # runtime-write-exempt: the lock file is scan.lock in the runtime-data folder (scan_runner.lock())
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # runtime-write-exempt: same file as above
-        fh = open(self.path, "a+b")
+        runtime_files.make_dirs(self.path.parent)
+        fh = runtime_files.open_file(self.path, "a+b")
         try:
             if sys.platform == "win32":
                 import msvcrt

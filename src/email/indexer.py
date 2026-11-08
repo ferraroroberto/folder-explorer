@@ -136,7 +136,6 @@ def spawn(trigger: str, scope: Optional[str] = None, fresh: bool = False) -> "su
     if fresh:
         cmd.append("--fresh")
     env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
-    # runtime-write-exempt: email.log sits in the runtime-data folder
     log = open(store.data_dir() / "email.log", "ab")
     try:
         return subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), env=env, stdout=log, stderr=subprocess.STDOUT,

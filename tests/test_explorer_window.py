@@ -35,8 +35,8 @@ def test_the_newest_window_wins_when_the_z_order_has_no_match() -> None:
 
 
 def test_only_the_explorer_program_hosts_a_destination() -> None:
-    assert explorer._is_explorer(r"C:\Windows\EXPLORER.EXE") and explorer._is_explorer("/win/explorer")
-    assert not explorer._is_explorer(r"C:\Program Files\Internet Explorer\iexplore.exe") and not explorer._is_explorer("")
+    assert explorer.is_explorer(r"C:\Windows\EXPLORER.EXE") and explorer.is_explorer("/win/explorer")
+    assert not explorer.is_explorer(r"C:\Program Files\Internet Explorer\iexplore.exe") and not explorer.is_explorer("")
 
 
 @pytest.fixture()
@@ -78,7 +78,7 @@ def test_no_com_at_all_is_also_unreachable(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_the_foremost_of_the_open_windows_is_returned(monkeypatch: pytest.MonkeyPatch, com: list[str]) -> None:
     monkeypatch.setattr(explorer, "_enumerate_explorer_folders", lambda: {1: r"E:\mail\a", 2: r"E:\mail\b"})
-    monkeypatch.setattr(explorer, "_top_level_z_order", lambda: [50, 1, 2])
+    monkeypatch.setattr(explorer, "top_level_z_order", lambda: [50, 1, 2])
     assert explorer.get_current_explorer_folder() == r"E:\mail\a"
 
 
@@ -87,5 +87,5 @@ def test_an_unreadable_z_order_falls_back_to_the_newest_window(monkeypatch: pyte
         raise OSError("no window list")
 
     monkeypatch.setattr(explorer, "_enumerate_explorer_folders", lambda: {1: r"E:\mail\a", 2: r"E:\mail\b"})
-    monkeypatch.setattr(explorer, "_top_level_z_order", refused)
+    monkeypatch.setattr(explorer, "top_level_z_order", refused)
     assert explorer.get_current_explorer_folder() == r"E:\mail\b"

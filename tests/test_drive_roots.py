@@ -55,8 +55,8 @@ def test_open_folder_checks_and_launches_the_clean_path(isolated: Path, monkeypa
     checked: list[str] = []
     launched: list[str] = []
     monkeypatch.setattr(search_routes.os.path, "isdir", lambda p: checked.append(str(p)) or True)
-    monkeypatch.setattr(search_routes, "open_in_explorer", launched.append)
-    monkeypatch.setattr(desktop, "_spawn", lambda command: launched.append(command[-1]))
+    monkeypatch.setattr(search_routes, "open_in_explorer", lambda path, *_: launched.append(path))
+    monkeypatch.setattr(desktop, "_shell", lambda path, verb: launched.append(path))
     with TestClient(app, client=LOCAL) as c:
         assert c.post("/api/scan", json={}).status_code == 202
         for _ in range(100):

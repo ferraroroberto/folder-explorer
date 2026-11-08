@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 _EXPLORER_PROGRAM = "explorer"
 
 
-def _is_explorer(program_path: str) -> bool:
+def is_explorer(program_path: str) -> bool:
     """True when the shell window's hosting program is File Explorer."""
     return os.path.splitext(os.path.basename(program_path))[0].lower() == _EXPLORER_PROGRAM
 
@@ -63,7 +63,7 @@ def _enumerate_explorer_folders() -> dict[int, str]:
     folders: dict[int, str] = {}
     for window in win32com.client.Dispatch("Shell.Application").Windows():
         try:
-            if not _is_explorer(str(window.FullName or "")):
+            if not is_explorer(str(window.FullName or "")):
                 continue
             hwnd = int(window.HWND)
             path = str(window.Document.Folder.Self.Path or "")
@@ -75,7 +75,7 @@ def _enumerate_explorer_folders() -> dict[int, str]:
     return folders
 
 
-def _top_level_z_order() -> list[int]:
+def top_level_z_order() -> list[int]:
     """Every top-level window handle, topmost first."""
     import win32gui  # noqa: PLC0415 - Windows only, imported where it is used
 
@@ -107,7 +107,7 @@ def get_current_explorer_folder() -> str | None:
             logger.info("ℹ️ explorer: no open window shows a real folder")
             return None
         try:
-            z_order = _top_level_z_order()
+            z_order = top_level_z_order()
         except Exception as exc:  # noqa: BLE001 - without a z-order the newest window still answers
             logger.warning("⚠️ explorer: can't read the window order: %s", exc)
             z_order = []

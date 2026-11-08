@@ -43,7 +43,7 @@ def test_each_verb_maps_to_its_launch(launched: list[tuple[str, Any]]) -> None:
     desktop.open_item(r"X:\Invented\notes.txt", "edit")
     desktop.open_item(r"X:\Invented folder\notes.txt", "reveal")
     explore, opened, edited, revealed = launched
-    assert explore[0] == "spawn" and explore[1][0].lower().endswith("explorer.exe") and explore[1][1] == r"X:\Invented\Photos"
+    assert explore == ("shell", (r"X:\Invented\Photos", "explore"))
     assert opened == ("shell", (r"X:\Invented\notes.txt", "open"))
     assert edited == ("shell", (r"X:\Invented\notes.txt", "edit"))
     assert revealed[0] == "spawn" and revealed[1].endswith(r'explorer.exe" /select,"X:\Invented folder\notes.txt"')
@@ -102,7 +102,7 @@ def test_open_runs_the_verb_on_the_item_looked_up_by_id(scanned: dict[str, Any],
         assert _ask(c, scanned, "file", "notes.txt", "edit").status_code == 200
         assert _ask(c, scanned, "file", "notes.txt", "reveal").status_code == 200
     notes = os.path.join(scanned["path"], "notes.txt")
-    assert launched[0][1][1] == os.path.join(scanned["path"], "Photos")
+    assert launched[0] == ("shell", (os.path.join(scanned["path"], "Photos"), "explore"))
     assert launched[1] == ("shell", (notes, "open")) and launched[2] == ("shell", (notes, "edit"))
     assert launched[3][1].endswith('/select,"' + notes + '"')
 
@@ -159,4 +159,4 @@ def test_an_offered_archive_folder_opens_by_its_place_in_the_scan(scanned: dict[
     with TestClient(app, client=LOCAL) as c:
         r = c.post("/api/open", json={"kind": "folder", "verb": "explore", **loc})
     assert r.json() == {"status": "opened"}
-    assert launched[0][1][1] == os.path.join(scanned["path"], "Photos", "2024")
+    assert launched[0] == ("shell", (os.path.join(scanned["path"], "Photos", "2024"), "explore"))

@@ -20,6 +20,9 @@
   "explore": {
     "show_hidden": false
   },
+  "desktop": {
+    "reuse_explorer_window": false
+  },
   "archive": {
     "date_prefix": false,
     "max_path_length": 255,

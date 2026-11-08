@@ -10,6 +10,7 @@ child) or a folder in File Explorer for loopback callers.
 from __future__ import annotations
 
 import os
+import time
 from contextlib import ExitStack
 from typing import Any, Optional
 
@@ -20,7 +21,13 @@ from app.webapp.auth import is_pc_itself
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.state import EMAILS, POOL
 from src import config, folder_search, store
-from src.desktop import open_in_explorer, open_in_outlook, outlook_exe
+from src.desktop import (
+    GoneError,
+    ensure_there,
+    open_in_explorer,
+    open_in_outlook,
+    outlook_exe,
+)
 from src.email.body import ERR_NOT_SET_UP, ERR_OUTSIDE, failed, fetch_body
 from src.email.search import PAGE, SORTS, EmailIndex
 from src.email.settings import EmailPart, email_part, is_under, under_any
@@ -208,6 +215,7 @@ def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
 
 @router.post("/folders/open")
 def open_folder(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
+    started = time.perf_counter()
     _pc_only(request)
     root = next((r for r in _roots() if r.key == body.get("root")), None)
     scan = store.current_index(root.key) if root else None
@@ -217,12 +225,15 @@ def open_folder(request: Request, body: dict[str, Any] = Body(...)) -> dict[str,
     with lock:
         names = [p["name"] for p in index.path(body["id"])][1:]
     path = folder_search.full_path(root, names)
-    if not os.path.isdir(path):
-        raise HTTPException(status_code=410, detail="the folder is no longer there")
     try:
-        open_in_explorer(path)
+        ensure_there(path, True, started)
+        open_in_explorer(path, started)
+    except GoneError as exc:
+        raise HTTPException(status_code=410, detail="the folder is no longer there") from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Windows can't open this folder: " + str(exc)) from exc
     return {"status": "opened"}
 
 

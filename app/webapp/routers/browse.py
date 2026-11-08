@@ -14,7 +14,7 @@ id in the current scan, never by a path from the client.
 
 from __future__ import annotations
 
-import os
+import time
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
@@ -101,6 +101,7 @@ def folder_contents(request: Request, root: str, folder: int = 0, basis: str = "
 @router.post("/open")
 def open_item(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
     """Ask Windows to open a folder (``explore``) or a file (``open``, ``edit``, ``reveal``) on this PC."""
+    started = time.perf_counter()
     if not is_pc_itself(request):
         raise HTTPException(status_code=403, detail="this works on the PC only")
     kind, verb, item_id = body.get("kind"), body.get("verb"), body.get("id")
@@ -120,10 +121,11 @@ def open_item(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, s
             path = item_path(root, index, str(kind), item_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="no such item") from exc
-    if not (os.path.isdir(path) if kind == "folder" else os.path.isfile(path)):
-        raise HTTPException(status_code=410, detail="it is no longer there")
     try:
-        desktop.open_item(path, str(verb))
+        desktop.ensure_there(path, kind == "folder", started)
+        desktop.open_item(path, str(verb), started)
+    except desktop.GoneError as exc:
+        raise HTTPException(status_code=410, detail="it is no longer there") from exc
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except OSError as exc:

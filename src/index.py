@@ -13,8 +13,9 @@ import math
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
+from src.folder_match import edits, unpack_ids
 from src.winfs import ONLINE_ONLY_ATTRS
 
 BASES = ("size", "disk")
@@ -25,6 +26,13 @@ NO_EXT = ""
 MAX_CHILDREN = 300
 MAX_CONTENTS = 200
 MAX_TYPES = 60
+
+# Values per ``IN (...)``, well under SQLite's bound-parameter limit.
+_SQL_CHUNK = 900
+# Near words kept per query word, the shortest first; each widens the paths read.
+MAX_NEAR = 40
+# Above every character, so ``word < prefix + _PAST_PREFIX`` ends a prefix's key range.
+_PAST_PREFIX = "\U0010ffff"
 
 
 def column(basis: str) -> str:
@@ -53,6 +61,7 @@ class Index:
         self.conn = conn
         self._types: dict[tuple[int, str], dict[str, Any]] = {}
         self._knows_hidden: Optional[bool] = None
+        self._folds_accents: Optional[bool] = None
 
     def knows_hidden(self) -> bool:
         """Whether this index marks hidden items (one written before the ``hidden`` column does not)."""
@@ -251,20 +260,80 @@ class Index:
         """Whether this index carries folder paths (an index from before folder search does not)."""
         return self.conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'folder_paths'").fetchone() is not None
 
-    def match_folders(self, terms: list[str], cap: int, skip_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[int], bool]:
-        """Ids of folders whose full path holds every term (already search-keyed), and whether ``cap`` cut them.
+    def folds_accents(self) -> bool:
+        """Whether this index stores folded paths and the name words (one written before accent folding does not)."""
+        if self._folds_accents is None:
+            self._folds_accents = self.conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE name = 'folder_words'").fetchone() is not None
+        return self._folds_accents
 
+    def near_words(self, folded_word: str) -> list[str]:
+        """Folder-name words one edit from ``folded_word``, or starting with such a spelling, without the word itself.
+
+        At most ``MAX_NEAR``, the shortest first: each is a key lookup or a
+        short key-range scan of ``folder_words``, never a pass over the paths.
+        """
+        spellings = sorted(edits(folded_word))
+        found: set[str] = set()
+        for start in range(0, len(spellings), _SQL_CHUNK):
+            chunk = spellings[start:start + _SQL_CHUNK]
+            # One statement per chunk: a key-range seek per spelling, all inside SQLite. CROSS JOIN keeps the
+            # spellings outermost; left to choose, the planner may scan every word once per spelling.
+            found.update(r[0] for r in self.conn.execute(
+                "WITH s(v) AS (VALUES " + ",".join(["(?)"] * len(chunk)) + ") "
+                "SELECT DISTINCT w.word FROM s CROSS JOIN folder_words w ON w.word >= s.v AND w.word < s.v || ?",
+                (*chunk, _PAST_PREFIX)))
+        return sorted((w for w in found if folded_word not in w), key=lambda w: (len(w), w))[:MAX_NEAR]
+
+    def word_spans(self, words: list[str]) -> tuple[set[int], list[tuple[int, int]]]:
+        """The folders whose own name holds one of ``words``, and their subtrees as merged ``(lo, hi)`` id ranges."""
+        named: set[int] = set()
+        for start in range(0, len(words), _SQL_CHUNK):
+            chunk = words[start:start + _SQL_CHUNK]
+            for (blob,) in self.conn.execute(
+                    "SELECT ids FROM folder_words WHERE word IN (%s)" % ",".join("?" * len(chunk)), chunk):
+                named.update(unpack_ids(blob))
+        ids = sorted(named)
+        spans: list[tuple[int, int]] = []
+        for start in range(0, len(ids), _SQL_CHUNK):
+            batch = ids[start:start + _SQL_CHUNK]
+            rows = self.conn.execute(
+                "SELECT lo, hi FROM folders WHERE id IN (%s) ORDER BY lo" % ",".join("?" * len(batch)), batch)
+            for lo, hi in rows:
+                if spans and lo <= spans[-1][1]:
+                    spans[-1] = (spans[-1][0], max(spans[-1][1], hi))
+                else:
+                    spans.append((lo, hi))
+        return named, spans
+
+    def paths_in(self, spans: list[tuple[int, int]]) -> Iterator[tuple[int, str]]:
+        """``(id, path)`` of every folder in the ``(lo, hi)`` ranges, in id order, read a batch of ranges at a time as asked."""
+        step = _SQL_CHUNK // 2
+        for start in range(0, len(spans), step):
+            chunk = spans[start:start + step]
+            # The spans are sorted and disjoint and CROSS JOIN keeps them outermost, so rows come in id order.
+            yield from ((int(r[0]), r[1]) for r in self.conn.execute(
+                "WITH s(lo, hi) AS (VALUES " + ",".join(["(?, ?)"] * len(chunk)) + ") "
+                "SELECT p.id, p.lpath FROM s CROSS JOIN folder_paths p ON p.id BETWEEN s.lo AND s.hi",
+                [v for span in chunk for v in span]))
+
+    def match_folders(self, groups: list[list[str]], cap: int,
+                      skip_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[tuple[int, str]], bool]:
+        """``(id, path)`` of folders whose path holds one spelling of every group, and whether ``cap`` cut them.
+
+        Each group is one query word's stored spellings (already search-keyed).
         A folder's id is the low end of its subtree's id range, so each
         ``(lo, hi)`` in ``skip_spans`` leaves out one folder and everything below it.
         """
-        if not terms:
+        if not groups:
             return [], False
-        where = ["instr(lpath, ?) > 0"] * len(terms) + ["id NOT BETWEEN ? AND ?"] * len(skip_spans)
+        where = ["(" + " OR ".join(["instr(lpath, ?) > 0"] * len(g)) + ")" for g in groups]
+        where += ["id NOT BETWEEN ? AND ?"] * len(skip_spans)
         rows = self.conn.execute(
-            "SELECT id FROM folder_paths WHERE " + " AND ".join(where) + " LIMIT ?",
-            (*terms, *(v for span in skip_spans for v in span), cap + 1),
+            "SELECT id, lpath FROM folder_paths WHERE " + " AND ".join(where) + " LIMIT ?",
+            (*(v for g in groups for v in g), *(v for span in skip_spans for v in span), cap + 1),
         ).fetchall()
-        return [int(r[0]) for r in rows[:cap]], len(rows) > cap
+        return [(int(r[0]), r[1]) for r in rows[:cap]], len(rows) > cap
 
     def people_folders(self) -> list[tuple[int, int, int, int]]:
         """``(lo, hi, id, people)`` of every folder of people that no other one contains, by ``lo``."""

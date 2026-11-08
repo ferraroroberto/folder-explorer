@@ -17,12 +17,14 @@ import os
 import re
 import sqlite3
 import time
+from array import array
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from src import winfs
+from src.folder_match import IDS_TYPE, fold, name_words
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,7 @@ CREATE TABLE folder_ext (
     online_files INTEGER NOT NULL, online_size INTEGER NOT NULL
 );
 CREATE TABLE folder_paths (id INTEGER PRIMARY KEY, lpath TEXT NOT NULL);
+CREATE TABLE folder_words (word TEXT NOT NULL, ids BLOB NOT NULL);
 CREATE TABLE folder_people (id INTEGER PRIMARY KEY, people INTEGER NOT NULL);
 """
 
@@ -88,8 +91,14 @@ def search_key(path: str) -> str:
     """How folder search compares a path: case-folded, with ``/`` as the one separator."""
     return path.casefold().replace("\\", "/")
 
+
+def folded_key(path: str) -> str:
+    """How folder search compares a path in an index with ``folder_words``: ``search_key`` without accents."""
+    return fold(search_key(path))
+
 INDEX_INDEXES = """
 CREATE INDEX folders_parent ON folders(parent);
+CREATE UNIQUE INDEX folder_words_word ON folder_words(word);
 CREATE INDEX files_folder ON files(folder_id);
 CREATE INDEX files_size ON files(size);
 CREATE INDEX files_alloc ON files(alloc);
@@ -167,11 +176,19 @@ def _open_index(path: Path) -> sqlite3.Connection:
 
 
 def _write_paths(conn: sqlite3.Connection, f: _Folders, root_path: str) -> None:
-    """Each folder's full path as folder search compares it, plus the folders of people."""
-    keys = [search_key(root_path).rstrip("/")]
+    """Each folder's folded path and the folders each name word is in, as folder search compares them, plus the folders of people."""
+    keys = [folded_key(root_path).rstrip("/")]
+    words: dict[str, array] = {}
     for i in range(1, len(f.parent)):
-        keys.append(keys[f.parent[i]] + "/" + f.name[i].casefold())
+        name = fold(f.name[i])
+        keys.append(keys[f.parent[i]] + "/" + name)
+        for w in name_words(name):
+            ids = words.get(w)
+            if ids is None:
+                ids = words[w] = array(IDS_TYPE)
+            ids.append(i)
     conn.executemany("INSERT INTO folder_paths VALUES (?, ?)", enumerate(keys))
+    conn.executemany("INSERT INTO folder_words VALUES (?, ?)", ((w, ids.tobytes()) for w, ids in words.items()))
     conn.executemany("INSERT INTO folder_people VALUES (?, ?)", f.people.items())
 
 

@@ -30,6 +30,7 @@ folder-explorer/
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
+│   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
 │   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)

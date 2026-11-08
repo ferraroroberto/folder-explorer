@@ -246,6 +246,7 @@ const CLICKS = [
   ['#skipDown', () => saveFolderOptions({ skip_levels: Math.max(0, S.status.folder_search.skip_levels - 1) })],
   ['#skipUp', () => saveFolderOptions({ skip_levels: Math.min(8, S.status.folder_search.skip_levels + 1) })],
   ['#pruneSwitch', () => saveFolderOptions({ prune_people: !S.status.folder_search.prune_people })],
+  ['#onedriveSwitch', () => saveFolderOptions({ onedrive_prevails: !S.status.folder_search.onedrive_prevails })],
   ['#keysInfo', () => $('keysDialog').showModal()],
   ['.side-toggle', (el) => setOpen(el.closest('.side-card').id, el.getAttribute('aria-expanded') !== 'true')],
 ];

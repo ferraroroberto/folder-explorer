@@ -49,8 +49,9 @@ DEFAULTS: dict[str, Any] = {
     # index leaves out; the global exclude above still applies to it too.
     "email": {"index_path": None, "roots": [], "exclude": [], "download_budget_mb": None},
     # Folder search: how many leading path components a result hides (display
-    # only) and whether a folder of per-person subfolders shows as one result.
-    "folder_search": {"skip_levels": 0, "prune_people": True},
+    # only), whether a folder of per-person subfolders shows as one result, and
+    # whether a folder in a scanned OneDrive root is listed once, not also under its drive.
+    "folder_search": {"skip_levels": 0, "prune_people": True, "onedrive_prevails": True},
     # Explore: whether hidden and system items are listed. Off by default, as
     # in File Explorer; the totals count them either way.
     "explore": {"show_hidden": False},
@@ -173,6 +174,8 @@ def _clean_folder_search(raw: Any) -> dict[str, Any]:
         out["skip_levels"] = skip
     if isinstance(raw.get("prune_people"), bool):
         out["prune_people"] = raw["prune_people"]
+    if isinstance(raw.get("onedrive_prevails"), bool):
+        out["onedrive_prevails"] = raw["onedrive_prevails"]
     return out
 
 
@@ -246,13 +249,14 @@ def _validate_email(value: Any) -> dict[str, Any]:
 
 
 def _validate_folder_search(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or set(value) - {"skip_levels", "prune_people"}:
-        raise ValueError("folder_search takes skip_levels and prune_people")
+    if not isinstance(value, dict) or set(value) - set(DEFAULTS["folder_search"]):
+        raise ValueError("folder_search takes skip_levels, prune_people and onedrive_prevails")
     skip = value.get("skip_levels", 0)
     if not (isinstance(skip, int) and not isinstance(skip, bool) and 0 <= skip <= MAX_SKIP_LEVELS):
         raise ValueError("folder_search.skip_levels must be 0 to %d" % MAX_SKIP_LEVELS)
-    if not isinstance(value.get("prune_people", True), bool):
-        raise ValueError("folder_search.prune_people must be true or false")
+    for key in ("prune_people", "onedrive_prevails"):
+        if not isinstance(value.get(key, True), bool):
+            raise ValueError("folder_search.%s must be true or false" % key)
     return _clean_folder_search(value)
 
 

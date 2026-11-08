@@ -156,8 +156,11 @@ def test_saved_searches_round_trip(isolated: Path) -> None:
 def test_config_validates_the_search_settings(isolated: Path) -> None:
     with TestClient(app, client=LOCAL) as c:
         ok = c.post("/api/config", json={"folder_search": {"skip_levels": 3, "prune_people": False}})
-        assert ok.json()["config"]["folder_search"] == {"skip_levels": 3, "prune_people": False}
+        assert ok.json()["config"]["folder_search"] == {"skip_levels": 3, "prune_people": False, "onedrive_prevails": True}
         assert c.post("/api/config", json={"folder_search": {"skip_levels": 99}}).status_code == 400
+        assert c.post("/api/config", json={"folder_search": {"onedrive_prevails": "yes"}}).status_code == 400
+        off = c.post("/api/config", json={"folder_search": {"onedrive_prevails": False}})
+        assert off.json()["config"]["folder_search"]["onedrive_prevails"] is False
         assert c.post("/api/config", json={"email": {"index_path": 5}}).status_code == 400
         assert c.post("/api/config", json={"email": {"bogus": 1}}).status_code == 400
 

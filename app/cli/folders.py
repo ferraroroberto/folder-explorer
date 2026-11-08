@@ -64,7 +64,8 @@ def run_search(query: str, limit: int) -> int:
         if not indexes:
             _emit({"error": {"code": "not_set_up", "message": "no root has a finished scan yet"}})
             return EXIT_NOT_SET_UP
-        found = folder_search.search(indexes, query, opts["prune_people"], opts["skip_levels"], limit)
+        found = folder_search.search(indexes, query, opts["prune_people"], opts["skip_levels"], limit,
+                                      opts["onedrive_prevails"])
     _emit({"query": query, **found})
     return EXIT_OK
 

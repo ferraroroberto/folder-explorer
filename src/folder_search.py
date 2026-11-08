@@ -7,7 +7,9 @@ and the folder's own name the other. A folder whose subfolders are named like
 email addresses is a "folder of people"; with ``prune`` on, every match at or
 below it folds into that one result. ``skip`` hides leading path components
 from the displayed path only; the full path is always kept for copying and
-opening.
+opening. A OneDrive library lives on a local drive too, so with
+``onedrive_prevails`` a folder in a scanned library is listed once, as the
+library's row, and the drive's copy is left out.
 
 This is a query over the scan's index, never a walk: it reads no folder on disk.
 """
@@ -17,11 +19,11 @@ from __future__ import annotations
 import bisect
 import os
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any, Iterator, Sequence
 
 from src import store
 from src.index import Index, open_index
-from src.roots import Root
+from src.roots import Root, relative_parts
 from src.scanner import search_key
 
 # Folders read per root before ranking, and results returned in all.
@@ -74,11 +76,30 @@ def item_path(root: Root, index: Index, kind: str, item_id: int) -> str:
     return os.path.join(full_path(root, [p["name"] for p in index.path(folder)][1:]), row["name"])
 
 
-def search_root(root: Root, index: Index, terms: list[str], prune: bool, skip: int) -> dict[str, Any]:
+def synced_spans(root: Root, index: Index, indexes: list[tuple[Root, Index]]) -> list[tuple[int, int]]:
+    """The id ranges in a local root's index that a scanned OneDrive root already lists.
+
+    A synced library sits on a local drive, so the drive's scan holds it too.
+    Only a library whose own index is searchable counts: hiding the drive's
+    copy of one that was never scanned would hide the only copy.
+    """
+    if root.kind != "local" or not index.searchable():
+        return []
+    spans = []
+    for other, other_index in indexes:
+        names = relative_parts(other.path, root.path) if other.kind == "synced" and other_index.searchable() else None
+        span = index.subtree_span(names) if names else None
+        if span is not None:
+            spans.append(span)
+    return spans
+
+
+def search_root(root: Root, index: Index, terms: list[str], prune: bool, skip: int,
+                skip_spans: Sequence[tuple[int, int]] = ()) -> dict[str, Any]:
     """One root's matching folders, ranked, plus whether the candidate cap cut the list."""
     if not index.searchable():
         return {"results": [], "truncated": False, "needs_rescan": True}
-    ids, truncated = index.match_folders(terms, CANDIDATES)
+    ids, truncated = index.match_folders(terms, CANDIDATES, skip_spans)
     owners = index.people_folders() if prune else []
     folded = _fold(ids, owners) if owners else {i: i for i in ids}
     people = {o[2]: o[3] for o in owners}
@@ -121,8 +142,15 @@ def open_scanned(roots: list[Root]) -> Iterator[list[tuple[Root, Index]]]:
             index.conn.close()
 
 
-def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int, limit: int = LIMIT) -> dict[str, Any]:
-    """Every root's matches merged: the best ``limit``, the total, and the roots that need a rescan first."""
+def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int, limit: int = LIMIT,
+           onedrive_prevails: bool = False) -> dict[str, Any]:
+    """Every root's matches merged: the best ``limit``, the total, and the roots that need a rescan first.
+
+    With ``onedrive_prevails`` a folder inside a scanned OneDrive root is
+    listed once, as that root's row, not also under the drive that holds it.
+    The drive's copies are left out of the query itself, so the total, the
+    candidate cap and the folding of folders of people all see the same list.
+    """
     terms = parse_terms(text)
     if not terms:
         return {"results": [], "total": 0, "truncated": False, "needs_rescan": []}
@@ -130,7 +158,8 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     truncated = False
     stale = []
     for root, index in indexes:
-        part = search_root(root, index, terms, prune, skip)
+        spans = synced_spans(root, index, indexes) if onedrive_prevails else []
+        part = search_root(root, index, terms, prune, skip, spans)
         merged.extend((hit, root, index) for hit in part["results"])
         truncated = truncated or part["truncated"]
         if part["needs_rescan"]:

@@ -94,7 +94,9 @@ function folderOptionsHtml() {
     '<span class="num" id="skipVal"></span>' +
     '<button type="button" class="icon-button" id="skipUp" aria-label="Hide one more level" data-track="skip-up">' + glyph('plus') + '</button></span></div>' +
     '<div class="ff-line"><span>One result per folder of people</span>' + switchHtml('pruneSwitch', 'One result per folder of people', 'prune') + '</div>' +
-    '<p class="row-note">A folder whose subfolders are email addresses shows once, with a count.</p>';
+    '<p class="row-note">A folder whose subfolders are email addresses shows once, with a count.</p>' +
+    '<div class="ff-line"><span>Show OneDrive folders once</span>' + switchHtml('onedriveSwitch', 'Show OneDrive folders once', 'onedrive-prevails') + '</div>' +
+    '<p class="row-note">A folder in a synced OneDrive library shows as the OneDrive row, not also under its drive.</p>';
 }
 
 let builtFor = null;
@@ -122,6 +124,7 @@ export function renderFilters() {
     const fs = S.status.folder_search;
     $('skipVal').textContent = String(fs.skip_levels);
     setSwitchState('pruneSwitch', fs.prune_people);
+    setSwitchState('onedriveSwitch', fs.onedrive_prevails);
     $('filtersMeta').textContent = fs.skip_levels ? 'Hiding ' + fs.skip_levels + (fs.skip_levels === 1 ? ' level' : ' levels') : 'Full paths';
     return;
   }

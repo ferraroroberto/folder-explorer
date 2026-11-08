@@ -13,7 +13,7 @@ import math
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from src.winfs import ONLINE_ONLY_ATTRS
 
@@ -251,13 +251,18 @@ class Index:
         """Whether this index carries folder paths (an index from before folder search does not)."""
         return self.conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'folder_paths'").fetchone() is not None
 
-    def match_folders(self, terms: list[str], cap: int) -> tuple[list[int], bool]:
-        """Ids of folders whose full path holds every term (already search-keyed), and whether ``cap`` cut them."""
+    def match_folders(self, terms: list[str], cap: int, skip_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[int], bool]:
+        """Ids of folders whose full path holds every term (already search-keyed), and whether ``cap`` cut them.
+
+        A folder's id is the low end of its subtree's id range, so each
+        ``(lo, hi)`` in ``skip_spans`` leaves out one folder and everything below it.
+        """
         if not terms:
             return [], False
+        where = ["instr(lpath, ?) > 0"] * len(terms) + ["id NOT BETWEEN ? AND ?"] * len(skip_spans)
         rows = self.conn.execute(
-            "SELECT id FROM folder_paths WHERE " + " AND ".join(["instr(lpath, ?) > 0"] * len(terms)) + " LIMIT ?",
-            (*terms, cap + 1),
+            "SELECT id FROM folder_paths WHERE " + " AND ".join(where) + " LIMIT ?",
+            (*terms, *(v for span in skip_spans for v in span), cap + 1),
         ).fetchall()
         return [int(r[0]) for r in rows[:cap]], len(rows) > cap
 
@@ -291,6 +296,14 @@ class Index:
                 return None
             cur = int(row[0])
         return cur
+
+    def subtree_span(self, names: list[str]) -> Optional[tuple[int, int]]:
+        """The ``(lo, hi)`` id range of the folder ``names`` leads to and everything below it, or ``None`` when it isn't indexed."""
+        fid = self.find_folder(names)
+        if fid is None:
+            return None
+        row = self.folder(fid)
+        return int(row["lo"]), int(row["hi"])
 
     def find_file(self, folder_id: int, name: str) -> Optional[dict[str, Any]]:
         """One file's indexed size and cloud state, by its folder and name."""

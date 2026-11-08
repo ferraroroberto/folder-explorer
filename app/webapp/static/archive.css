@@ -63,6 +63,9 @@
 .ao-why .chip { margin: 0; }
 .arch-other { display: grid; gap: 6px; margin-top: 10px; }
 .arch-other .search-field { margin: 0; }
+.arch-other .button-surface { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.arch-other .button-surface .icon { width: var(--icon-inline); height: var(--icon-inline); }
+@media (pointer: coarse) { .arch-other .button-surface { height: var(--row-sm); } }
 .arch-found { list-style: none; margin: 0; padding: 0; }
 .arch-found button {
   font: inherit;

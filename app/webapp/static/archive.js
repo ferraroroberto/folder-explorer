@@ -35,6 +35,15 @@ const A = {
   error: null,
   lastFiled: '',
   found: [], // the last "Another email folder" answer
+  reading: false, // the server is asking Windows for the front File Explorer folder
+  explorerError: null, // why the Explorer folder could not be offered: {title, message}
+};
+
+// What a refused Explorer folder is called, by the server's error code; each is a different fix for the user.
+const EXPLORER_TITLES = {
+  explorer_unavailable: 'Cannot read Explorer windows',
+  no_explorer_folder: 'No Explorer folder open',
+  outside_email_folders: 'Outside the email folders',
 };
 
 let pollTimer = null;
@@ -162,7 +171,10 @@ function renderArchive() {
       : '<p class="row-note">No folder matches this mail yet. Find one below.</p>') +
     '<div class="arch-other"><label class="search-field">' + glyph('search') +
     '<input type="search" id="archSearch" placeholder="Another email folder" aria-label="Find another email folder" autocomplete="off" spellcheck="false" data-track="archive-search"></label>' +
-    '<ul class="arch-found" id="archFound"></ul></div>' +
+    '<ul class="arch-found" id="archFound"></ul>' +
+    '<button type="button" class="button-surface" id="archExplorer" title="Use the folder open in the front File Explorer window"' + (A.reading ? ' disabled' : '') +
+    ' data-track="archive-explorer">' + glyph('folder-open') + (A.reading ? 'Reading File Explorer…' : 'Current Explorer folder') + '</button>' +
+    (A.explorerError ? errorBlock(A.explorerError.title, A.explorerError.message, false) : '') + '</div>' +
     '<div class="row"><span>Outlook category</span><select class="select-native" id="archCat" aria-label="Outlook category" data-track="archive-category">' +
     (d.category ? '<option value="' + esc(d.category) + '"' + (A.category === d.category ? ' selected' : '') + '>' + esc(d.category) + '</option>' : '') +
     '<option value=""' + (A.category ? '' : ' selected') + '>No category</option></select></div>' +
@@ -186,6 +198,8 @@ function showSheet(doc, fromMacro) {
   A.datePrefix = 'auto';
   A.previewOpen = false;
   A.busy = false;
+  A.reading = false;
+  A.explorerError = null;
   A.category = doc.ok ? doc.category || '' : '';
   renderArchive();
   if (!$('archiveDialog').open) $('archiveDialog').showModal();
@@ -266,6 +280,29 @@ function pickFound(f) {
   renderArchive();
 }
 
+/** Offer the folder open in the front File Explorer window; the full path is shown with it and the user still presses Archive. */
+async function useExplorerFolder() {
+  if (A.reading) return;
+  A.reading = true;
+  A.explorerError = null;
+  renderArchive();
+  let r;
+  try {
+    r = await postJSON('/api/archive/explorer', {});
+  } catch (e) {
+    r = { ok: false, error: { code: '', message: e.message } };
+  }
+  A.reading = false;
+  if (r.ok) {
+    A.extra = { folder_path: r.folder_path, why: [{ label: 'Explorer window', tone: '' }], note: 'open in File Explorer: ' + winPath(r.folder_path),
+      saved_as: null, location: r.location };
+    A.choice = 0;
+  } else {
+    A.explorerError = { title: EXPLORER_TITLES[r.error.code] || 'No Explorer folder', message: r.error.message };
+  }
+  renderArchive();
+}
+
 // --------------------------------------------------------------- macro
 
 // What the user environment says about FOLDER_EXPLORER_HOME, in words; the state also sets the colour.
@@ -343,6 +380,7 @@ export function initArchive() {
     else if (el.dataset.openChoice) openFolder(options()[Number(el.dataset.openChoice)]);
     else if (el.dataset.date) { A.datePrefix = el.dataset.date; renderArchive(); }
     else if (el.dataset.found) pickFound(A.found[Number(el.dataset.found)]);
+    else if (el.id === 'archExplorer') useExplorerFolder();
     else if (el.id === 'archRetry') { $('archiveDialog').close(); openArchive(); }
     else if (el.id === 'archMacro') openMacro();
   });

@@ -21,6 +21,7 @@ from app import outlook
 from app.webapp.routers import archive as archive_routes
 from app.webapp.server import app
 from src import config
+from src.email import archive_sheet
 from src.email import body as child
 from src.email.archive_sheet import (
     ERR_GONE,
@@ -30,6 +31,7 @@ from src.email.archive_sheet import (
     ERR_TIMEOUT,
     MESSAGES,
 )
+from src.explorer_window import ExplorerUnavailableError
 from src.outlook.mapi import OutlookUnavailableError
 from tests.archive.batch_support import (
     FAKE_STORE_ID,
@@ -138,8 +140,8 @@ def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: Simple
 def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict = {}
 
-    def window(doc: dict, on_file, find_folders) -> None:  # type: ignore[no-untyped-def]
-        seen["doc"], seen["find"] = doc, find_folders
+    def window(doc: dict, on_file, find_folders, current_explorer=None) -> None:  # type: ignore[no-untyped-def]
+        seen["doc"], seen["find"], seen["explorer"] = doc, find_folders, current_explorer
         seen["result"] = on_file(doc["suggestions"][0]["folder_path"], None, False, "auto")
 
     monkeypatch.setattr("src.archive_window.show_window", window)
@@ -195,7 +197,7 @@ def test_find_in_mailbox_opens_the_live_copy(fake: SimpleNamespace) -> None:
 def test_the_archive_routes_answer_the_pc_only(fake: SimpleNamespace) -> None:
     with TestClient(app, client=REMOTE) as c:
         for method, path in (("post", "/api/archive/current"), ("post", "/api/archive/handoff"), ("get", "/api/archive/pending"),
-                             ("post", "/api/archive/file"), ("get", "/api/archive/folders")):
+                             ("post", "/api/archive/file"), ("get", "/api/archive/folders"), ("post", "/api/archive/explorer")):
             kwargs = {"json": {}} if method == "post" else {}
             assert getattr(c, method)(path, headers={"Authorization": "Bearer nope"}, **kwargs).status_code in (401, 403)
 
@@ -248,3 +250,46 @@ def test_the_date_prefix_choice_reaches_the_child_and_a_bad_one_never_does(fake:
         filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "date_prefix": "on"}).json()
     assert "--date-prefix=on" in asked[-1]
     assert Path(filed["files"][0]).name == first["saved_as"]["on"]
+
+
+def test_the_window_gets_the_explorer_folder_through_the_same_function(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict = {}
+
+    def window(doc: dict, on_file, find_folders, current_explorer=None) -> None:  # type: ignore[no-untyped-def]
+        seen["answer"] = current_explorer()
+
+    monkeypatch.setattr("src.archive_window.show_window", window)
+    monkeypatch.setattr(archive_sheet, "get_current_explorer_folder", lambda: str(fake.root / "Project Alpha"))
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID)
+    assert seen["answer"] == {"ok": True, "folder_path": str((fake.root / "Project Alpha").resolve())}
+
+
+def test_the_page_asks_the_server_for_the_explorer_folder_and_hears_each_failure(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+                                                                                tmp_path: Path) -> None:
+    (fake.root / "Project Alpha").mkdir(exist_ok=True)
+    shown = {"path": str(fake.root / "Project Alpha")}
+
+    def current() -> str:
+        if shown["path"] == "unreachable":
+            raise ExplorerUnavailableError("COM server unavailable")
+        return shown["path"]
+
+    monkeypatch.setattr(archive_sheet, "get_current_explorer_folder", current)
+    with TestClient(app, client=LOCAL) as c:
+        found = c.post("/api/archive/explorer", json={}).json()
+        assert found["ok"] and found["folder_path"] == str((fake.root / "Project Alpha").resolve()) and "location" in found
+        codes = {}
+        for state, path in (("none", ""), ("cannot", "unreachable"), ("outside", str(tmp_path))):
+            shown["path"] = path
+            codes[state] = c.post("/api/archive/explorer", json={}).json()["error"]
+    assert codes["none"]["code"] == "no_explorer_folder" and codes["cannot"]["code"] == "explorer_unavailable"
+    assert codes["outside"]["code"] == "outside_email_folders"
+    assert len({e["message"] for e in codes.values()}) == 3
+    assert not (tmp_path / "001 - Kickoff agenda.msg").exists()
+
+
+def test_the_explorer_verb_files_nothing_and_needs_pywin32(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(outlook.bridge, "pywin32_installed", lambda: False)
+    assert _in_process(["explorer"], 1)["error"]["code"] == ERR_NO_COM

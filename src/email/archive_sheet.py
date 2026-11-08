@@ -14,13 +14,14 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
 from src.email.archive_settings import get_outlook_category
 from src.email.repository import EmailRepository, open_index
 from src.email.suggester import EmailData, RankedSuggestion, SuggestionEngine
+from src.explorer_window import ExplorerUnavailableError, get_current_explorer_folder
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,8 @@ ERR_NO_MAIL = "no_mail"
 ERR_GONE = "mail_gone"
 ERR_NO_ROOT = "no_archive_root"
 ERR_OUTSIDE = "outside_email_folders"
+ERR_EXPLORER_UNAVAILABLE = "explorer_unavailable"
+ERR_NO_EXPLORER = "no_explorer_folder"
 ERR_ALREADY = "already_archived"
 ERR_ARCHIVE = "archive_failed"
 ERR_CATEGORY = "category_failed"
@@ -48,6 +51,8 @@ MESSAGES = {
     ERR_GONE: "That mail is no longer in Outlook: it was moved or deleted after the click.",
     ERR_NO_ROOT: "No archive root is mounted: none of the email folders is on this PC right now.",
     ERR_OUTSIDE: "That folder is outside the email folders, so nothing is filed there.",
+    ERR_EXPLORER_UNAVAILABLE: "Cannot read Explorer windows: Windows didn't say which folders are open. Pick a folder from the list instead.",
+    ERR_NO_EXPLORER: "No Explorer folder is open: open the destination folder in File Explorer and try again, or pick one from the list.",
     ERR_ALREADY: "This mail is already archived.",
     ERR_ARCHIVE: "The mail couldn't be saved to the folder.",
     ERR_CATEGORY: "The mail was filed, but Outlook wouldn't take the category.",
@@ -112,6 +117,27 @@ def _why(repo: EmailRepository, s: RankedSuggestion, sender: str) -> tuple[list[
     else:
         note = ""
     return chips, note
+
+
+def explorer_folder(cfg: dict[str, Any], current: Optional[Callable[[], Optional[str]]] = None) -> dict[str, Any]:
+    """The folder open in the foremost File Explorer window, as a destination the sheet and the fallback window offer.
+
+    Each way it can fail has its own code: the shell can't be asked, no Explorer folder is open, or the open
+    folder is outside the email folders (filing refuses those, so the user hears it before choosing).
+    """
+    roots = mounted_roots(cfg)
+    try:
+        opened = (current or get_current_explorer_folder)()
+    except ExplorerUnavailableError as exc:
+        logger.warning("⚠️ archive: Explorer windows can't be read: %s", exc)
+        raise SheetError(ERR_EXPLORER_UNAVAILABLE) from exc
+    if not opened:
+        raise SheetError(ERR_NO_EXPLORER)
+    folder, refusal = resolve_under_roots(opened, roots)
+    if folder is None:
+        logger.warning("⚠️ archive: the Explorer folder is %s", refusal)
+        raise SheetError(ERR_OUTSIDE)
+    return {"ok": True, "folder_path": str(folder)}
 
 
 def suggest(client: Any, cfg: dict[str, Any], item: Any, where: str = "") -> dict[str, Any]:

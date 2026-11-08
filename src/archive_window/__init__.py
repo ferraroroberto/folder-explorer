@@ -16,15 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 def show_window(doc: dict[str, Any], on_file: Callable[[str, Optional[str], bool, str], dict[str, Any]],
-                find_folders: Optional[Callable[[str], list[dict[str, Any]]]] = None, dark: Optional[bool] = None) -> None:
+                find_folders: Optional[Callable[[str], list[dict[str, Any]]]] = None, dark: Optional[bool] = None,
+                current_explorer: Optional[Callable[[], dict[str, Any]]] = None) -> None:
     """Show the window until it is closed or the mail is filed.
 
     ``on_file(folder, category, duplicate, date_prefix)`` files the mail. ``find_folders(query)`` turns on the
     "Another email folder" search (hits are ``{"path", "name"}``); ``dark`` forces a theme, ``None`` follows Windows.
+    ``current_explorer()`` turns on the Explorer button: it answers ``{"ok": true, "folder_path"}`` or the sheet's error document.
     """
     from src.archive_window.view import ArchiveView  # noqa: PLC0415 - tkinter only when a window opens
 
-    window = ArchiveView(doc, on_file, find_folders, palette(dark))
+    window = ArchiveView(doc, on_file, find_folders, palette(dark), current_explorer=current_explorer)
     window.build()
     logger.info("ℹ️ archive: the fallback window is open (%s)", "dark" if window.pal.dark else "light")
     window.root.mainloop()

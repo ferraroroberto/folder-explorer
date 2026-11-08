@@ -23,7 +23,7 @@ MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "
 # The sheet caps to the viewport and scrolls its card, so on a phone these sit below its fold by design.
 _FOLD = "below the fold of the scrolling sheet on a phone"
 BELOW_FOLD = {sel: _FOLD for sel in ("#archiveDialog #archMacro", "#archiveDialog .arch-row > button", "#archiveDialog #archSearch",
-                                     "#archiveDialog #archFound button", "#archiveDialog #archCat", "#archiveDialog #archDate > button")}
+                                     "#archiveDialog #archFound button", "#archiveDialog #archExplorer", "#archiveDialog #archCat", "#archiveDialog #archDate > button")}
 
 
 def _suggestion(rel: str, label: str, tone: str, note: str, seq: str, score: float, folder_id: int) -> dict[str, Any]:
@@ -210,3 +210,54 @@ def test_the_macro_hand_off_opens_the_sheet_and_a_failure_says_why(page: Page, a
     preview.locator('[data-act="mailbox"]').click()
     expect(page.locator(".toast")).to_contain_text("Opened in Outlook from Archive")
     assert errors == []
+
+
+def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_says_why(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    filed: list[dict[str, Any]] = []
+    answers = [
+        {"ok": False, "error": {"code": "explorer_unavailable", "message": "Cannot read Explorer windows: Windows didn't say which folders are open."}},
+        {"ok": False, "error": {"code": "no_explorer_folder", "message": "No Explorer folder is open: open the destination folder in File Explorer."}},
+        {"ok": False, "error": {"code": "outside_email_folders", "message": "That folder is outside the email folders, so nothing is filed there."}},
+        {"ok": True, "folder_path": ROOT + "/Clients/Northwind/2026", "location": None},
+    ]
+    asked: list[int] = []
+    _archive_ready(page)
+    page.route("**/api/archive/pending", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
+    page.route("**/api/archive/explorer", lambda r: asked.append(1) or _json(r, answers[len(asked) - 1]))
+
+    def file_mail(route: Route) -> None:
+        filed.append(route.request.post_data_json)
+        _json(route, {"ok": True, "folder_path": filed[-1]["folder"], "files": [filed[-1]["folder"] + "/005 - Kickoff agenda.msg"],
+                      "categorized": True, "indexing": True, "error": None})
+    page.route("**/api/archive/file", file_mail)
+
+    page.goto(app_url + "/")
+    page.locator("#openArchive").click()
+    sheet = page.locator("#archiveDialog")
+    button = sheet.locator("#archExplorer")
+    expect(button).to_have_text("Current Explorer folder")
+    for title in ("Cannot read Explorer windows", "No Explorer folder open", "Outside the email folders"):
+        button.click()
+        expect(sheet.locator(".arch-other .pv-error strong")).to_have_text(title)
+        # A refusal picks nothing: the first suggestion still leads and the filing button still names it.
+        expect(sheet.locator("#archiveGo")).to_have_text("Archive to Project Alpha\\2026")
+    # The clicks scrolled the sheet; the lint reads it from the top, as it opens.
+    sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    button.click()
+    first = sheet.locator(".arch-opt").first
+    # The path comes first: it waits for the answer, and the old first option has two chips, which a chip check would trip on.
+    expect(first.locator(".ao-path")).to_have_text("Clients\\Northwind\\2026")
+    expect(sheet.locator(".arch-other .pv-error")).to_have_count(0)
+    expect(first.locator(".chip")).to_have_text("Explorer window")
+    expect(first).to_contain_text("open in File Explorer: \\archive\\Mail\\Clients\\Northwind\\2026")
+    expect(sheet.locator("#archiveGo")).to_have_text("Archive to Northwind\\2026")
+    assert filed == []
+    sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    sheet.locator("#archiveGo").click()
+    expect(sheet).to_be_hidden()
+    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2026", "category": "Archived", "date_prefix": "auto"}]
+    assert asked == [1, 1, 1, 1] and errors == []

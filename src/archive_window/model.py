@@ -85,6 +85,14 @@ def mail_line(mail: dict[str, Any]) -> str:
     return " · ".join(b for b in bits if b)
 
 
+EXPLORER_CHIP = "Explorer window"
+
+
+def explorer_note(path: str) -> str:
+    """The Explorer folder's whole path, shown with its choice so the user sees where the mail goes before filing."""
+    return "open in File Explorer: " + win_path(path)
+
+
 def openable_folder(path: str, roots: list[str]) -> Optional[str]:
     """``path`` as a folder File Explorer may be asked to show: inside an email folder and on this PC; else None."""
     folder, _ = resolve_under_roots(path, [Path(r) for r in roots])
@@ -146,6 +154,7 @@ class ModelView:
         self.date_prefix = "auto"
         self.choice = 0
         self.extra: Optional[str] = None
+        self.extra_chip, self.extra_note = "Chosen", ""
         self._options = self._suggested()
 
     def _suggested(self) -> list[Option]:
@@ -161,16 +170,17 @@ class ModelView:
                 similar=_similar(s), saved_as=s.get("saved_as"), open_target=openable_folder(s["folder_path"], self.roots)))
         return offered
 
-    def pick_extra(self, path: str) -> None:
+    def pick_extra(self, path: str, chip: str = "Chosen", note: str = "picked from the folder index") -> None:
         """Lead the list with a folder the user picked; the suggestions keep their own rank after it."""
         self.extra = path
+        self.extra_chip, self.extra_note = chip, note
         self.choice = 0
 
     def options(self) -> list[Option]:
         if not self.extra:
             return self._options
         picked = Option(folder_path=self.extra, shown=under_root(self.extra, self.roots), rank=None, percent=None, weak=False,
-                        chips=(("Chosen", ""),), note="picked from the folder index", similar="", saved_as=None,
+                        chips=((self.extra_chip, ""),), note=self.extra_note, similar="", saved_as=None,
                         open_target=openable_folder(self.extra, self.roots))
         return [picked] + self._options
 

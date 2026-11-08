@@ -35,10 +35,11 @@ One SQLite file per finished scan, `index/<root>-<scan id>.sqlite3` in the runti
 | `folders` | id, parent, name, depth, `lo`/`hi`, subtree totals (size, alloc, files, folders, online-only files and bytes, listing errors), and `hidden` |
 | `files` | folder id, name, extension, size, alloc, attributes, modified time, and `hidden` |
 | `folder_ext` | per folder and extension, the folder's *own* files: size, alloc, count, online-only count and bytes; a subtree's type totals sum a range of it |
-| `folder_paths` | each folder's full path, case-folded with `/` separators: what folder search matches every word against |
+| `folder_paths` | each folder's full path, case-folded, accents dropped, with `/` separators: what folder search matches every word against |
+| `folder_words` | each word of the folder names (folded the same way) with the ids of the folders whose own name holds it, packed: where folder search finds a near word's folders |
 | `folder_people` | folders holding subfolders named like email addresses, with how many: folder search's "folder of people" |
 
-Folder search scans `folder_paths` with `instr`: on 200,000 invented paths that answers in about 30 ms, where a trigram FTS index would triple the index size for little gain. An index written before these two tables existed answers folder search with "rescan".
+Folder search scans `folder_paths` with `instr`, one call per word, where a trigram FTS index would triple the index size for little gain. When the exact hits leave room in the results, a word of six letters or more also looks for its near words: its one-edit spellings are looked up in `folder_words` by key (a spelling or a word starting with it), and only the subtrees under those folders are read, never every path again. On 2.6 million folders `folder_words` adds about 3% to the index. An index written before `folder_words` stores paths case-folded only; it is searched for each word as typed and folded, with no near words, until the next scan replaces it. One written before `folder_paths` answers folder search with "rescan".
 
 `hidden` is 0 for a visible item, 1 for one with the hidden or system attribute (both come with the listing, so nothing extra is read), and 2 for anything inside a hidden folder. Explore leaves out every nonzero row unless its Hidden items switch is on. The totals count every row either way. An index from before the column lists everything, and Explore says a rescan would tell hidden items apart.
 

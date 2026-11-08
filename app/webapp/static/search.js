@@ -14,7 +14,7 @@ import {
   withFacet, withoutChip,
 } from './search-side.js';
 import { initPreview, openPreviewSheet, previewAction, renderPreview } from './search-preview.js';
-import { renderOutlookCard } from './archive.js';
+import { renderOutlookCard, scoreChip } from './archive.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { esc, fmtBytes, glyph, plural, winPath } from './fmt.js';
@@ -75,7 +75,7 @@ function folderRow(f, i, terms) {
     '<span class="rr-who">' + glyph(f.people ? 'users' : 'folder') + '<span>' + hl(f.name, terms) + '</span></span>' +
     '<span class="rr-when">' + fmtBytes(f.size) + '</span>' +
     '<span class="rr-snip">' + hl(f.display, terms) + '</span>' +
-    '<span class="rr-meta">' + plural(f.files, 'file') + (f.people ? ' · <span class="chip tone-accent">' + plural(f.people, 'person', 'people') + '</span>' : '') +
+    '<span class="rr-meta"><span class="rr-score">' + scoreChip(f.score) + '</span>' + plural(f.files, 'file') + (f.people ? ' · <span class="chip tone-accent">' + plural(f.people, 'person', 'people') + '</span>' : '') +
     (f.kind === 'synced' ? ' · ' + glyph('cloud') + 'OneDrive' : '') + '</span></button></li>';
 }
 

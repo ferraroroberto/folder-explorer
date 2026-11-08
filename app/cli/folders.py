@@ -5,8 +5,8 @@
 For another local app (life-os's folders lookup) that wants the Search tab's
 folder results without the web app running. The document is the Search tab's
 own answer plus ``schema_version`` and ``query``: ``results`` (each with
-``path``, the full path on disk, and ``display``, with the configured leading
-components hidden), ``total``, ``truncated`` and ``needs_rescan`` (the roots
+``path``, the full path on disk, ``display``, with the configured leading
+components hidden, and ``score``, 0 to 1, 1 when every word matched exactly), ``total``, ``truncated`` and ``needs_rescan`` (the roots
 whose index predates folder search). The configured ``folder_search`` options
 apply: folders of people fold into one result, and ``skip_levels`` shortens
 ``display`` only.

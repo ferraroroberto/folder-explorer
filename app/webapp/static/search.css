@@ -201,6 +201,7 @@ kbd {
 .result-row.is-folder { grid-template-areas: "who when" "snip snip" "meta meta"; }
 .result-row.is-folder .rr-who { display: flex; align-items: center; gap: var(--space-sm); }
 .result-row.is-folder .rr-who .icon { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); flex: none; }
+.rr-meta .rr-score .chip { font-variant-numeric: tabular-nums; min-width: 4ch; text-align: center; overflow: visible; }
 .result-row.is-folder .rr-snip { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; }
 .keys-line { margin: var(--space-sm) 0 0; padding-top: var(--space-sm); border-top: 1px solid var(--line-muted); font-size: var(--font-body-sm); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .keys-line span { display: inline-flex; align-items: center; gap: 4px; }

@@ -82,12 +82,16 @@ function errorBlock(title, message, retry) {
     (retry ? '<button type="button" class="button-ghost" id="archRetry" data-track="archive-retry">Try again</button>' : '') + '</div></div>';
 }
 
-/** The % match as a chip: neutral for a real match, attention for a weak guess; the bar shows the same share. */
-function scoreHtml(score) {
-  const p = Math.round(score * 100);
+/** The % match as a chip: neutral for a real match, attention for a weak guess. Folder search shows the same chip. */
+export function scoreChip(score) {
   const weak = score < WEAK_SCORE;
-  return '<span class="ao-score"><span class="chip' + (weak ? ' tone-attention' : '') + '" title="' + (weak ? 'A weak match' : 'Match') + '">' +
-    p + '%</span>' + bar(p) + '</span>';
+  return '<span class="chip' + (weak ? ' tone-attention' : '') + '" title="' + (weak ? 'A weak match' : 'Match') + '">' +
+    Math.round(score * 100) + '%</span>';
+}
+
+/** The % chip with a bar showing the same share. */
+function scoreHtml(score) {
+  return '<span class="ao-score">' + scoreChip(score) + bar(Math.round(score * 100)) + '</span>';
 }
 
 function similarHtml(o) {

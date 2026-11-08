@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
@@ -95,6 +96,50 @@ def test_folder_search_opens_from_a_link_and_matches_every_word(page: Page, app_
         page.locator("#previewDialog [data-close]").click()
     page.locator("#q").fill("harbour nothing-like-this")
     expect(page.locator("#results .empty-state-message")).to_have_text("No folder matches every word.")
+    assert errors == []
+
+
+@pytest.mark.desktop_only
+def test_folder_card_keys_run_the_buttons_actions(page: Page, app_url: str, browser_name: str) -> None:
+    errors = _errors(page)
+    asked: list[dict] = []
+
+    def fake_open(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
+
+    page.route("**/api/folders/open", fake_open)
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    page.goto(app_url + "/#search?mode=folders&q=harbour%202024")
+    page.locator("#results .result-row").first.click()
+    preview = _preview(page, browser_name)
+    expect(preview.locator(".pv-path")).to_contain_text("harbour-trip")
+    expect(page.locator("#keysLine")).to_contain_text("open in File Explorer")
+    expect(page.locator("#keysLine")).to_contain_text("copy path")
+
+    # Typing in the box, or a held modifier, runs nothing.
+    page.locator("#q").press("c")
+    page.locator("#q").press("e")
+    page.locator("#q").fill("harbour 2024")
+    expect(page.locator("#results .result-row").first).to_contain_text("harbour-trip")
+    page.locator("#results .result-row").first.focus()
+    page.keyboard.press("Control+e")
+    page.keyboard.press("Control+c")
+    page.wait_for_timeout(300)
+    assert asked == []
+    expect(page.locator(".toast")).to_have_count(0)
+
+    page.keyboard.press("e")
+    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
+    assert len(asked) == 1 and asked[0]["id"] > 0 and "path" not in asked[0]
+
+    page.keyboard.press("c")
+    expect(page.locator(".toast", has_text="Path copied")).to_be_visible()
+    shown = preview.locator(".pv-path").inner_text().strip()
+    assert page.evaluate("() => navigator.clipboard.readText()").replace("/", "\\") == shown
+
+    page.keyboard.press("f")
+    expect(page.locator("#paneExplore")).to_be_visible()
     assert errors == []
 
 

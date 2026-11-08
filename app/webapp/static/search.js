@@ -87,7 +87,7 @@ function emptyRow(icon, text, clear) {
 function keysLine(mode) {
   const k = (keys, label) => '<span>' + keys.map((x) => '<kbd>' + x + '</kbd>').join('') + ' ' + label + '</span>';
   return mode === 'folders'
-    ? k(['/'], 'search') + k(['j', 'k'], 'move') + k(['f'], 'show in Explore') + k(['Esc'], 'back')
+    ? k(['/'], 'search') + k(['j', 'k'], 'move') + (S.status.pc ? k(['e'], 'open in File Explorer') : '') + k(['f'], 'show in Explore') + k(['c'], 'copy path') + k(['Esc'], 'back')
     : k(['/'], 'search') + k(['j', 'k'], 'move') + k(['a'], 'show all') + (S.status.outlook.ready ? k(['o'], 'Outlook') : '') + k(['f'], 'folder') + k(['Esc'], 'back');
 }
 
@@ -298,6 +298,8 @@ function onKey(ev) {
   else if (k === 'Enter' && t.classList.contains('result-row')) { ev.preventDefault(); openPreviewSheet(); }
   else if (k === 'a' && mode === 'emails') previewAction('showall');
   else if (k === 'o' && mode === 'emails') previewAction('outlook');
+  else if (k === 'e' && mode === 'folders') previewAction('explorer');
+  else if (k === 'c' && mode === 'folders') previewAction('copy');
   else if (k === 'f') previewAction('folder');
   else if (k === 'Escape' && !$('previewDialog').open) box().focus();
 }

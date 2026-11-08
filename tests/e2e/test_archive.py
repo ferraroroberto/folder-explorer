@@ -247,10 +247,11 @@ def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_s
     sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
     _lint_both_themes(page, allow=BELOW_FOLD)
     button.click()
-    expect(sheet.locator(".arch-other .pv-error")).to_have_count(0)
     first = sheet.locator(".arch-opt").first
-    expect(first.locator(".chip")).to_have_text("Explorer window")
+    # The path comes first: it waits for the answer, and the old first option has two chips, which a chip check would trip on.
     expect(first.locator(".ao-path")).to_have_text("Clients\\Northwind\\2026")
+    expect(sheet.locator(".arch-other .pv-error")).to_have_count(0)
+    expect(first.locator(".chip")).to_have_text("Explorer window")
     expect(first).to_contain_text("open in File Explorer: \\archive\\Mail\\Clients\\Northwind\\2026")
     expect(sheet.locator("#archiveGo")).to_have_text("Archive to Northwind\\2026")
     assert filed == []

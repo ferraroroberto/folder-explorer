@@ -11,6 +11,8 @@ import contextlib
 import io
 import json
 import subprocess
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -72,9 +74,11 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr(outlook.bridge, "folder_name", lambda _item: "Inbox")
     monkeypatch.setattr(outlook.bridge, "display", shown.append)
     monkeypatch.setattr(outlook, "OutlookClient", lambda mailbox=None: client)
-    monkeypatch.setattr(outlook.indexer, "spawn", lambda trigger, scope: spawned.append((trigger, scope)))
+    monkeypatch.setattr("src.email.indexer.spawn", lambda trigger, scope: spawned.append((trigger, scope)))
     monkeypatch.setattr(archive_routes, "PREPARED", archive_routes._Prepared())
     monkeypatch.setattr(archive_routes, "bridge", _in_process)
+    # The server ranks a handed-over mail on a thread; here it ranks before the hand-off answers, so a test reads one document.
+    monkeypatch.setattr(archive_routes, "_rank_later", lambda work: work())
     return SimpleNamespace(root=root, cfg=cfg, item=item, client=client, spawned=spawned, shown=shown)
 
 
@@ -88,10 +92,10 @@ def _in_process(args: list[str], timeout: float) -> dict:
 
 def _route_handoff(monkeypatch: pytest.MonkeyPatch, c: TestClient) -> None:
     """The entry's POST to 127.0.0.1 lands on the TestClient, as a caller on this PC."""
-    def post(url: str, json: dict, timeout: float, verify: bool) -> SimpleNamespace:
-        r = c.post("/api/archive/handoff", json=json)
-        return SimpleNamespace(ok=r.status_code < 400, status_code=r.status_code, json=r.json)
-    monkeypatch.setattr(outlook.requests, "post", post)
+    def post(url: str, doc: dict, timeout: float) -> tuple[int, dict]:
+        r = c.post("/api/archive/handoff", json=doc)
+        return r.status_code, r.json()
+    monkeypatch.setattr(outlook, "_post_json", post)
 
 
 def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -140,9 +144,11 @@ def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: Simple
 def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict = {}
 
-    def window(doc: dict, on_file, find_folders, current_explorer=None) -> None:  # type: ignore[no-untyped-def]
+    def window(doc: dict, on_file, find_folders, current_explorer=None, rank=None, progress=None) -> None:  # type: ignore[no-untyped-def]
         seen["doc"], seen["find"], seen["explorer"] = doc, find_folders, current_explorer
-        seen["result"] = on_file(doc["suggestions"][0]["folder_path"], None, False, "auto")
+        assert doc["ranking"] and doc["suggestions"] == [] and "ids" not in doc and "rank_input" not in doc
+        suggestions = rank()
+        seen["result"] = on_file(suggestions[0]["folder_path"], None, False, "auto")
 
     monkeypatch.setattr("src.archive_window.show_window", window)
     with TestClient(app, client=LOCAL) as c:
@@ -154,9 +160,9 @@ def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamesp
 
 def test_the_window_opens_when_the_app_is_not_running(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     def refused(*_a: object, **_k: object) -> None:
-        raise outlook.requests.ConnectionError("nothing listens")
+        raise ConnectionRefusedError("nothing listens")
 
-    monkeypatch.setattr(outlook.requests, "post", refused)
+    monkeypatch.setattr(outlook, "_post_json", refused)
     assert outlook.hand_to_page({"ok": True}, fake.cfg) is False
 
 
@@ -255,7 +261,7 @@ def test_the_date_prefix_choice_reaches_the_child_and_a_bad_one_never_does(fake:
 def test_the_window_gets_the_explorer_folder_through_the_same_function(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict = {}
 
-    def window(doc: dict, on_file, find_folders, current_explorer=None) -> None:  # type: ignore[no-untyped-def]
+    def window(doc: dict, on_file, find_folders, current_explorer=None, rank=None, progress=None) -> None:  # type: ignore[no-untyped-def]
         seen["answer"] = current_explorer()
 
     monkeypatch.setattr("src.archive_window.show_window", window)
@@ -293,3 +299,64 @@ def test_the_page_asks_the_server_for_the_explorer_folder_and_hears_each_failure
 def test_the_explorer_verb_files_nothing_and_needs_pywin32(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(outlook.bridge, "pywin32_installed", lambda: False)
     assert _in_process(["explorer"], 1)["error"]["code"] == ERR_NO_COM
+
+
+def test_the_page_gets_the_mail_first_and_its_folders_under_the_same_token(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    later: list = []
+    monkeypatch.setattr(archive_routes, "_rank_later", later.append)
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        first = c.get("/api/archive/pending").json()["mail"]
+        assert first["ranking"] is True and first["suggestions"] == [] and first["mail"]["subject"] == "Kickoff agenda"
+        assert "rank_input" not in first and "ids" not in first
+        assert c.get("/api/archive/pending").json() == {"mail": None}
+        later.pop()()
+        full = c.get("/api/archive/pending").json()["mail"]
+    assert full["token"] == first["token"] and full["ranking"] is False
+    assert full["suggestions"][0]["folder_path"] == str(fake.root / "Project Alpha") and "location" in full["suggestions"][0]
+
+
+def test_a_newer_hand_off_keeps_an_older_mails_folders_off_the_page(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    later: list = []
+    monkeypatch.setattr(archive_routes, "_rank_later", later.append)
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID)
+        older = c.get("/api/archive/pending").json()["mail"]["token"]
+        outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID)
+        newer = c.get("/api/archive/pending").json()["mail"]["token"]
+        later[0]()
+        assert c.get("/api/archive/pending").json() == {"mail": None}
+        later[1]()
+        ranked = c.get("/api/archive/pending").json()["mail"]
+    assert older != newer and ranked["token"] == newer and ranked["suggestions"]
+
+
+def test_a_waiting_poll_answers_the_moment_a_mail_is_handed_over(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        asked = time.monotonic()
+        assert c.get("/api/archive/pending?wait=0.2").json() == {"mail": None}
+        assert time.monotonic() - asked >= 0.2
+        assert c.get("/api/archive/pending?wait=600").status_code == 422
+        hand = threading.Timer(0.3, lambda: outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID))
+        hand.start()
+        asked = time.monotonic()
+        handed = c.get("/api/archive/pending?wait=10").json()["mail"]
+        waited = time.monotonic() - asked
+        hand.join()
+    assert handed["mail"]["subject"] == "Kickoff agenda" and 0.25 <= waited < 5
+
+
+def test_the_sheets_own_open_reads_in_the_child_and_ranks_in_the_server(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    asked: list[list[str]] = []
+    monkeypatch.setattr(outlook.bridge, "mail_at_hand", lambda _app: fake.item)
+    monkeypatch.setattr(archive_routes, "bridge", lambda args, timeout: asked.append(args) or _in_process(args, timeout))
+    with TestClient(app, client=LOCAL) as c:
+        doc = c.post("/api/archive/current", json={}).json()
+    assert asked == [["prepare", "--current", "--defer-ranking"]]
+    assert doc["ok"] and doc["ranking"] is False and doc["token"] and "rank_input" not in doc
+    assert doc["suggestions"][0]["folder_path"] == str(fake.root / "Project Alpha")

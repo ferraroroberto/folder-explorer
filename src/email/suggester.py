@@ -33,6 +33,7 @@ from typing import Any, Optional
 from src.email.archive_settings import get_suggestion_limits
 from src.email.naming import clean_subject, normalize_message_id
 from src.email.repository import EmailRepository, FolderSuggestion, open_index
+from src.stage_timer import StageTimer
 
 logger = logging.getLogger(__name__)
 
@@ -86,27 +87,38 @@ def _thread_score(subject: str, samples: list[str]) -> float:
 
 
 class SuggestionEngine:
-    """Ranked folder suggestions; opens its own connection per call, so any thread may use it."""
+    """Ranked folder suggestions; without a caller's repository it opens its own connection per call, so any thread may use it."""
 
     def __init__(self, cfg: dict[str, Any], max_suggestions: Optional[int] = None) -> None:
         self._cfg = cfg
         top, self._min_score = get_suggestion_limits(cfg)
         self._max = top if max_suggestions is None else max_suggestions
 
-    def suggest(self, email: EmailData) -> list[RankedSuggestion]:
-        """Up to ``max_suggestions`` folders: same-email first, then exact-subject, then by blended score."""
+    def suggest(self, email: EmailData, repo: Optional[EmailRepository] = None,
+                timer: Optional[StageTimer] = None) -> list[RankedSuggestion]:
+        """Up to ``max_suggestions`` folders: same-email first, then exact-subject, then by blended score.
+
+        ``repo`` is an open repository to read through; without one the engine opens and closes its own.
+        ``timer`` gets one mark per step (the FTS pool, the exact lookups, the blend).
+        """
+        if repo is None:
+            conn = open_index(self._cfg)
+            try:
+                return self.suggest(email, EmailRepository(conn), timer)
+            finally:
+                conn.close()
         subject = clean_subject(email.subject)
-        conn = open_index(self._cfg)
-        repo = EmailRepository(conn)
-        try:
-            # Extra candidates for re-ranking; min_score applies after blending.
-            raw = repo.suggest_folders(subject, email.sender, email.recipients, self._max * 3, 0.0)
-            exact = repo.exact_subject_counts(subject)
-            same = repo.folders_with_message_id(normalize_message_id(email.message_id))
-            missing = (set(exact) | same) - {s.folder_path for s in raw}
-            raw += [FolderSuggestion(f, 0.0, 0, repo.sample_subjects(f)) for f in sorted(missing)]
-        finally:
-            conn.close()
+        # Extra candidates for re-ranking; min_score applies after blending.
+        raw = repo.suggest_folders(subject, email.sender, email.recipients, self._max * 3, 0.0)
+        if timer:
+            timer.mark("fts_pool")
+        exact = repo.exact_subject_counts(subject)
+        same = repo.folders_with_message_id(normalize_message_id(email.message_id))
+        missing = (set(exact) | same) - {s.folder_path for s in raw}
+        raw += [FolderSuggestion(f, 0.0, 0, repo.sample_subjects(f)) for f in sorted(missing)]
+        if timer:
+            timer.mark("exact")
+            timer.count("candidates", len(raw))
         if not raw:
             logger.info("ℹ️ no folder matches for subject %r", subject)
             return []
@@ -117,6 +129,8 @@ class SuggestionEngine:
         for r in ranked:
             unique.setdefault(r.folder_path, r)
         top = list(unique.values())[:self._max]
+        if timer:
+            timer.mark("blend")
         logger.info("ℹ️ suggestions for %r: %s", subject, [(r.display_name, round(r.score, 3)) for r in top])
         return top
 

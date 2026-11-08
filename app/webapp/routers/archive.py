@@ -8,14 +8,17 @@ category, and the child checks the folder against the email folders again.
 Each offered folder carries its place in the scan (root, scan id, folder id),
 so the sheet's Open asks ``/api/open`` by id, never by a path.
 
-The macro's entry hands its prepared mail to ``/archive/handoff``. A page on
-this PC polls ``/archive/pending`` while it is visible, so the server knows
-whether one is open to show the mail; when none is, the entry opens its own
-window instead.
+The macro's entry hands its mail to ``/archive/handoff`` before any ranking.
+A page on this PC holds a poll of ``/archive/pending`` open while it is
+visible, so the server knows whether one is open to show the mail, and the
+sheet opens the moment it arrives; this process then ranks the folders with
+its warm index and the next poll brings them. When no page is open, the entry
+opens its own window instead.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -24,7 +27,7 @@ import sys
 import threading
 import time
 import uuid
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
@@ -33,9 +36,11 @@ from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits, locate_folder
 from src import config, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
+from src.email import archive_sheet
 from src.email import body as child
 from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_sheet import ERR_FAILED, ERR_TIMEOUT, error_document
+from src.email.suggester import EmailData
 from src.outlook.bridge import pywin32_installed
 from src.roots import resolve_roots
 
@@ -53,8 +58,12 @@ SHOW_TIMEOUT_S = 30.0
 # Listing the shell's open windows is quick; a longer wait means the shell is stuck.
 EXPLORER_TIMEOUT_S = 15.0
 # A page that polled within this many seconds is open to show a mail from the macro
-# (it polls every 3 s while it is visible).
+# (a waiting poll counts as polling on every tick, and a visible page asks again at once).
 PAGE_LIVE_S = 8.0
+# The longest a page's poll may wait for a hand-off: an idle page asks about twice a minute.
+PENDING_WAIT_MAX_S = 25.0
+# How often a waiting poll looks for a hand-off, which is the most it delays one.
+PENDING_TICK_S = 0.025
 # How long a prepared mail can still be filed, and how many are kept at once.
 PREPARED_TTL_S = 30 * 60.0
 PREPARED_MAX = 20
@@ -71,12 +80,17 @@ def bridge_off() -> bool:
 
 
 class _Prepared:
-    """Prepared mails by token, the macro's pending hand-off, and when a page last polled."""
+    """Prepared mails by token, the macro's pending hand-off, and when a page last polled.
+
+    ``pending`` is (when it was handed, the page's document, the hand-off's start); ``latest`` is the
+    token of the newest hand-off, so a slow ranking of an older mail never replaces a newer one.
+    """
 
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.items: dict[str, tuple[float, dict[str, str], dict[str, Any]]] = {}
-        self.pending: Optional[tuple[float, dict[str, Any]]] = None
+        self.pending: Optional[tuple[float, dict[str, Any], float]] = None
+        self.latest: Optional[str] = None
         self.last_poll = 0.0
 
     def keep(self, doc: dict[str, Any]) -> dict[str, Any]:
@@ -156,38 +170,102 @@ def with_locations(doc: dict[str, Any]) -> dict[str, Any]:
     return doc
 
 
-@router.post("/archive/current")
-def current(request: Request) -> dict[str, Any]:
-    """The sheet's document for the mail open or selected in Outlook."""
-    _pc_only(request)
-    return PREPARED.keep(with_locations(bridge(["prepare", "--current"], PREPARE_TIMEOUT_S)))
+def ranked_doc(doc: dict[str, Any], data: EmailData) -> dict[str, Any]:
+    """``doc`` (a document still ranking) with its folders, ranked in this process, whose index is warm.
+
+    A ranking that fails offers no folder, so the sheet still files through "Another email folder".
+    """
+    try:
+        return archive_sheet.ranked(config.load(), doc, data)
+    except Exception:
+        logger.exception("❌ archive: ranking the folders failed")
+        return dict(doc, suggestions=[], ranking=False)
 
 
-@router.post("/archive/handoff")
-def handoff(request: Request, doc: dict[str, Any] = Body(...)) -> dict[str, bool]:
-    """The macro's entry gives its prepared mail; ``shown`` says whether a page is open to show it."""
-    _pc_only(request)
-    public = PREPARED.keep(with_locations(doc))
-    now = time.monotonic()
+def _rank_later(work: Callable[[], None]) -> None:
+    """Rank a handed-over mail off the request, so the macro's entry hears ``shown`` at once."""
+    threading.Thread(target=work, name="archive-rank", daemon=True).start()
+
+
+def _publish_ranked(public: dict[str, Any], data: EmailData, started: float) -> None:
+    """Rank the handed-over mail and give the page its folders, unless a newer hand-off came in meanwhile."""
+    full = with_locations(ranked_doc(public, data))
     with PREPARED.lock:
-        shown = now - PREPARED.last_poll <= PAGE_LIVE_S
-        if shown:
-            PREPARED.pending = (now, public)
-    logger.info("ℹ️ archive hand-off from the macro: %s", "a page shows it" if shown else "no page is open")
-    return {"shown": shown}
+        if PREPARED.latest != public.get("token"):
+            logger.info("ℹ️ archive: a newer hand-off came in, so this mail's folders are dropped")
+            return
+        PREPARED.pending = (time.monotonic(), full, started)
 
 
-@router.get("/archive/pending")
-def pending(request: Request) -> dict[str, Any]:
-    """The mail the macro handed over since the last poll, once; a page polls this while it is visible."""
-    _pc_only(request)
+def _take_pending() -> Optional[dict[str, Any]]:
+    """The waiting hand-off, once; logs how long it took to reach the page since the macro's entry handed it."""
     now = time.monotonic()
     with PREPARED.lock:
         PREPARED.last_poll = now
         item, PREPARED.pending = PREPARED.pending, None
     if item is None or now - item[0] > HANDOFF_TTL_S:
-        return {"mail": None}
-    return {"mail": item[1]}
+        return None
+    _, doc, started = item
+    logger.info("⏱️ archive hand-off ms: %s reached the page=%.0f", "mail" if doc.get("ranking") else "folders",
+                (now - started) * 1000)
+    return doc
+
+
+@router.post("/archive/current")
+def current(request: Request) -> dict[str, Any]:
+    """The sheet's document for the mail open or selected in Outlook; the child reads it, this process ranks it."""
+    _pc_only(request)
+    doc = bridge(["prepare", "--current", "--defer-ranking"], PREPARE_TIMEOUT_S)
+    data = archive_sheet.rank_data(doc.pop("rank_input", None))
+    if doc.get("ok") and data is not None:
+        doc = ranked_doc(doc, data)
+    return PREPARED.keep(with_locations(doc))
+
+
+@router.post("/archive/handoff")
+def handoff(request: Request, doc: dict[str, Any] = Body(...)) -> dict[str, bool]:
+    """The macro's entry gives its mail; ``shown`` says whether a page is open to show it.
+
+    A mail still ranking is shown at once and ranked here right after, and the page gets the same
+    token again with its folders filled in.
+    """
+    _pc_only(request)
+    started = time.monotonic()
+    data = archive_sheet.rank_data(doc.pop("rank_input", None))
+    ranking = bool(doc.get("ok") and doc.get("ranking") and data is not None)
+    if doc.get("ranking") and not ranking:
+        doc = dict(doc, ranking=False)
+    public = PREPARED.keep(with_locations(doc))
+    now = time.monotonic()
+    with PREPARED.lock:
+        shown = now - PREPARED.last_poll <= PAGE_LIVE_S
+        if shown:
+            PREPARED.pending = (now, public, started)
+            PREPARED.latest = public.get("token")
+    if shown and ranking and data is not None:
+        _rank_later(lambda: _publish_ranked(public, data, started))
+    logger.info("ℹ️ archive hand-off from the macro: %s", "a page shows it" if shown else "no page is open")
+    return {"shown": shown}
+
+
+@router.get("/archive/pending")
+async def pending(request: Request, wait: float = Query(0.0, ge=0.0, le=PENDING_WAIT_MAX_S)) -> dict[str, Any]:
+    """The mail the macro handed over since the last poll, once; a page polls this while it is visible.
+
+    ``wait`` holds the poll open up to that many seconds and answers the moment a hand-off arrives, so
+    the sheet opens without waiting for the next poll. A page that went away ends the wait.
+    """
+    _pc_only(request)
+    deadline = time.monotonic() + wait
+    while True:
+        doc = _take_pending()
+        if doc is not None:
+            return {"mail": doc}
+        if time.monotonic() >= deadline:
+            return {"mail": None}
+        await asyncio.sleep(PENDING_TICK_S)
+        if await request.is_disconnected():
+            return {"mail": None}
 
 
 @router.post("/archive/file")

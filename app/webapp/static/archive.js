@@ -1,8 +1,10 @@
 /* The Search tab's Archive card, the Archive sheet, the Outlook macro sheet, and the macro's hand-off.
  *
  * Every Outlook step runs on the server in a child of its own; the page only
- * holds a prepared mail's token. A page on this PC polls for a mail the
- * Outlook macro handed over while it is visible, and opens the sheet with it.
+ * holds a prepared mail's token. A page on this PC holds a poll open for a
+ * mail the Outlook macro hands over while it is visible, opens the sheet the
+ * moment one arrives, and fills its folders in when the same token comes
+ * again ranked.
  */
 
 import { api, getJSON, postJSON } from './api.js';
@@ -12,7 +14,12 @@ import { showToast } from './_vendored/toast/toast.js';
 import { bindCodeListing } from './_vendored/code-listing/code-listing.js';
 
 const $ = (id) => document.getElementById(id);
-// How often a visible page on this PC asks whether the macro handed over a mail.
+// How long the server may hold a visible page's hand-off poll open; it answers the moment the macro hands a mail over.
+const PENDING_WAIT_S = 20;
+// A poll answered sooner than this, with no mail, came from a server that doesn't hold polls open:
+// the page then asks again after PENDING_MS.
+const HELD_MS = 1000;
+// How long a page waits before asking again when it can't hold a poll open (hidden, an error, a quick answer).
 const PENDING_MS = 3000;
 // How long typing in "Another email folder" pauses before it searches.
 const DEBOUNCE_MS = 200;
@@ -47,6 +54,7 @@ const EXPLORER_TITLES = {
 };
 
 let pollTimer = null;
+let polling = false; // a hand-off poll is in flight
 let searchTimer = null;
 
 const lastTwo = (path) => (path || '').split(/[\\/]/).filter(Boolean).slice(-2).join('\\');
@@ -168,7 +176,8 @@ function renderArchive() {
     '<div class="arch-head"><h3>Suggested folders</h3><button type="button" class="icon-button" id="rankInfo" aria-label="How folders are suggested" title="How folders are suggested" data-track="rank-info">' + glyph('info') + '</button></div>' +
     '<p class="row-note" id="rankNote" hidden>Each folder scores by its best match: the same subject first, then the sender and the topic. A big folder doesn\'t win by volume.</p>' +
     (opts.length ? '<ul class="arch-options" role="radiogroup" aria-label="Archive folder">' + opts.map(optionHtml).join('') + '</ul>'
-      : '<p class="row-note">No folder matches this mail yet. Find one below.</p>') +
+      : d.ranking ? '<p class="row-note" id="archRanking">Finding folders…</p>'
+        : '<p class="row-note">No folder matches this mail yet. Find one below.</p>') +
     '<div class="arch-other"><label class="search-field">' + glyph('search') +
     '<input type="search" id="archSearch" placeholder="Another email folder" aria-label="Find another email folder" autocomplete="off" spellcheck="false" data-track="archive-search"></label>' +
     '<ul class="arch-found" id="archFound"></ul>' +
@@ -339,24 +348,50 @@ async function openMacro() {
 
 // ------------------------------------------------------------- hand-off
 
+/** A hand-off from the macro: a new mail opens the sheet; the same one again brings its ranked folders. */
+function takeHandoff(doc) {
+  if (!(A.doc && doc.token && A.doc.token === doc.token)) {
+    showSheet(doc, true);
+    return;
+  }
+  // The user closed the sheet before the folders came: leave it closed.
+  if (!$('archiveDialog').open) return;
+  // Keep what the user already typed in "Another email folder" across the repaint.
+  const search = $('archSearch');
+  const typed = search ? search.value : '';
+  const focused = search && document.activeElement === search;
+  A.doc = doc;
+  renderArchive();
+  const again = $('archSearch');
+  if (again && typed) again.value = typed;
+  if (again && focused) again.focus();
+}
+
 async function pollPending() {
   pollTimer = null;
+  if (polling) return;
+  let next = PENDING_MS;
   if (document.visibilityState === 'visible') {
+    polling = true;
+    const asked = Date.now();
     let res = null;
-    try { res = await api('/api/archive/pending'); } catch (e) { res = null; }
+    try { res = await api('/api/archive/pending?wait=' + PENDING_WAIT_S); } catch (e) { res = null; }
+    polling = false;
     // Not this PC: the macro only ever hands a mail to the PC's own pages.
     if (res && res.status === 403) return;
     if (res && res.ok) {
       const body = await res.json();
-      if (body.mail) showSheet(body.mail, true);
+      if (body.mail) { takeHandoff(body.mail); next = 0; }
+      // A server that held the poll open is waiting for hand-offs: ask again at once.
+      else if (Date.now() - asked >= HELD_MS) next = 0;
     }
   }
-  pollTimer = setTimeout(pollPending, PENDING_MS);
+  if (!pollTimer) pollTimer = setTimeout(pollPending, next);
 }
 
 /** Start asking for the macro's hand-off; called once the page has signed in. */
 export function startArchivePoll() {
-  if (!pollTimer) pollPending();
+  if (!pollTimer && !polling) pollPending();
 }
 
 // --------------------------------------------------------------- wiring
@@ -393,6 +428,6 @@ export function initArchive() {
   body.addEventListener('toggle', (ev) => { if (ev.target.classList.contains('arch-preview')) A.previewOpen = ev.target.open; }, true);
   body.addEventListener('change', (ev) => { if (ev.target.id === 'archCat') A.category = ev.target.value; });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && pollTimer) { clearTimeout(pollTimer); pollPending(); }
+    if (document.visibilityState === 'visible' && pollTimer && !polling) { clearTimeout(pollTimer); pollPending(); }
   });
 }

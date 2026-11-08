@@ -8,6 +8,8 @@ can pick another folder or close it.
 from __future__ import annotations
 
 import logging
+import queue
+import threading
 import tkinter as tk
 from tkinter import filedialog
 from typing import Any, Callable, Optional
@@ -47,7 +49,12 @@ _WRAP = WIDTH - 2 * SPACE_MD - 24
 PLACEHOLDER = "Another email folder"
 EXPLORER_BUTTON = "Current Explorer folder"
 
+# How often Tk's thread looks for the worker's ranking; short, as the ranking itself takes tens of ms.
+RANK_POLL_MS = 15
+RANK_FAILED = "Couldn't rank the folders. Find one below."
+
 OnFile = Callable[[str, Optional[str], bool, str], dict[str, Any]]
+Rank = Callable[[], list[dict[str, Any]]]
 FindFolders = Callable[[str], list[dict[str, Any]]]
 CurrentExplorer = Callable[[], dict[str, Any]]
 
@@ -213,7 +220,7 @@ class ArchiveView:
             child.destroy()
         opts = self.model.options()
         if not opts:
-            self._label(self.options, "No folder matches this mail yet. Find one below.", SIZE_SMALL, fg=self.pal.muted)
+            self._label(self.options, self.model.empty_note(), SIZE_SMALL, fg=self.pal.muted)
         for i, option in enumerate(opts):
             self._option_row(i, option, i == self.model.choice)
 
@@ -339,6 +346,41 @@ class ArchiveView:
 
     def _say(self, text: str, color: str) -> None:
         self.status.configure(text=text, fg=color)
+
+    # ------------------------------------------------------------ ranking
+
+    def fill(self, suggestions: list[dict[str, Any]]) -> None:
+        """Offer the ranked folders in place of the "Finding folders" line."""
+        assert self.model is not None
+        self.model.fill(suggestions)
+        self._paint_options()
+        self._paint_summary()
+
+    def fill_in_background(self, rank: Rank, progress: Optional[Callable[[str], None]] = None) -> None:
+        """Rank on a worker thread, so the window is already up, and fill the folders in on Tk's thread."""
+        answer: queue.Queue[tuple[bool, list[dict[str, Any]]]] = queue.Queue(maxsize=1)
+
+        def work() -> None:
+            try:
+                answer.put((True, rank()))
+            except Exception:
+                logger.exception("❌ archive: ranking the folders failed")
+                answer.put((False, []))
+
+        def poll() -> None:
+            try:
+                ok, suggestions = answer.get_nowait()
+            except queue.Empty:
+                self.root.after(RANK_POLL_MS, poll)
+                return
+            self.fill(suggestions)
+            if not ok:
+                self._say(RANK_FAILED, self.pal.danger_text)
+            if progress:
+                progress("suggestions_shown")
+
+        threading.Thread(target=work, name="archive-rank", daemon=True).start()
+        self.root.after(RANK_POLL_MS, poll)
 
     # ------------------------------------------------------------ another folder
 

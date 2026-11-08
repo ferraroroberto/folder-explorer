@@ -32,6 +32,7 @@ folder-explorer/
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
+│   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
 │   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)

@@ -29,7 +29,10 @@ MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 
 # Where each field of the sheet's document is shown in the window; the value names the Option or ModelView attribute.
 DOC_SHOWN = {"ok": "error block", "error": "error block", "mail": "mail card", "already_archived": "ModelView.filed",
-             "suggestions": "ModelView.options", "category": "ModelView.category_choices", "roots": "Option.shown"}
+             "suggestions": "ModelView.options", "ranking": "ModelView.ranking", "category": "ModelView.category_choices",
+             "roots": "Option.shown"}
+RANKING_NOTE = "Finding folders…"
+NO_MATCH_NOTE = "No folder matches this mail yet. Find one below."
 MAIL_SHOWN = {"subject": "mail card", "sender": "mail card", "date_sent": "mail card", "attachment_count": "mail card",
               "where": "mail card", "preview": "mail card"}
 MAIL_NOT_SHOWN = {"message_id": "an identity for the index, never read by a person"}
@@ -155,7 +158,19 @@ class ModelView:
         self.choice = 0
         self.extra: Optional[str] = None
         self.extra_chip, self.extra_note = "Chosen", ""
+        # True while the folders are still being ranked: the window shows the mail and says so.
+        self.ranking = bool(doc.get("ranking"))
         self._options = self._suggested()
+
+    def fill(self, suggestions: list[dict[str, Any]]) -> None:
+        """The ranked folders arrived: offer them, keeping a folder the user already picked first."""
+        self.doc = dict(self.doc, suggestions=suggestions, ranking=False)
+        self.ranking = False
+        self._options = self._suggested()
+
+    def empty_note(self) -> str:
+        """What the folder list says when it offers nothing."""
+        return RANKING_NOTE if self.ranking else NO_MATCH_NOTE
 
     def _suggested(self) -> list[Option]:
         offered: list[Option] = []

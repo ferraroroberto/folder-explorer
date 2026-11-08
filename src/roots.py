@@ -77,7 +77,7 @@ def _volume_label(drive: str) -> str:
 
 
 def _is_drive_root(path: str) -> bool:
-    return bool(re.fullmatch(r"[A-Za-z]:[\\/]?", path))
+    return bool(re.fullmatch(r"[A-Za-z]:[\\/]*", path))
 
 
 def _slug(text: str) -> str:
@@ -111,6 +111,9 @@ def resolve_roots(configured: Optional[list[str]]) -> list[Root]:
     keys: set[str] = set()
     for raw in paths:
         path = os.path.expandvars(os.path.expanduser(str(raw).strip()))
+        if _is_drive_root(path):
+            # One spelling, so a path joined below it has a single separator and never a drive-relative ``C:Users``.
+            path = path[0].upper() + ":\\"
         ident = normalize(path)
         if ident in seen:
             continue

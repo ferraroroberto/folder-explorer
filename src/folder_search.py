@@ -23,12 +23,12 @@ from __future__ import annotations
 import bisect
 import os
 from contextlib import contextmanager
-from typing import Any, Iterator, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
 from src import store
 from src.folder_match import fold, fuzzy, near_score
 from src.index import Index, open_index
-from src.roots import Root, relative_parts
+from src.roots import Root, normalize, relative_parts
 from src.scanner import search_key
 
 # Folders read per root before ranking, and results returned in all.
@@ -103,6 +103,46 @@ def synced_spans(root: Root, index: Index, indexes: list[tuple[Root, Index]]) ->
     return spans
 
 
+def in_spans(spans: Sequence[tuple[int, int]], fid: int) -> bool:
+    """Whether ``fid`` falls in one of the sorted, disjoint ``(lo, hi)`` ranges."""
+    pos = bisect.bisect_right(spans, (fid, NO_END)) - 1
+    return pos >= 0 and spans[pos][0] <= fid <= spans[pos][1]
+
+
+def merge_spans(spans: Sequence[tuple[int, int]]) -> list[tuple[int, int]]:
+    """The ranges sorted, with nested or overlapping ones joined, as ``in_spans`` needs them."""
+    out: list[tuple[int, int]] = []
+    for lo, hi in sorted(spans):
+        if out and lo <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], hi))
+        else:
+            out.append((lo, hi))
+    return out
+
+
+def within_spans(root: Root, index: Index, paths: Sequence[str]) -> tuple[Optional[list[tuple[int, int]]], set[str]]:
+    """The id ranges of the ``paths`` that lie in this root, and which of them it holds.
+
+    The ranges are ``None`` when one of the paths is the root itself (the whole
+    root is in scope). A path is walked by the names as typed below the root,
+    matched case-insensitively, so a folder the scan never saw is not held.
+    """
+    spans: list[tuple[int, int]] = []
+    held: set[str] = set()
+    whole = False
+    for path in paths:
+        if normalize(path) == normalize(root.path):
+            whole = True
+            held.add(path)
+        elif relative_parts(path, root.path) is not None:
+            names = [p for p in os.path.relpath(os.path.abspath(path), root.path).split(os.sep) if p and p != "."]
+            span = index.subtree_span(names)
+            if span is not None:
+                spans.append(span)
+                held.add(path)
+    return (None if whole else merge_spans(spans)), held
+
+
 class Term:
     """One query word as one index matches it: the spellings its paths are searched for, and where its near words are."""
 
@@ -122,8 +162,7 @@ class Term:
                 self.named, self.spans = index.word_spans(words)
 
     def near(self, fid: int) -> bool:
-        pos = bisect.bisect_right(self.spans, (fid, NO_END)) - 1
-        return pos >= 0 and self.spans[pos][0] <= fid <= self.spans[pos][1]
+        return in_spans(self.spans, fid)
 
     def score(self, fid: int, key: str) -> float:
         """How well this word matches a folded path: 1 for itself, the near score under a near word, else 0."""
@@ -132,16 +171,17 @@ class Term:
         return self.near_score if self.near(fid) else 0.0
 
 
-def _candidates(index: Index, terms: list[Term], room: int,
-                skip_spans: Sequence[tuple[int, int]]) -> tuple[list[tuple[int, str]], int, bool]:
+def _candidates(index: Index, terms: list[Term], room: int, skip_spans: Sequence[tuple[int, int]],
+                only_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[tuple[int, str]], int, bool]:
     """``(id, path)`` of folders holding every word exactly, then, when fewer than ``room``, those that need a near word.
 
     Also says how many lead the list as exact hits. A near match always
     scores below an exact one, so it is looked for only while the exact ones
     leave room in the results shown. Near matches are read from the subtrees
-    under a near word, never by a pass over every path.
+    under a near word, never by a pass over every path. With ``only_spans``
+    every candidate lies in one of those subtrees.
     """
-    found, truncated = index.match_folders([t.exact for t in terms], CANDIDATES, skip_spans)
+    found, truncated = index.match_folders([t.exact for t in terms], CANDIDATES, skip_spans, only_spans)
     exact = len(found)
     if exact >= room:
         return found, exact, truncated
@@ -158,6 +198,8 @@ def _candidates(index: Index, terms: list[Term], room: int,
                 return found, exact, True
             if fid in seen or (skip_spans and any(lo <= fid <= hi for lo, hi in skip_spans)):
                 continue
+            if only_spans and not in_spans(only_spans, fid):
+                continue
             if all(u.folded in key or u.near(fid) for u in others):
                 seen.add(fid)
                 found.append((fid, key))
@@ -165,13 +207,20 @@ def _candidates(index: Index, terms: list[Term], room: int,
 
 
 def search_root(root: Root, index: Index, words: list[str], prune: bool, skip: int,
-                skip_spans: Sequence[tuple[int, int]] = (), room: int = LIMIT) -> dict[str, Any]:
-    """One root's matching folders, each with its score, plus whether the candidate cap cut the list."""
+                skip_spans: Sequence[tuple[int, int]] = (), room: int = LIMIT,
+                only_spans: Sequence[tuple[int, int]] = ()) -> dict[str, Any]:
+    """One root's matching folders, each with its score, plus whether the candidate cap cut the list.
+
+    With ``only_spans`` the search keeps to those subtrees, and a match folds
+    only into a folder of people inside them, so no result lies outside.
+    """
     if not index.searchable():
         return {"results": [], "truncated": False, "needs_rescan": True}
     terms = [Term(w, index) for w in words]
-    found, exact, truncated = _candidates(index, terms, room, skip_spans)
+    found, exact, truncated = _candidates(index, terms, room, skip_spans, only_spans)
     owners = index.people_folders() if prune else []
+    if only_spans:
+        owners = [o for o in owners if in_spans(only_spans, o[0])]
     folded = _fold([fid for fid, _ in found], owners) if owners else {fid: fid for fid, _ in found}
     # A folder of people scores as its best-matching folder. An exact hit holds every word, so it reads 1;
     # a near one scores the mean of its words' scores.
@@ -188,6 +237,7 @@ def search_root(root: Root, index: Index, words: list[str], prune: bool, skip: i
             "root": root.key, "root_name": root.name, "kind": root.kind, "id": fid, "name": r["name"],
             "size": int(r["size"]), "disk": int(r["alloc"]), "files": int(r["files"]),
             "online_files": int(r["online_files"]), "people": people.get(fid, 0), "score": best[fid],
+            "depth": int(r["depth"]),
             # Within one score, a word in the folder's own name ranks above one in its ancestry, then a shallower folder.
             "_rank": (sum(1 for t in terms if t.folded in name or fid in t.named), -int(r["depth"])),
         })
@@ -221,8 +271,12 @@ def open_scanned(roots: list[Root]) -> Iterator[list[tuple[Root, Index]]]:
 
 
 def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int, limit: int = LIMIT,
-           onedrive_prevails: bool = False) -> dict[str, Any]:
+           onedrive_prevails: bool = False, within: Sequence[str] = ()) -> dict[str, Any]:
     """Every root's matches merged: the best ``limit``, the total, and the roots that need a rescan first.
+
+    ``within`` keeps the search to those folders and everything below them
+    (a root's own path keeps that whole root); a root holding none of them is
+    not searched, and ``missing`` lists the paths no scanned root holds.
 
     With ``onedrive_prevails`` a folder inside a scanned OneDrive root is
     listed once, as that root's row, not also under the drive that holds it.
@@ -231,13 +285,20 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     """
     terms = parse_terms(text)
     if not terms:
-        return {"results": [], "total": 0, "truncated": False, "needs_rescan": []}
+        return {"results": [], "total": 0, "truncated": False, "needs_rescan": [], "missing": []}
     merged: list[tuple[dict[str, Any], Root, Index]] = []
     truncated = False
     stale = []
+    held: set[str] = set()
     for root, index in indexes:
+        only: Optional[list[tuple[int, int]]] = None
+        if within:
+            only, found_here = within_spans(root, index, within)
+            held |= found_here
+            if only == []:
+                continue
         spans = synced_spans(root, index, indexes) if onedrive_prevails else []
-        part = search_root(root, index, terms, prune, skip, spans, limit)
+        part = search_root(root, index, terms, prune, skip, spans, limit, only or ())
         merged.extend((hit, root, index) for hit in part["results"])
         truncated = truncated or part["truncated"]
         if part["needs_rescan"]:
@@ -246,4 +307,4 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     # Paths are rebuilt only for the results shown: each costs one lookup per level.
     shown = [_with_path(hit, root, index, skip) for hit, root, index in merged[:limit]]
     return {"results": shown, "total": len(merged), "truncated": truncated or len(merged) > limit,
-            "needs_rescan": stale}
+            "needs_rescan": stale, "missing": [p for p in within if p not in held]}

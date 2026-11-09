@@ -24,13 +24,15 @@ folder-explorer/
 │       ├── state.py            # the open-index pool, its housekeeping and the email-folder search
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
-│       │                       #   archive (the Archive sheet and the macro's hand-off)
+│       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
+│       │                       #   versioned search API other apps call, docs/service-api.md)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
+│   ├── search_api.py           # the v1 search contract: its states, hit shapes and the page link
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
@@ -69,7 +71,7 @@ folder-explorer/
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, scanning.md, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, scanning.md, service-api.md (the v1 search API), and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

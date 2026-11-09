@@ -24,7 +24,15 @@ from starlette.types import Scope
 
 from app.webapp import auth
 from app.webapp.build import BUILD_INFO, STATIC_DIR
-from app.webapp.routers import archive, browse, emails, scans, search, settings
+from app.webapp.routers import (
+    archive,
+    browse,
+    emails,
+    scans,
+    search,
+    search_v1,
+    settings,
+)
 from app.webapp.state import EMAILS, POOL, refresh_pool
 from src import config, scan_runner, store
 from src.compression import StreamSafeGZipMiddleware
@@ -98,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(browse.router)
     app.include_router(scans.router)
     app.include_router(search.router)
+    app.include_router(search_v1.router)
     app.include_router(emails.router)
     app.include_router(archive.router)
     # Local-only view/tap log, under the same sign-in rule as every other route.

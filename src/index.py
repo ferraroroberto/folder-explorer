@@ -317,21 +317,25 @@ class Index:
                 "SELECT p.id, p.lpath FROM s CROSS JOIN folder_paths p ON p.id BETWEEN s.lo AND s.hi",
                 [v for span in chunk for v in span]))
 
-    def match_folders(self, groups: list[list[str]], cap: int,
-                      skip_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[tuple[int, str]], bool]:
+    def match_folders(self, groups: list[list[str]], cap: int, skip_spans: Sequence[tuple[int, int]] = (),
+                      only_spans: Sequence[tuple[int, int]] = ()) -> tuple[list[tuple[int, str]], bool]:
         """``(id, path)`` of folders whose path holds one spelling of every group, and whether ``cap`` cut them.
 
         Each group is one query word's stored spellings (already search-keyed).
         A folder's id is the low end of its subtree's id range, so each
-        ``(lo, hi)`` in ``skip_spans`` leaves out one folder and everything below it.
+        ``(lo, hi)`` in ``skip_spans`` leaves out one folder and everything below it,
+        and ``only_spans``, when given, keeps just those subtrees (an id-range read, not a pass over every path).
         """
         if not groups:
             return [], False
         where = ["(" + " OR ".join(["instr(lpath, ?) > 0"] * len(g)) + ")" for g in groups]
         where += ["id NOT BETWEEN ? AND ?"] * len(skip_spans)
+        if only_spans:
+            where.append("(" + " OR ".join(["id BETWEEN ? AND ?"] * len(only_spans)) + ")")
         rows = self.conn.execute(
             "SELECT id, lpath FROM folder_paths WHERE " + " AND ".join(where) + " LIMIT ?",
-            (*(v for g in groups for v in g), *(v for span in skip_spans for v in span), cap + 1),
+            (*(v for g in groups for v in g), *(v for span in skip_spans for v in span),
+             *(v for span in only_spans for v in span), cap + 1),
         ).fetchall()
         return [(int(r[0]), r[1]) for r in rows[:cap]], len(rows) > cap
 

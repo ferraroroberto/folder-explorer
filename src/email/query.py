@@ -5,8 +5,8 @@
     has:attachment filename:pdf larger:5M is:flagged is:done id:<message id>
 
 Free words and quoted phrases search every indexed text column; a word is a
-prefix match, so the box answers while it is being typed. ``OR`` between two
-words takes either; ``-`` excludes a word or an operator. An operator the
+prefix match, so the box answers while it is being typed (a single letter
+matches only itself). ``OR`` between two words takes either; ``-`` excludes a word or an operator. An operator the
 index cannot answer yet (a column it does not have) is reported in ``notes``
 and left out, never silently turned into "no results".
 
@@ -37,6 +37,9 @@ _SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)([kmg]?)b?$", re.IGNORECASE)
 _DATE_RE = re.compile(r"^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$")
 _NEWER_RE = re.compile(r"^(\d+)([dmy])$", re.IGNORECASE)
 _SIZE_UNITS = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
+# Shortest word searched as a prefix: a one-letter prefix reads a large share of the index
+# (measured near 0.3 s on 17k mails) for hits no one wants, so one letter matches only itself.
+MIN_PREFIX = 2
 
 
 @dataclass(frozen=True)
@@ -84,8 +87,8 @@ def words_of(tokens: list[Token]) -> list[str]:
 
 
 def fts_term(value: str, prefix: bool = True) -> str:
-    """One FTS5 string, quoted so any character is literal; a prefix match unless a phrase."""
-    return '"' + value.replace('"', '""') + '"' + ("*" if prefix else "")
+    """One FTS5 string, quoted so any character is literal; a prefix match unless a phrase or a single character."""
+    return '"' + value.replace('"', '""') + '"' + ("*" if prefix and len(value) >= MIN_PREFIX else "")
 
 
 def size_bytes(value: str) -> Optional[int]:

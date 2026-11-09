@@ -142,6 +142,8 @@ powershell -File scripts\verify-before-ship.ps1
 
 Byte-compile, the unit tests, the browser suite (Chromium desktop and WebKit iPhone against a disposable instance over an invented tree), and the ten fleet ratchets. Needs `requirements-dev.txt` and Node (`npx`) for the static ratchet.
 
+The last stdout line of a run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`, on a pass, a failed stage, a missing `.venv` and an unhandled error; exit codes are 0 and 1. Do not pipe the gate when its exit code matters (`| tail` reports `tail`'s status); a caller that must pipe asserts on that line, and a run without it is not a pass.
+
 ## Layout
 
 Where code goes: [docs/layout.md](docs/layout.md). Agent instructions: [CLAUDE.md](CLAUDE.md).

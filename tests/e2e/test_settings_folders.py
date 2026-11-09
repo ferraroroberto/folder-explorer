@@ -1,4 +1,4 @@
-"""Settings' folder lists: add and remove a scan root and an email folder, a refusal, and Scans without settings."""
+"""The Settings sheet: remote access, the schedule and the download budget, then the folder lists (add and remove a scan root and an email folder, a refusal), and Scans without settings."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def saved_lists(page: Page, app_url: str) -> Iterator[None]:
 
 
 @pytest.mark.usefixtures("saved_lists")
-def test_folder_lists_add_remove_and_refuse(page: Page, app_url: str, tmp_path: Path) -> None:
+def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(page: Page, app_url: str, tmp_path: Path) -> None:
     extra = tmp_path / "Invented archive"
     inbox = extra / "Inbox"
     inbox.mkdir(parents=True)
@@ -57,6 +57,12 @@ def test_folder_lists_add_remove_and_refuse(page: Page, app_url: str, tmp_path: 
     scans.locator(".open-settings").click()
     sheet = page.locator("#settingsDialog")
     expect(sheet).to_be_visible()
+    expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
+    expect(sheet.locator("#remoteNote")).to_contain_text("this PC only")
+    expect(sheet.locator("#scheduleSelect")).to_have_value("off")
+    # A config that never set a download budget has no limit, and the menu offers that first.
+    expect(sheet.locator("#emailBudget")).to_have_value("")
+    expect(sheet.locator("#emailBudget option").first).to_have_text("No limit (recommended)")
     roots = sheet.locator("#rootsEditor")
     emails = sheet.locator("#emailRootsEditor")
     expect(roots).to_be_visible()

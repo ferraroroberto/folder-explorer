@@ -1,4 +1,4 @@
-"""Explore's hidden-items switch, double-click to open, and the row menu, with the open route faked."""
+"""Explore's hidden-items switch, double-click to open, and the row menu on and off the PC, with the open route faked."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _wait_for(page: Page, asked: list[dict[str, Any]], n: int) -> dict[str, Any]
 
 
 @pytest.mark.desktop_only
-def test_hidden_items_switch_and_opening_items_on_the_pc(page: Page, app_url: str) -> None:
+def test_hidden_items_switch_and_opening_items_on_and_off_the_pc(page: Page, app_url: str) -> None:
     if app_url.endswith(":%d" % LIVE_PORT):
         pytest.skip("the switch writes the settings: never on the live app")
     asked: list[dict[str, Any]] = []
@@ -69,18 +69,15 @@ def test_hidden_items_switch_and_opening_items_on_the_pc(page: Page, app_url: st
     assert (third["kind"], third["id"], third["verb"]) == ("folder", folder_id, "explore")
     assert all(a["scan_id"] == asked[0]["scan_id"] and a["root"] for a in asked)
 
-
-@pytest.mark.desktop_only
-def test_off_the_pc_the_row_menu_says_opening_works_on_the_pc(page: Page, app_url: str) -> None:
+    # A caller off the PC: the same folder listing says opening is not possible, and the menu offers only the copy.
     def as_remote(route: Route) -> None:
         body = route.fetch().json()
         body["can_open"] = False
         route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
 
     page.route("**/api/folder?*", as_remote)
-    page.goto(app_url + "/")
+    page.reload()
     page.locator('.tab[data-tab="explore"]').click()
-    dock = page.locator("#contentsDock")
     dock.locator(".row-item", has_text="notes.txt").locator(".row-kebab").click()
     menu = page.locator(".row-menu")
     expect(menu.locator(".row-menu-head")).to_have_text("Opening files and folders works on the PC")

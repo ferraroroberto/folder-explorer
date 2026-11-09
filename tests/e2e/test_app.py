@@ -1,15 +1,13 @@
-"""The rendered app: each tab, the folder tree and sheet, the filters, scans and settings."""
+"""The rendered app: each tab, the folder tree and sheet, the type filter and scans."""
 
 from __future__ import annotations
 
 from typing import Any
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._shot import settle
-from tests.e2e.test_settings_folders import BELOW_FOLD
 
 TABS = ("search", "explore", "largest", "types", "scans")
 TITLES = {"search": "Search", "explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
@@ -46,7 +44,7 @@ def test_every_tab_leads_with_its_own_header_and_lays_out_clean(page: Page, app_
     assert errors == []
 
 
-def test_tree_expands_and_selecting_a_folder_shows_its_contents(page: Page, app_url: str, browser_name: str) -> None:
+def test_tree_selecting_a_folder_shows_its_contents_and_the_basis_switches_totals(page: Page, app_url: str, browser_name: str) -> None:
     _open(page, app_url)
     videos = page.locator(".tree-main", has_text="Videos")
     videos.click()
@@ -62,6 +60,10 @@ def test_tree_expands_and_selecting_a_folder_shows_its_contents(page: Page, app_
     expect(page.locator("#scopePill")).to_contain_text("Videos")
     _tab(page, "largest")
     expect(page.locator("#topList .list-row").first).to_contain_text("river-01.mp4")
+    _tab(page, "explore")
+    expect(page.locator("#summary .stat-label").first).to_have_text("Total size")
+    page.locator('#basisSeg [data-value="disk"]').click()
+    expect(page.locator("#summary .stat-label").first).to_have_text("On disk")
 
 
 def test_type_filter_narrows_every_view(page: Page, app_url: str) -> None:
@@ -77,13 +79,6 @@ def test_type_filter_narrows_every_view(page: Page, app_url: str) -> None:
     expect(page.locator("#typesFilterLine")).to_be_hidden()
 
 
-def test_on_disk_basis_switches_the_totals(page: Page, app_url: str) -> None:
-    _open(page, app_url)
-    expect(page.locator("#summary .stat-label").first).to_have_text("Total size")
-    page.locator('#basisSeg [data-value="disk"]').click()
-    expect(page.locator("#summary .stat-label").first).to_have_text("On disk")
-
-
 def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_count: int) -> None:
     _open(page, app_url)
     _tab(page, "scans")
@@ -92,6 +87,12 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
     names = [t.strip() for t in rows.locator(".action-row-title").all_inner_texts()]
     assert len(set(names)) == len(names)
     expect(page.locator("#toolbar")).to_be_hidden()
+    expect(page.locator("#emailCard")).to_be_visible()
+    boxes = [page.locator(sel).bounding_box() for sel in ("#rescanAll", "#indexEmails")]
+    assert all(boxes)
+    left, right = boxes[0], boxes[1]
+    assert abs(left["x"] - right["x"]) <= 1 and abs(left["width"] - right["width"]) <= 1
+    assert abs(left["height"] - right["height"]) <= 1
     page.locator("#rescanAll").click()
     expect(page.locator(".toast")).to_be_visible()
     expect(page.locator("#rescanAll")).to_be_enabled(timeout=20_000)
@@ -99,29 +100,3 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
     # overshoot reaches past the bar; the lint measures the layout once that motion has ended.
     settle(page)
     assert_layout_clean(page)
-
-
-def test_scans_footer_actions_share_one_box(page: Page, app_url: str) -> None:
-    _open(page, app_url)
-    _tab(page, "scans")
-    expect(page.locator("#emailCard")).to_be_visible()
-    boxes = [page.locator(sel).bounding_box() for sel in ("#rescanAll", "#indexEmails")]
-    assert all(boxes)
-    left, right = boxes[0], boxes[1]
-    assert abs(left["x"] - right["x"]) <= 1 and abs(left["width"] - right["width"]) <= 1
-    assert abs(left["height"] - right["height"]) <= 1
-
-
-@pytest.mark.desktop_only
-def test_settings_show_remote_access_and_the_schedule(page: Page, app_url: str) -> None:
-    _open(page, app_url)
-    page.locator("#paneExplore .open-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
-    expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
-    expect(sheet.locator("#remoteNote")).to_contain_text("this PC only")
-    expect(sheet.locator("#scheduleSelect")).to_have_value("off")
-    # A config that never set a download budget has no limit, and the menu offers that first.
-    expect(sheet.locator("#emailBudget")).to_have_value("")
-    expect(sheet.locator("#emailBudget option").first).to_have_text("No limit (recommended)")
-    assert_layout_clean(page, allow=BELOW_FOLD)

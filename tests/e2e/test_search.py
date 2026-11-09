@@ -1,11 +1,10 @@
-"""The Search tab in a browser: email search with facets and the preview, folder search from a link."""
+"""The Search tab in a browser: email search with facets, the preview and its actions, folder search from a link, Show all."""
 
 from __future__ import annotations
 
 import json
 import re
 
-import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
@@ -29,8 +28,53 @@ def _preview(page: Page, browser_name: str):  # type: ignore[no-untyped-def]
     return page.locator("#previewSheetBody" if browser_name == "webkit" else "#previewDock")
 
 
-def test_email_search_refines_previews_and_shows_the_folder(page: Page, app_url: str, browser_name: str) -> None:
+def _open_faked(page: Page, route_glob: str) -> list[dict]:
+    """Answer an open route with ``opened`` and record each body, so nothing is launched on this PC."""
+    asked: list[dict] = []
+
+    def fake_open(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
+
+    page.route(route_glob, fake_open)
+    return asked
+
+
+def _typing_or_a_held_modifier_runs_nothing(page: Page, box_keys: tuple[str, ...], restore: str) -> None:
+    """Typing in the box, or a held modifier, runs no card key; the box is restored and the first result focused."""
+    for key in box_keys:
+        page.locator("#q").press(key)
+    page.locator("#q").fill(restore)
+    page.locator("#results .result-row").first.focus()
+    page.keyboard.press("Control+e")
+    page.keyboard.press("Control+c")
+    page.wait_for_timeout(300)
+    expect(page.locator(".toast")).to_have_count(0)
+
+
+def _copy_key_puts_the_shown_path_on_the_clipboard(page: Page, preview) -> None:  # type: ignore[no-untyped-def]
+    page.keyboard.press("c")
+    expect(page.locator(".toast", has_text="Path copied")).to_be_visible()
+    shown = preview.locator(".pv-path").inner_text().strip()
+    assert page.evaluate("() => navigator.clipboard.readText()").replace("/", "\\") == shown
+
+
+def test_email_search_refines_previews_and_acts_on_the_mail(page: Page, app_url: str, browser_name: str) -> None:
     errors = _errors(page)
+    opened_folder = _open_faked(page, "**/api/open")
+    opened_mail: list[str] = []
+
+    def fake_open_mail(route: Route) -> None:
+        opened_mail.append(route.request.url)
+        route.fulfill(status=200, content_type="application/json", body="{}")
+
+    def outlook_ready(route: Route) -> None:
+        # The e2e instance has no Outlook; the keys only need the detail to say the mail can be opened.
+        fetched = route.fetch()
+        route.fulfill(response=fetched, json={**fetched.json(), "can_open": True})
+
+    page.route(re.compile(r"/api/emails/\d+/open$"), fake_open_mail)
+    page.route(re.compile(r"/api/emails/\d+\?"), outlook_ready)
     page.goto(app_url + "/")
     expect(page.locator("#paneSearch")).to_be_visible()
     page.locator("#q").fill("budget")
@@ -47,40 +91,45 @@ def test_email_search_refines_previews_and_shows_the_folder(page: Page, app_url:
     preview = _preview(page, browser_name)
     expect(preview.locator(".pv-subject")).to_contain_text("Q4 budget draft")
     expect(preview.locator(".pv-snippet mark").first).to_have_text("budget", ignore_case=True)
+    expect(preview.locator('[data-act="folder"]').first).to_be_visible()
+    expect(preview.locator('[data-act="outlook"]')).to_be_visible()
+    open_folder = preview.locator('[data-act="openfolder"]')
+    expect(open_folder).to_have_text("Open folder")
     _lint(page)
-    preview.locator('[data-act="folder"]').first.click()
+    if browser_name == "chromium":
+        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        for label in ("open folder", "show folder", "copy path"):
+            expect(page.locator("#keysLine")).to_contain_text(label)
+        _typing_or_a_held_modifier_runs_nothing(page, ("e", "o"), "budget is:flagged")
+        assert opened_folder == [] and opened_mail == []
+        page.keyboard.press("o")
+        expect(page.locator(".toast", has_text="Opening in Outlook")).to_be_visible()
+        assert len(opened_mail) == 1
+        page.keyboard.press("e")
+        expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
+        assert len(opened_folder) == 1
+        _copy_key_puts_the_shown_path_on_the_clipboard(page, preview)
+
+    open_folder.click()
+    expect(page.locator(".toast", has_text="Opened in File Explorer").last).to_be_visible()
+    # The server is asked to open by the mail's folder record, never by a path from the page.
+    assert len(opened_folder) == (2 if browser_name == "chromium" else 1)
+    assert opened_folder[-1]["kind"] == "folder" and opened_folder[-1]["verb"] == "explore"
+    assert opened_folder[-1]["id"] > 0 and "path" not in opened_folder[-1]
+
+    if browser_name == "chromium":
+        page.keyboard.press("f")
+    else:
+        preview.locator('[data-act="folder"]').first.click()
     expect(page.locator("#paneExplore")).to_be_visible()
     expect(page.locator("#scopePill")).to_contain_text("Northwind")
     assert errors == []
 
 
-def test_open_folder_beside_show_folder_posts_the_mails_folder(page: Page, app_url: str, browser_name: str) -> None:
+def test_folder_search_opens_from_a_link_matches_every_word_and_runs_the_card_keys(page: Page, app_url: str, browser_name: str,
+                                                                                    roots_count: int) -> None:
     errors = _errors(page)
-    asked: list[dict] = []
-
-    def fake_open(route: Route) -> None:
-        asked.append(route.request.post_data_json)
-        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
-
-    page.route("**/api/open", fake_open)
-    page.goto(app_url + "/")
-    page.locator("#q").fill("budget")
-    page.locator("#results .result-row").first.click()
-    preview = _preview(page, browser_name)
-    expect(preview.locator('[data-act="folder"]').first).to_be_visible()
-    button = preview.locator('[data-act="openfolder"]')
-    expect(button).to_have_text("Open folder")
-    _lint(page)
-    button.click()
-    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
-    assert len(asked) == 1
-    assert asked[0]["kind"] == "folder" and asked[0]["verb"] == "explore" and asked[0]["id"] > 0 and "path" not in asked[0]
-    assert errors == []
-
-
-def test_folder_search_opens_from_a_link_and_matches_every_word(page: Page, app_url: str, browser_name: str,
-                                                                roots_count: int) -> None:
-    errors = _errors(page)
+    asked = _open_faked(page, "**/api/folders/open")
     page.goto(app_url + "/#search?mode=folders&q=harbour%202024")
     expect(page.locator("#q")).to_have_value("harbour 2024")
     expect(page.locator('#modeSeg [data-value="folders"]')).to_have_attribute("aria-pressed", "true")
@@ -96,112 +145,23 @@ def test_folder_search_opens_from_a_link_and_matches_every_word(page: Page, app_
         page.locator("#previewDialog [data-close]").click()
     page.locator("#q").fill("harbour nothing-like-this")
     expect(page.locator("#results .empty-state-message")).to_have_text("No folder matches every word.")
-    assert errors == []
-
-
-@pytest.mark.desktop_only
-def test_folder_card_keys_run_the_buttons_actions(page: Page, app_url: str, browser_name: str) -> None:
-    errors = _errors(page)
-    asked: list[dict] = []
-
-    def fake_open(route: Route) -> None:
-        asked.append(route.request.post_data_json)
-        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
-
-    page.route("**/api/folders/open", fake_open)
-    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
-    page.goto(app_url + "/#search?mode=folders&q=harbour%202024")
-    page.locator("#results .result-row").first.click()
-    preview = _preview(page, browser_name)
-    expect(preview.locator(".pv-path")).to_contain_text("harbour-trip")
-    expect(page.locator("#keysLine")).to_contain_text("open in File Explorer")
-    expect(page.locator("#keysLine")).to_contain_text("copy path")
-
-    # Typing in the box, or a held modifier, runs nothing.
-    page.locator("#q").press("c")
-    page.locator("#q").press("e")
     page.locator("#q").fill("harbour 2024")
-    expect(page.locator("#results .result-row").first).to_contain_text("harbour-trip")
-    page.locator("#results .result-row").first.focus()
-    page.keyboard.press("Control+e")
-    page.keyboard.press("Control+c")
-    page.wait_for_timeout(300)
-    assert asked == []
-    expect(page.locator(".toast")).to_have_count(0)
 
-    page.keyboard.press("e")
-    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
-    assert len(asked) == 1 and asked[0]["id"] > 0 and "path" not in asked[0]
-
-    page.keyboard.press("c")
-    expect(page.locator(".toast", has_text="Path copied")).to_be_visible()
-    shown = preview.locator(".pv-path").inner_text().strip()
-    assert page.evaluate("() => navigator.clipboard.readText()").replace("/", "\\") == shown
-
-    page.keyboard.press("f")
-    expect(page.locator("#paneExplore")).to_be_visible()
-    assert errors == []
-
-
-@pytest.mark.desktop_only
-def test_email_card_keys_run_the_buttons_actions(page: Page, app_url: str, browser_name: str) -> None:
-    errors = _errors(page)
-    opened_folder: list[dict] = []
-    opened_mail: list[str] = []
-
-    def fake_open(route: Route) -> None:
-        opened_folder.append(route.request.post_data_json)
-        route.fulfill(status=200, content_type="application/json", body='{"status": "opened"}')
-
-    def fake_open_mail(route: Route) -> None:
-        opened_mail.append(route.request.url)
-        route.fulfill(status=200, content_type="application/json", body="{}")
-
-    def outlook_ready(route: Route) -> None:
-        # The e2e instance has no Outlook; the keys only need the detail to say the mail can be opened.
-        fetched = route.fetch()
-        route.fulfill(response=fetched, json={**fetched.json(), "can_open": True})
-
-    page.route("**/api/open", fake_open)
-    page.route(re.compile(r"/api/emails/\d+/open$"), fake_open_mail)
-    page.route(re.compile(r"/api/emails/\d+\?"), outlook_ready)
-    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
-    page.goto(app_url + "/")
-    page.locator("#q").fill("budget")
-    page.locator("#results .result-row").first.click()
-    preview = _preview(page, browser_name)
-    expect(preview.locator('[data-act="outlook"]')).to_be_visible()
-    for label in ("open folder", "show folder", "copy path"):
-        expect(page.locator("#keysLine")).to_contain_text(label)
-
-    # Typing in the box, or a held modifier, runs nothing.
-    page.locator("#q").press("e")
-    page.locator("#q").press("o")
-    page.locator("#q").fill("budget")
-    page.locator("#results .result-row").first.focus()
-    page.keyboard.press("Control+e")
-    page.keyboard.press("Control+c")
-    page.wait_for_timeout(300)
-    assert opened_folder == [] and opened_mail == []
-    expect(page.locator(".toast")).to_have_count(0)
-
-    page.keyboard.press("o")
-    expect(page.locator(".toast", has_text="Opening in Outlook")).to_be_visible()
-    assert len(opened_mail) == 1
-
-    page.keyboard.press("e")
-    expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
-    assert len(opened_folder) == 1
-    assert opened_folder[0]["kind"] == "folder" and opened_folder[0]["verb"] == "explore" and opened_folder[0]["id"] > 0
-    assert "path" not in opened_folder[0]
-
-    page.keyboard.press("c")
-    expect(page.locator(".toast", has_text="Path copied")).to_be_visible()
-    shown = preview.locator(".pv-path").inner_text().strip()
-    assert page.evaluate("() => navigator.clipboard.readText()").replace("/", "\\") == shown
-
-    page.keyboard.press("f")
-    expect(page.locator("#paneExplore")).to_be_visible()
+    if browser_name == "chromium":
+        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        expect(rows).to_have_count(roots_count)
+        rows.first.click()
+        expect(preview.locator(".pv-path")).to_contain_text("harbour-trip")
+        expect(page.locator("#keysLine")).to_contain_text("open in File Explorer")
+        expect(page.locator("#keysLine")).to_contain_text("copy path")
+        _typing_or_a_held_modifier_runs_nothing(page, ("c", "e"), "harbour 2024")
+        assert asked == []
+        page.keyboard.press("e")
+        expect(page.locator(".toast", has_text="Opened in File Explorer")).to_be_visible()
+        assert len(asked) == 1 and asked[0]["id"] > 0 and "path" not in asked[0]
+        _copy_key_puts_the_shown_path_on_the_clipboard(page, preview)
+        page.keyboard.press("f")
+        expect(page.locator("#paneExplore")).to_be_visible()
     assert errors == []
 
 

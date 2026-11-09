@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from playwright.sync_api import Page, Route, expect
+from playwright.sync_api import Locator, Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 
@@ -71,7 +71,49 @@ def _errors(page: Page) -> list[str]:
     return errors
 
 
-def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, app_url: str, browser_name: str) -> None:
+def _file_the_archived_mail_again_through_the_copy_switch(page: Page, sheet: Locator, filed: list[dict[str, Any]]) -> None:
+    """The mail just filed reads as archived: the sheet refuses a second filing until the copy switch is on."""
+    page.route("**/api/archive/current", lambda r: _json(r, dict(PREPARED, already_archived=ROOT + "/Clients/Project Alpha/2026/003 - Kickoff agenda.msg")))
+    page.locator("#openArchive").click()
+    expect(sheet).to_be_visible()
+    expect(sheet.locator(".arch-filed")).to_have_text("Already archived as Clients\\Project Alpha\\2026\\003 - Kickoff agenda.msg")
+    go, copy = sheet.locator("#archiveGo"), sheet.locator("#archCopy")
+    expect(copy).to_have_attribute("aria-checked", "false")
+    expect(go).to_be_disabled()
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    copy.click()
+    expect(copy).to_have_attribute("aria-checked", "true")
+    expect(go).to_have_text("Archive a copy to Project Alpha\\2026")
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    go.click()
+    expect(sheet).to_be_hidden()
+    assert filed[1:] == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived",
+                          "date_prefix": "auto", "duplicate": True}]
+
+
+def _the_macro_sheet_lists_its_steps_and_copies_the_macro(page: Page, browser_name: str) -> None:
+    page.locator("#paneSearch .home-settings").click()
+    page.locator("#showMacro").click()
+    macro = page.locator("#macroDialog")
+    expect(macro).to_be_visible()
+    expect(macro.locator("#setxText")).to_contain_text("setx FOLDER_EXPLORER_HOME")
+    expect(macro.locator("#homeState")).not_to_be_empty()
+    expect(macro.locator(".setup-step-title")).to_have_text(["Set the folder", "Import the macro", "Add it to the ribbon", "Restart Outlook"])
+    expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
+    # The vendored code-listing: Copy is an unpainted icon button that puts the listing on the clipboard and says so.
+    if browser_name == "chromium":
+        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    macro.locator("#copyMacro").click()
+    expect(macro.locator(".code-listing-status").nth(1)).to_have_text("Copied")
+    if browser_name == "chromium":
+        assert "Sub ArchiveCurrentItem()" in page.evaluate("() => navigator.clipboard.readText()")
+    # The tap scrolled the sheet to the Copy; the lint below reads the sheet from its top.
+    macro.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
+    # The sheet is capped to the viewport and scrolls its card, so the VBA's Copy sits below a phone's fold by design.
+    _lint_both_themes(page, allow={"#macroDialog #copyMacro": "below the fold of the scrolling sheet"})
+
+
+def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_through_the_switch(page: Page, app_url: str, browser_name: str) -> None:
     errors = _errors(page)
     filed: list[dict[str, Any]] = []
     _archive_ready(page)
@@ -132,83 +174,10 @@ def test_the_card_opens_the_sheet_which_files_to_the_chosen_folder(page: Page, a
     assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2026", "category": "Archived", "date_prefix": "on"}]
     expect(page.locator(".toast")).to_contain_text("Archived to Northwind\\2026")
     expect(page.locator("#outlookMeta")).to_have_text("Last filed to Northwind\\2026")
-    page.locator("#paneSearch .home-settings").click()
-    page.locator("#showMacro").click()
-    macro = page.locator("#macroDialog")
-    expect(macro).to_be_visible()
-    expect(macro.locator("#setxText")).to_contain_text("setx FOLDER_EXPLORER_HOME")
-    expect(macro.locator("#homeState")).not_to_be_empty()
-    expect(macro.locator(".setup-step-title")).to_have_text(["Set the folder", "Import the macro", "Add it to the ribbon", "Restart Outlook"])
-    expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
-    # The vendored code-listing: Copy is an unpainted icon button that puts the listing on the clipboard and says so.
-    if browser_name == "chromium":
-        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
-    macro.locator("#copyMacro").click()
-    expect(macro.locator(".code-listing-status").nth(1)).to_have_text("Copied")
-    if browser_name == "chromium":
-        assert "Sub ArchiveCurrentItem()" in page.evaluate("() => navigator.clipboard.readText()")
-    # The tap scrolled the sheet to the Copy; the lint below reads the sheet from its top.
-    macro.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
-    # The sheet is capped to the viewport and scrolls its card, so the VBA's Copy sits below a phone's fold by design.
-    _lint_both_themes(page, allow={"#macroDialog #copyMacro": "below the fold of the scrolling sheet"})
-    assert errors == []
 
+    _file_the_archived_mail_again_through_the_copy_switch(page, sheet, filed)
 
-def test_an_archived_mail_is_filed_again_only_through_the_copy_switch(page: Page, app_url: str) -> None:
-    errors = _errors(page)
-    filed: list[dict[str, Any]] = []
-    _archive_ready(page)
-    page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
-    page.route("**/api/archive/current", lambda r: _json(r, dict(PREPARED, already_archived=ROOT + "/Clients/Project Alpha/2026/003 - Kickoff agenda.msg")))
-
-    def file_mail(route: Route) -> None:
-        filed.append(route.request.post_data_json)
-        _json(route, {"ok": True, "folder_path": filed[-1]["folder"], "files": [filed[-1]["folder"] + "/004 - Kickoff agenda.msg"],
-                      "categorized": True, "indexing": True, "error": None})
-    page.route("**/api/archive/file", file_mail)
-
-    page.goto(app_url + "/")
-    page.locator("#openArchive").click()
-    sheet = page.locator("#archiveDialog")
-    expect(sheet.locator(".arch-filed")).to_have_text("Already archived as Clients\\Project Alpha\\2026\\003 - Kickoff agenda.msg")
-    go, copy = sheet.locator("#archiveGo"), sheet.locator("#archCopy")
-    expect(copy).to_have_attribute("aria-checked", "false")
-    expect(go).to_be_disabled()
-    _lint_both_themes(page, allow=BELOW_FOLD)
-    copy.click()
-    expect(copy).to_have_attribute("aria-checked", "true")
-    expect(go).to_have_text("Archive a copy to Project Alpha\\2026")
-    _lint_both_themes(page, allow=BELOW_FOLD)
-    go.click()
-    expect(sheet).to_be_hidden()
-    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived",
-                      "date_prefix": "auto", "duplicate": True}]
-    assert errors == []
-
-
-def test_the_macro_hand_off_opens_the_sheet_and_a_failure_says_why(page: Page, app_url: str, browser_name: str) -> None:
-    errors = _errors(page)
-    handed = [{"mail": dict(PREPARED, from_macro=True)}]
-    _archive_ready(page)
-    page.route("**/api/archive/pending*", lambda r: _json(r, handed.pop() if handed else {"mail": None}))
-    page.route("**/api/archive/current", lambda r: _json(r, {"ok": False, "error": {
-        "code": "outlook_unreachable", "message": "Outlook isn't reachable: open Outlook (classic) and try again."}}))
-    page.route("**/api/emails/*/find", lambda r: _json(r, {"ok": True, "folder": "Archive", "mailbox": "default"}))
-    page.goto(app_url + "/")
-    sheet = page.locator("#archiveDialog")
-    expect(sheet.locator(".arch-source")).to_have_text("Opened from the Archive button in Outlook")
-    expect(sheet.locator(".arch-mail strong")).to_have_text("Kickoff agenda")
-    sheet.locator("[data-close]").click()
-    page.locator("#openArchive").click()
-    expect(sheet.locator(".pv-error")).to_contain_text("Outlook isn't reachable")
-    expect(sheet.locator("#archRetry")).to_be_visible()
-    _lint_both_themes(page)
-    sheet.locator("[data-close]").click()
-    page.locator("#q").fill("budget")
-    page.locator("#results .result-row").first.click()
-    preview = page.locator("#previewSheetBody" if browser_name == "webkit" else "#previewDock")
-    preview.locator('[data-act="mailbox"]').click()
-    expect(page.locator(".toast")).to_contain_text("Opened in Outlook from Archive")
+    _the_macro_sheet_lists_its_steps_and_copies_the_macro(page, browser_name)
     assert errors == []
 
 
@@ -263,7 +232,8 @@ def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_s
     assert asked == [1, 1, 1, 1] and errors == []
 
 
-def test_the_macro_hand_off_shows_the_mail_first_and_fills_its_folders_in(page: Page, app_url: str) -> None:
+def test_the_macro_hand_off_shows_the_mail_first_fills_its_folders_in_and_a_failure_says_why(page: Page, app_url: str,
+                                                                                            browser_name: str) -> None:
     errors = _errors(page)
     asked: list[str] = []
     queue = [{"mail": dict(PREPARED, from_macro=True, suggestions=[], ranking=True)}]
@@ -274,8 +244,12 @@ def test_the_macro_hand_off_shows_the_mail_first_and_fills_its_folders_in(page: 
         _json(route, queue.pop(0) if queue else {"mail": None})
 
     page.route("**/api/archive/pending*", pending)
+    page.route("**/api/archive/current", lambda r: _json(r, {"ok": False, "error": {
+        "code": "outlook_unreachable", "message": "Outlook isn't reachable: open Outlook (classic) and try again."}}))
+    page.route("**/api/emails/*/find", lambda r: _json(r, {"ok": True, "folder": "Archive", "mailbox": "default"}))
     page.goto(app_url + "/")
     sheet = page.locator("#archiveDialog")
+    expect(sheet.locator(".arch-source")).to_have_text("Opened from the Archive button in Outlook")
     expect(sheet.locator(".arch-mail strong")).to_have_text("Kickoff agenda")
     expect(sheet.locator("#archRanking")).to_have_text("Finding folders…")
     expect(sheet.locator("#archiveGo")).to_be_disabled()
@@ -291,4 +265,16 @@ def test_the_macro_hand_off_shows_the_mail_first_and_fills_its_folders_in(page: 
     queue.append({"mail": dict(PREPARED, from_macro=True, ranking=False)})
     page.wait_for_timeout(4000)
     expect(sheet).not_to_be_visible()
+
+    # Opened by hand while Outlook is unreachable, the sheet says why and offers a retry.
+    page.locator("#openArchive").click()
+    expect(sheet.locator(".pv-error")).to_contain_text("Outlook isn't reachable")
+    expect(sheet.locator("#archRetry")).to_be_visible()
+    _lint_both_themes(page)
+    sheet.locator("[data-close]").click()
+    page.locator("#q").fill("budget")
+    page.locator("#results .result-row").first.click()
+    preview = page.locator("#previewSheetBody" if browser_name == "webkit" else "#previewDock")
+    preview.locator('[data-act="mailbox"]').click()
+    expect(page.locator(".toast")).to_contain_text("Opened in Outlook from Archive")
     assert errors == []

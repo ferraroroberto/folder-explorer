@@ -100,15 +100,23 @@ kbd {
 .saved-row .button-ghost::before { content: ""; position: absolute; inset: -8px -2px; }
 .facet[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-border-soft); color: var(--accent-text); }
 .facet .count { font-weight: 400; color: inherit; opacity: 0.85; font-variant-numeric: tabular-nums; }
-.recent-list { list-style: none; margin: 0; padding: 0; }
-.recent-list li + li { border-top: 1px solid var(--line-muted); }
+.recent-items { list-style: none; margin: 0; padding: 0; }
+.recent-items[hidden] { display: none; }
+.recent-items li { display: flex; align-items: center; gap: var(--space-sm); }
+.recent-items li + li { border-top: 1px solid var(--line-muted); }
+.recent-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-height: var(--row-sm); }
+.recent-clear { min-height: 28px; padding: 0 10px; font-size: var(--font-caption); font-weight: 600; position: relative; }
+.recent-clear::before { content: ""; position: absolute; inset: -8px -2px; }
+.recent-remove { width: 28px; height: 28px; min-height: 28px; flex: none; }
+.recent-remove .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .recent-item {
   font: inherit;
   line-height: normal;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: var(--row-sm);
   padding: 0;
   border: 0;
@@ -119,7 +127,24 @@ kbd {
   cursor: pointer;
 }
 .recent-item .icon { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); }
-.recent-head { margin: 0; font-size: var(--font-label); font-weight: 600; color: var(--muted); }
+.recent-item > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-head {
+  font: inherit;
+  line-height: normal;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: var(--row-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-label);
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.recent-count { font-weight: 400; font-variant-numeric: tabular-nums; }
+.recent-head[aria-expanded="true"] .summary-chevron { transform: rotate(90deg); }
 
 /* ---------------------------------------------- collapsible side cards */
 .card--collapsible { padding: 0; }

@@ -94,6 +94,21 @@ export function pushRecent(mode, text) {
   writePref('search.recent.' + mode, JSON.stringify([q].concat(recent(mode).filter((r) => r !== q)).slice(0, RECENT_MAX)));
 }
 
+/** Forget one recent search for ``mode``. */
+export function dropRecent(mode, text) {
+  writePref('search.recent.' + mode, JSON.stringify(recent(mode).filter((r) => r !== text)));
+}
+
+/** Forget every recent search for ``mode``. */
+export function clearRecent(mode) {
+  writePref('search.recent.' + mode, '[]');
+}
+
+/** Whether the Recent list is unfolded on this device; it stays folded until the user opens it. */
+export const recentOpen = () => readPref('search.recent.open', '0') === '1';
+
+export const setRecentOpen = (open) => writePref('search.recent.open', open ? '1' : '0');
+
 /** Copy ``text`` to the clipboard, falling back to a hidden textarea where the API is not allowed. */
 export async function copyText(text) {
   try {

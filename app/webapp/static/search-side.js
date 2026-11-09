@@ -5,7 +5,7 @@
  */
 
 import { LABEL, getOp, serialize, tokenize, withOp } from './query.js';
-import { S, $, effectiveMode, recent, shortFolder } from './search-state.js';
+import { S, $, effectiveMode, recent, recentOpen, shortFolder } from './search-state.js';
 import { esc, fmtNum, glyph } from './fmt.js';
 
 const box = () => $('q');
@@ -46,10 +46,17 @@ export function renderRecent() {
   const mode = effectiveMode();
   const list = mode ? recent(mode) : [];
   const show = !box().value.trim() && list.length > 0;
+  const open = recentOpen();
   $('recentList').hidden = !show;
-  $('recentList').innerHTML = show ? '<li><p class="recent-head">Recent</p></li>' + list.map((r) =>
-    '<li><button type="button" class="recent-item" data-recent="' + esc(r) + '" data-track="recent-search">' + glyph('clock') +
-    '<span>' + esc(r) + '</span></button></li>').join('') : '';
+  $('recentList').innerHTML = !show ? '' :
+    '<div class="recent-bar"><button type="button" class="recent-head" aria-expanded="' + open + '" aria-controls="recentItems" data-track="recent-fold">' +
+    '<span>Recent</span><span class="recent-count">' + list.length + '</span>' + glyph('chevron-right', 'summary-chevron') + '</button>' +
+    '<button type="button" class="button-ghost recent-clear" data-track="recent-clear">Clear</button></div>' +
+    '<ul class="recent-items" id="recentItems"' + (open ? '' : ' hidden') + '>' + list.map((r) =>
+      '<li><button type="button" class="recent-item" data-recent="' + esc(r) + '" data-track="recent-search">' + glyph('clock') +
+      '<span>' + esc(r) + '</span></button>' +
+      '<button type="button" class="icon-button recent-remove" data-unrecent="' + esc(r) + '" aria-label="Remove ' + esc(r) +
+      '" data-track="recent-remove">' + glyph('x') + '</button></li>').join('') + '</ul>';
 }
 
 // ------------------------------------------------------------- filters

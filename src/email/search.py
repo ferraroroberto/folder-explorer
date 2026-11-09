@@ -95,8 +95,11 @@ class EmailIndex:
         return sql, args + list(q.args)
 
     def search(self, text: str, sort: str = "relevance", offset: int = 0, limit: int = PAGE,
-               today: Optional[date] = None) -> dict[str, Any]:
-        """One page of hits for ``text``, the total, the facets and any notes on skipped operators."""
+               today: Optional[date] = None, facets: bool = True) -> dict[str, Any]:
+        """One page of hits for ``text``, the total, the facets (first page only) and any notes on skipped operators.
+
+        Facets cost most of a broad query's time, so a caller that shows none passes ``facets=False``.
+        """
         if sort not in SORTS:
             raise ValueError("sort must be relevance or newest")
         q = compile_query(text, self.columns, today or date.today())
@@ -112,11 +115,11 @@ class EmailIndex:
             rows = self.conn.execute("SELECT " + self._select + extra + body + " ORDER BY " + order + " LIMIT ? OFFSET ?",
                                      args + [limit, max(0, offset)]).fetchall()
             total = int(self.conn.execute("SELECT COUNT(*)" + body, args).fetchone()[0])
-            facets = self._facets(body, args) if offset == 0 else None
+            chips = self._facets(body, args) if facets and offset == 0 else None
         except sqlite3.OperationalError as exc:
             # A query FTS5 refuses (rare: the terms are always quoted) answers empty with the reason.
             return {"hits": [], "total": 0, "facets": None, "notes": ["the search could not run: " + str(exc)], "words": q.words}
-        return {"hits": [self._hit(r, bool(q.match)) for r in rows], "total": total, "facets": facets,
+        return {"hits": [self._hit(r, bool(q.match)) for r in rows], "total": total, "facets": chips,
                 "notes": q.notes, "words": q.words}
 
     def _hit(self, r: sqlite3.Row, matched: bool) -> dict[str, Any]:
@@ -127,9 +130,11 @@ class EmailIndex:
             "id": r["id"],
             "subject": (r["hl_subject"] if matched else r["subject"]) or "",
             "from_name": name, "from_addr": addr,
+            "recipients": r["recipients"] or "",
             "date": r["date_sent"] or "",
             "folder": r["folder_path"] or "",
             "path": r["file_path"],
+            "filename": r["filename"] or "",
             "snippet": (r["snip"] if matched and r["snip"] else preview[:200]) or "",
             "flagged": r["flag_status"] == FLAG_FLAGGED,
         }

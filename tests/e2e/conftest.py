@@ -31,6 +31,7 @@ import pytest
 from playwright.sync_api import BrowserContext
 
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.e2e._scan_capture import NO_WINDOW, run_utf8
 from tests.email_fixture import build_email_index
 from tests.fixture_tree import add_hidden, build_tree
 
@@ -41,7 +42,6 @@ AUTOBOOT_ENV = "FOLDER_EXPLORER_E2E_AUTOBOOT"
 _BOOT_TIMEOUT_S = 20.0
 # Playwright's own 30 s default turns a stuck locator into a silent wait; 15 s names it sooner.
 _DEFAULT_TIMEOUT_MS = 15_000
-NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -113,8 +113,7 @@ def app_url(roots_count: int) -> Iterator[str]:
                                                   "email": {"index_path": str(emails), "roots": [str(mail)]}}))
     env = dict(os.environ, FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
                FOLDER_EXPLORER_OUTLOOK="off", FOLDER_EXPLORER_DESKTOP="off", PYTHONUTF8="1", PYTHONUNBUFFERED="1")
-    scan = subprocess.run([sys.executable, "-m", "app.cli", "scan"], cwd=str(ROOT), env=env, capture_output=True, text=True,
-                          timeout=60, creationflags=NO_WINDOW)
+    scan = run_utf8([sys.executable, "-m", "app.cli", "scan"], cwd=ROOT, env=env, timeout=60)
     if scan.returncode != 0:
         pytest.fail("fixture scan failed: " + scan.stdout + scan.stderr)
     log = open(work / "webapp.log", "wb")

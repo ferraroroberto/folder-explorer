@@ -8,7 +8,9 @@
 import { getJSON, postJSON, api } from './api.js';
 import { writePref } from './state.js';
 import { withOp } from './query.js';
-import { S, $, WIDE, effectiveMode, hl, mailDate, marked, plain, pushRecent, setOpen, shortFolder } from './search-state.js';
+import {
+  S, $, WIDE, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, setOpen, setRecentOpen, shortFolder,
+} from './search-state.js';
 import {
   FIELD_OPS, renderChips, renderFacets, renderFilters, renderRecent, renderSaved, resetFilters, toggled, withDate,
   withFacet, withoutChip,
@@ -235,6 +237,14 @@ const CLICKS = [
   ['.saved-remove', (el) => forget(Number(el.dataset.unsave))],
   ['#saveSearch', () => saveSearch()],
   ['.recent-item', (el) => setBox(el.dataset.recent)],
+  ['.recent-remove', (el) => { dropRecent(effectiveMode(), el.dataset.unrecent); renderRecent(); ($('recentList').querySelector('.recent-head') || box()).focus(); }],
+  ['.recent-clear', () => { clearRecent(effectiveMode()); renderRecent(); box().focus(); }],
+  ['.recent-head', (el) => {
+    const open = el.getAttribute('aria-expanded') !== 'true';
+    setRecentOpen(open);
+    el.setAttribute('aria-expanded', String(open));
+    $('recentItems').hidden = !open;
+  }],
   ['#clearQuery', () => { setBox(''); box().focus(); }],
   ['.facet', (el) => setBox(withFacet(el.dataset.op, el.dataset.val, el.getAttribute('aria-pressed') === 'true'))],
   ['#sortSeg .segmented-item', (el) => { S.sort = el.dataset.value; runSearch(); }],

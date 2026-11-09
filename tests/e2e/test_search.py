@@ -232,3 +232,40 @@ def test_show_all_follows_the_theme_and_loads_remote_images_only_when_asked(page
     # The bypass probe is what the browser reports: its script blocked, its image refused by the policy.
     assert any("Blocked script execution" in e for e in errors)
     assert [e for e in errors if "Blocked script execution" not in e and "Content Security Policy" not in e] == []
+
+
+def _stored_recent(page: Page, mode: str) -> list[str]:
+    return json.loads(page.evaluate("(k) => localStorage.getItem(k) || '[]'", "folder-explorer.search.recent." + mode))
+
+
+def test_recent_searches_fold_remove_one_and_clear(page: Page, app_url: str) -> None:
+    page.goto(app_url + "/#search")
+    page.evaluate("localStorage.setItem('folder-explorer.search.recent.emails', JSON.stringify(['harbour 2024', 'alpha', 'beta']))")
+    page.reload()
+    head = page.locator("#recentList .recent-head")
+    items = page.locator("#recentList .recent-item")
+    # Folded by default once the list has entries, and the choice survives a reload.
+    expect(head).to_have_attribute("aria-expanded", "false")
+    expect(page.locator("#recentItems")).to_be_hidden()
+    head.click()
+    expect(head).to_have_attribute("aria-expanded", "true")
+    expect(items).to_have_count(3)
+    page.reload()
+    errors = _errors(page)  # after the last reload: it cancels the Archive sheet's long poll, which WebKit logs
+    expect(head).to_have_attribute("aria-expanded", "true")
+    expect(items).to_have_count(3)
+    _lint(page)
+    # Remove one: only that query goes, and nothing runs.
+    page.locator('#recentList .recent-remove[aria-label="Remove alpha"]').click()
+    expect(items).to_have_count(2)
+    assert _stored_recent(page, "emails") == ["harbour 2024", "beta"]
+    expect(page.locator("#q")).to_have_value("")
+    # The entry's text still runs it.
+    items.first.click()
+    expect(page.locator("#q")).to_have_value("harbour 2024")
+    page.locator("#q").fill("")
+    # Clear empties the list and the block hides.
+    page.locator("#recentList .recent-clear").click()
+    expect(page.locator("#recentList")).to_be_hidden()
+    assert _stored_recent(page, "emails") == []
+    assert errors == []

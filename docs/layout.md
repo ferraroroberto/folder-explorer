@@ -11,7 +11,7 @@ folder-explorer/
 │   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
 │   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
-│   │   ├── tray.py             # menu, adopt-or-spawn, watchdog, breadcrumbs
+│   │   ├── tray.py             # menu (left click: Quick search or Open), adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
 │   │   └── watchdog.py         # vendored: retry-with-backoff, health watchdog, breadcrumb log
 │   └── webapp/
@@ -39,6 +39,8 @@ folder-explorer/
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's Archive window (Tk), shown by default or when no page is open on this PC: model (what each
 │   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
+│   ├── search_window/          # the tray's Quick search window (Tk): model (rows and states, no Tk), client (the web app's
+│   │                           #   local API, its only source), view (the widgets, the archive window's theme)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

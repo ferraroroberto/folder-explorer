@@ -22,6 +22,8 @@ CONFIG_ENV = "FOLDER_EXPLORER_CONFIG"
 
 SCHEDULES = ("off", "nightly", "hourly")
 SERVERS = ("hypercorn", "uvicorn")
+# What a left click on the tray icon does: the Quick search window, or the web app in the browser.
+LEFT_CLICKS = ("quick_search", "open_app")
 
 DEFAULTS: dict[str, Any] = {
     # The one switch for reaching the app from the phone. Off binds loopback
@@ -61,6 +63,9 @@ DEFAULTS: dict[str, Any] = {
     # The Outlook macro's Archive button: on opens the small Archive window even when a page is open
     # (and skips the hand-off wait); off hands the mail to an open page and opens the window only without one.
     "macro": {"prefer_window": True},
+    # The tray icon: a left click opens the small always-on-top Quick search window (folders and email)
+    # or the web app; the tray menu offers both either way.
+    "tray": {"left_click": "quick_search"},
     # The archive verbs (python -m app.cli email batch): the file-name form
     # (date_prefix true, false or "auto" to follow the destination folder),
     # the longest path the archiver writes, and the folder suggester's limits.
@@ -112,6 +117,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["explore"] = _clean_explore(raw.get("explore"))
     cfg["desktop"] = _clean_desktop(raw.get("desktop"))
     cfg["macro"] = _clean_macro(raw.get("macro"))
+    cfg["tray"] = _clean_tray(raw.get("tray"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
@@ -208,6 +214,13 @@ def _clean_macro(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_tray(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["tray"])
+    if isinstance(raw, dict) and raw.get("left_click") in LEFT_CLICKS:
+        out["left_click"] = raw["left_click"]
+    return out
+
+
 def load() -> dict[str, Any]:
     """The effective settings: the file's valid keys over the defaults."""
     path = config_path()
@@ -255,6 +268,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "macro":
             if not (isinstance(value, dict) and set(value) == {"prefer_window"} and isinstance(value["prefer_window"], bool)):
                 raise ValueError("macro takes prefer_window, true or false")
+        if key == "tray":
+            if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
+                raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
         out[key] = value
     return out
 

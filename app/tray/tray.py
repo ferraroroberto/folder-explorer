@@ -1,10 +1,13 @@
-"""The Windows tray: owns the webapp process, watches it, and offers Open / Rescan / Restart / Quit.
+"""The Windows tray: owns the webapp process, watches it, and offers Quick search / Open / Rescan / Restart / Quit.
 
 Started by ``tray.bat`` as ``pythonw -m app.tray``. One tray per session (a
 named mutex); the webapp start retries with backoff, a dead webapp is
 respawned, and a wedged one (listening, not answering) is only reported.
 Every start, retry, respawn and recovery is written to ``watchdog.log`` in
 the runtime-data folder, the one record a console-less tray leaves.
+
+A left click runs the menu's default item, which ``tray.left_click`` picks at
+click time: the Quick search window (``src.search_window``) or the web app.
 """
 
 from __future__ import annotations
@@ -27,14 +30,26 @@ from PIL import Image  # noqa: E402
 
 from app.tray.single_instance import SingleInstance  # noqa: E402
 from app.tray.watchdog import BreadcrumbLog, HealthWatchdog, retry_with_backoff  # noqa: E402
+from app.webapp.bind import resolve_bind  # noqa: E402
 from app.webapp.manager import WebappManager  # noqa: E402
-from src import scan_runner, store  # noqa: E402
+from src import config, scan_runner, store  # noqa: E402
 from src.config import PROJECT_ROOT  # noqa: E402
 from src.scan_lock import ScanBusy  # noqa: E402
+from src.search_window import QuickSearch  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 MUTEX_NAME = r"Local\folder-explorer-tray"
+
+
+def left_click_searches() -> bool:
+    """A left click opens Quick search (the default) rather than the web app; read per click, so Settings applies at once."""
+    return config.load()["tray"]["left_click"] == "quick_search"
+
+
+def local_base() -> str:
+    """The web app's loopback address over the scheme its bind uses now, for the Quick search window's API calls."""
+    return resolve_bind(config.load()).local_url
 
 
 def main() -> int:
@@ -75,8 +90,13 @@ def main() -> int:
             crumbs("webapp failed to start after every retry: %s" % exc)
         watchdog.run(stop)
 
+    quick = QuickSearch(local_base)
+
     def on_open(icon: "pystray.Icon", item: object) -> None:
         webbrowser.open(manager.url)
+
+    def on_quick_search(icon: "pystray.Icon", item: object) -> None:
+        quick.show()
 
     def on_rescan(icon: "pystray.Icon", item: object) -> None:
         try:
@@ -103,7 +123,8 @@ def main() -> int:
         Image.open(PROJECT_ROOT / "assets" / "tray" / "folder-explorer.ico"),
         "Folder explorer",
         menu=pystray.Menu(
-            pystray.MenuItem("Open", on_open, default=True),
+            pystray.MenuItem("Quick search", on_quick_search, default=lambda _item: left_click_searches()),
+            pystray.MenuItem("Open", on_open, default=lambda _item: not left_click_searches()),
             pystray.MenuItem("Rescan now", on_rescan),
             pystray.MenuItem("Restart web app", on_restart),
             pystray.MenuItem("Quit", on_quit),

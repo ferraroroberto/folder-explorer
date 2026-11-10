@@ -1,4 +1,4 @@
-/* Settings: text size, default basis, how File Explorer opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, default basis, how File Explorer opens, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -10,6 +10,7 @@ import { folderList } from './folder-list.js';
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
+let traySwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
 // The four folder lists, built once in initSettings.
@@ -29,6 +30,11 @@ function render(body) {
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
     : 'Off: each Open starts a new File Explorer window. Turn on for a faster open that reuses the window you used last.';
+  const quick = cfg.tray.left_click === 'quick_search';
+  setSwitch(traySwitch, quick);
+  $('trayClickNote').textContent = quick
+    ? 'On: a left click on the tray icon opens the small Quick search window for folders and email. Open in the tray menu still opens this app.'
+    : 'Off: a left click on the tray icon opens this app. Quick search stays in the tray menu.';
   setSwitch(remoteSwitch, cfg.remote_access);
   remoteSwitch.setAttribute('aria-label', 'Remote access');
   let note = REMOTE_TEXT[remote.running] || '';
@@ -110,6 +116,15 @@ export function initSettings(opts) {
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
+  traySwitch = switchEl(true, {
+    label: 'Tray click opens Quick search',
+    onToggle: async (next) => {
+      if (await save({ tray: { left_click: next ? 'quick_search' : 'open_app' } })) {
+        showToast(next ? 'Tray click opens Quick search' : 'Tray click opens the app');
+      }
+    },
+  });
+  $('trayClickSlot').appendChild(traySwitch);
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);
   autoSwitch = switchEl(true, {

@@ -26,6 +26,9 @@
   "macro": {
     "prefer_window": true
   },
+  "tray": {
+    "left_click": "quick_search"
+  },
   "archive": {
     "date_prefix": false,
     "max_path_length": 255,

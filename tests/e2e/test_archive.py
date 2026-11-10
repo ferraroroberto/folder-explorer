@@ -100,6 +100,18 @@ def _the_macro_sheet_lists_its_steps_and_copies_the_macro(page: Page, browser_na
     expect(macro.locator("#homeState")).not_to_be_empty()
     expect(macro.locator(".setup-step-title")).to_have_text(["Set the folder", "Import the macro", "Add it to the ribbon", "Restart Outlook"])
     expect(macro.locator("#macroText")).to_contain_text("Sub ArchiveCurrentItem()")
+    # The window is preferred by default; the switch saves, says so, and the sheet shows it again when reopened.
+    prefer = macro.locator("#preferWindowSlot [role=switch]")
+    expect(prefer).to_have_attribute("aria-checked", "true")
+    prefer.click()
+    expect(prefer).to_have_attribute("aria-checked", "false")
+    expect(page.locator(".toast")).to_contain_text("uses the app when it is open")
+    macro.locator("[data-close]").click()
+    page.locator("#paneSearch .home-settings").click()
+    page.locator("#showMacro").click()
+    expect(prefer).to_have_attribute("aria-checked", "false")
+    prefer.click()
+    expect(prefer).to_have_attribute("aria-checked", "true")
     # The vendored code-listing: Copy is an unpainted icon button that puts the listing on the clipboard and says so.
     if browser_name == "chromium":
         page.context.grant_permissions(["clipboard-read", "clipboard-write"])

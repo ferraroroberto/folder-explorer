@@ -37,7 +37,7 @@ folder-explorer/
 │   ├── archive_api.py          # the v1 archive contract: outcomes, acknowledged vs confirmed, the envelope
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
-│   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
+│   ├── archive_window/         # the macro's Archive window (Tk), shown by default or when no page is open on this PC: model (what each
 │   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer

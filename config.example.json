@@ -23,6 +23,9 @@
   "desktop": {
     "reuse_explorer_window": false
   },
+  "macro": {
+    "prefer_window": true
+  },
   "archive": {
     "date_prefix": false,
     "max_path_length": 255,

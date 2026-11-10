@@ -264,7 +264,7 @@ def test_the_entry_hands_the_window_a_search_and_a_filer_that_takes_every_option
     monkeypatch.setattr(outlook, "_guarded", lambda work: work())
     monkeypatch.setattr("src.archive_window.show_window",
                         lambda doc, on_file, find, current_explorer=None, rank=None, progress=None: on_file("F", "Filed", True, "off"))
-    outlook.archive({"c": 1}, "e", "s")
+    outlook.archive({"macro": {"prefer_window": False}}, "e", "s")
     assert got["args"] == ("F", "Filed", True, "off")
 
 

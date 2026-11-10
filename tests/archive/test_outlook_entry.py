@@ -60,7 +60,8 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """An email folder with filed mail, one mail in a fake Inbox, and the bridge pointed at them."""
     root = tmp_path / "archive"
     root.mkdir()
-    write_config(tmp_path, roots=[str(tmp_path)], email={"roots": [str(root)]})
+    # The setting is off here so the hand-off tests reach the page; the tests of the default turn it on.
+    write_config(tmp_path, roots=[str(tmp_path)], email={"roots": [str(root)]}, macro={"prefer_window": False})
     cfg = config.load()
     _seed_index(cfg, root, {"Project Alpha": ["Kickoff agenda"]})
     item = _mail("kick@example.invalid", "Kickoff agenda")
@@ -156,6 +157,61 @@ def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamesp
         assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
     assert seen["doc"]["ok"] and callable(seen["find"]) and seen["result"]["ok"] and not seen["result"]["categorized"]
     assert Path(seen["result"]["files"][0]).is_file() and fake.item.Categories == ""
+
+
+def _window_recorder(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    """Replace the Tk window with a recorder of the documents it was asked to show."""
+    opened: list[dict] = []
+    monkeypatch.setattr("src.archive_window.show_window",
+                        lambda doc, on_file, find, current_explorer=None, rank=None, progress=None: opened.append(doc))
+    return opened
+
+
+def test_the_window_opens_over_an_open_page_by_default_and_nothing_is_handed_over(
+        fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    assert config.DEFAULTS["macro"] == {"prefer_window": True}
+    cfg = {**fake.cfg, "macro": config.DEFAULTS["macro"]}
+    opened = _window_recorder(monkeypatch)
+    handed: list[dict] = []
+    monkeypatch.setattr(outlook, "_post_json", lambda url, doc, timeout: handed.append(doc) or (200, {"shown": True}))
+    with TestClient(app, client=LOCAL) as c, caplog.at_level("INFO", logger="app.outlook"):
+        c.get("/api/archive/pending")  # a page is open on this PC
+        assert outlook.archive(cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        assert c.get("/api/archive/pending").json() == {"mail": None}
+    assert handed == [] and len(opened) == 1 and opened[0]["ok"]
+    assert any("macro.prefer_window is on" in r.getMessage() for r in caplog.records)
+
+
+def test_with_the_setting_off_an_open_page_takes_the_mail_and_the_window_stays_shut(
+        fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    opened = _window_recorder(monkeypatch)
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        assert c.get("/api/archive/pending").json()["mail"]["from_macro"]
+    assert opened == []
+
+
+def test_with_the_setting_off_and_no_page_open_the_window_opens(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    opened = _window_recorder(monkeypatch)
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+    assert len(opened) == 1
+
+
+def test_the_macro_sheet_reads_and_saves_the_setting(fake: SimpleNamespace) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        assert c.get("/api/archive/macro").json()["prefer_window"] is False
+        for bad in ("yes", None, 1):
+            assert c.post("/api/config", json={"macro": {"prefer_window": bad}}).status_code == 400
+        assert c.post("/api/config", json={"macro": {"prefer_window": True, "other": 1}}).status_code == 400
+        assert c.post("/api/config", json={"macro": {}}).status_code == 400
+        saved = c.post("/api/config", json={"macro": {"prefer_window": True}})
+        assert saved.status_code == 200 and saved.json()["config"]["macro"] == {"prefer_window": True}
+        assert c.get("/api/archive/macro").json()["prefer_window"] is True
+    assert config.load()["macro"] == {"prefer_window": True}
 
 
 def test_the_window_opens_when_the_app_is_not_running(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:

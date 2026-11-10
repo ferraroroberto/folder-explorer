@@ -314,7 +314,7 @@ def explorer(request: Request) -> dict[str, Any]:
 
 @router.get("/archive/folders")
 def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, Any]:
-    """Folders inside the email folders whose path holds every word, for "Another email folder"."""
+    """Folders inside the email folders that Quick search finds for the same words, for "Another email folder"."""
     _pc_only(request)
     return {"folders": email_folder_hits(config.load(), q, EMAIL_FOLDER_HITS)}
 

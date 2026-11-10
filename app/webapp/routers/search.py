@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import time
-from contextlib import ExitStack
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
@@ -19,7 +18,7 @@ from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
-from app.webapp.state import EMAILS, POOL
+from app.webapp.state import EMAILS, POOL, folder_hits
 from src import config, folder_search, store
 from src.desktop import (
     GoneError,
@@ -98,15 +97,7 @@ def status(request: Request) -> dict[str, Any]:
 @router.get("/search/folders")
 def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int] = Query(None, ge=0, le=config.MAX_SKIP_LEVELS),
                    onedrive: Optional[bool] = None) -> dict[str, Any]:
-    opts = config.load()["folder_search"]
-    entries = [(root, POOL.get(store.index_dir() / scan["index_file"])) for root, scan in _scanned(_roots())]
-    with ExitStack() as stack:
-        for _, (_, lock) in entries:
-            stack.enter_context(lock)
-        return folder_search.search([(root, ix) for root, (ix, _) in entries], q,
-                                    opts["prune_people"] if prune is None else prune,
-                                    opts["skip_levels"] if skip is None else skip,
-                                    onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
+    return folder_hits(config.load(), q, prune, skip, onedrive)
 
 
 @router.get("/search/emails")

@@ -235,7 +235,7 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[S
             if shown:
                 timer.log(logger)
                 return EXIT_OK
-        from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits  # noqa: PLC0415 - only the window searches here
+        from app.webapp.state import LocalFolders  # noqa: PLC0415 - only the window searches here
         from src.archive_window import show_window  # noqa: PLC0415 - tkinter only when no page is open
 
         data = archive_sheet.rank_data(doc.pop("rank_input", None))
@@ -252,7 +252,7 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[S
 
         show_window(doc, lambda folder, category, duplicate, date_prefix: _guarded(
             lambda: file_one(cfg, entry_id, store_id, folder, category, duplicate, date_prefix)),
-                    lambda query: email_folder_hits(cfg, query, EMAIL_FOLDER_HITS),
+                    LocalFolders(cfg),
                     current_explorer=lambda: _guarded(lambda: archive_sheet.explorer_folder(cfg)),
                     rank=rank, progress=progress)
     return EXIT_OK

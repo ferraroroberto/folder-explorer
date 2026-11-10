@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Iterator
 
 import pytest
 
 from app import outlook
 from src.archive_window import theme
+from src.archive_window.finder import OUTSIDE
 from src.archive_window.model import (
     EXPLORER_CHIP,
     NO_NAME,
@@ -22,7 +24,7 @@ from src.archive_window.model import (
     openable_folder,
     under_root,
 )
-from src.archive_window.view import ArchiveView
+from src.archive_window.view import ARCHIVE_HERE, PLACEHOLDER, ArchiveView
 
 ARCHIVE_JS = Path(__file__).resolve().parents[3] / "app" / "webapp" / "static" / "archive.js"
 SAVED = {"auto": "001 - Plan.msg", "on": "2026-11-05 - 001 - Plan.msg", "off": "001 - Plan.msg"}
@@ -176,6 +178,28 @@ def _build(view: ArchiveView) -> ArchiveView:
     return view
 
 
+def _hit(i: int, path: Path) -> dict[str, Any]:
+    return {"root": "r", "id": i, "name": path.name, "path": str(path), "display": str(path), "files": 1, "size": 10}
+
+
+class _Folders:
+    """An invented folder source: "int" finds a folder outside the email folders first, then one inside."""
+
+    def __init__(self, root: Path, outside: Path) -> None:
+        self.root, self.outside = root, outside
+        self.asked: list[str] = []
+
+    def folders(self, query: str) -> dict[str, Any]:
+        if query != "int":
+            return {"results": [], "total": 0}
+        hits = [_hit(1, self.outside / "Internal notes"), _hit(2, self.root / "Internal")]
+        return {"results": hits, "total": len(hits)}
+
+    def children(self, path: str) -> list[dict[str, Any]]:
+        self.asked.append(path)
+        return [_hit(3, Path(path) / "2026")] if path == str(self.root / "Internal") else []
+
+
 @pytest.fixture()
 def window(root: Path, tk_root: tk.Tk, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     """A built window over the invented document, its launches and its search replaced."""
@@ -188,9 +212,9 @@ def window(root: Path, tk_root: tk.Tk, monkeypatch: pytest.MonkeyPatch) -> Itera
         filed.append(args)
         return {"ok": True, "files": ["a"], "folder_path": args[0]}
 
-    hits = [{"path": str(root / "Internal"), "name": "Internal", "location": None}]
-    view = _build(ArchiveView(_doc(root), on_file, lambda q: hits if q == "int" else [], theme.palette(False), tk_root))
-    calls["view"] = view
+    source = _Folders(root, root.parent / "Elsewhere")
+    view = _build(ArchiveView(_doc(root), on_file, source, theme.palette(False), tk_root))
+    calls["view"], calls["source"] = view, source
     yield calls
     view.frame.destroy()
 
@@ -236,16 +260,81 @@ def test_open_asks_windows_for_the_folder_and_never_a_path_outside(window: dict[
     assert len(window["opened"]) == 1
 
 
-def test_typing_searches_and_a_hit_leads_the_list(window: dict[str, Any], root: Path) -> None:
-    view = window["view"]
-    view._clear_placeholder(None)
-    view.query.set("int")
+def _search_now(view: ArchiveView) -> None:
+    """Run the typed search now, cancelling the debounced one so it can't fire into a later test."""
+    if view.search_job:
+        view.root.after_cancel(view.search_job)
     view._search()
-    hits = view.found.winfo_children()
-    assert [b.cget("text") for b in hits] == ["Internal"]
-    hits[0].invoke()
-    assert view.model.extra == str(root / "Internal") and view.model.options()[0].chips == (("Chosen", ""),)
-    assert not view.found.winfo_children()
+
+
+def _type(view: ArchiveView, text: str) -> None:
+    view._clear_placeholder(None)
+    view.query.set(text)
+    _search_now(view)
+    view.root.update()
+
+
+def test_find_a_folder_lists_the_email_folders_first_and_greys_the_others(window: dict[str, Any], root: Path) -> None:
+    view = window["view"]
+    assert view.query.get() == PLACEHOLDER == "Find a folder"
+    _type(view, "int")
+    assert [f.name for f in view.finder.found()] == ["Internal", "Internal notes"]
+    shown = _texts(view.found)
+    assert shown.count(OUTSIDE) == 1 and "2 folders" in shown and ARCHIVE_HERE in shown
+    assert str(view.here_button.cget("state")) == "normal"
+    view._move(1)
+    assert str(view.here_button.cget("state")) == "disabled"
+    view._archive_here()
+    assert window["filed"] == [] and view.status.cget("text").startswith(OUTSIDE)
+
+
+def test_archive_here_files_at_once_with_the_windows_choices(window: dict[str, Any], root: Path) -> None:
+    view = window["view"]
+    view._set_date("on")
+    view.category.choose("")
+    _type(view, "int")
+    assert view.entry.bind("<Return>")
+    view._archive_here()
+    assert window["filed"] == [(str(root / "Internal"), None, False, "on")]
+    assert view.model.options()[0].chips == (("Found", ""),) and view.status.cget("text") == "Archived to Mail\\Internal"
+
+
+def test_an_archived_mail_is_filed_again_only_as_a_copy(root: Path, tk_root: tk.Tk) -> None:
+    filed: list[tuple[Any, ...]] = []
+    doc = _doc(root, already_archived=str(root / "Internal" / "001 - Plan.msg"))
+    view = _build(ArchiveView(doc, lambda *a: filed.append(a) or {"ok": True, "files": ["a"]}, _Folders(root, root.parent),
+                              theme.palette(False), tk_root))
+    _type(view, "int")
+    view._archive_here()
+    assert filed == [] and "Archive a copy anyway" in view.status.cget("text")
+    view._set_copy("on")
+    view._archive_here()
+    assert filed == [(str(root / "Internal"), "Filed", True, "auto")]
+    view.frame.destroy()
+
+
+def test_a_folder_steps_into_its_subfolders_and_back_from_the_keys(window: dict[str, Any], root: Path) -> None:
+    view = window["view"]
+    _type(view, "int")
+    assert all(view.entry.bind(key) for key in ("<Right>", "<Left>", "<BackSpace>", "<Up>", "<Down>"))
+    view.entry.icursor(1)
+    assert view._key_right(SimpleNamespace(keysym="Right")) is None and not view.finder.browsing
+    view.entry.icursor("end")
+    assert view._key_right(SimpleNamespace(keysym="Right")) == "break"
+    assert window["source"].asked == [str(root / "Internal")] and view.finder.crumbs() == ["Internal"]
+    assert [f.name for f in view.finder.found()] == ["2026"] and "Internal" in _texts(view.found)
+    view.query.set("")
+    view.root.after_cancel(view.search_job)
+    assert view._key_back(SimpleNamespace(keysym="BackSpace")) == "break"
+    assert not view.finder.browsing and [f.name for f in view.finder.found()] == ["Internal", "Internal notes"]
+
+
+def test_open_in_explorer_shows_any_found_folder(window: dict[str, Any], root: Path) -> None:
+    view = window["view"]
+    _type(view, "int")
+    view._move(1)
+    view._explore_found()
+    assert window["opened"] == [str(root.parent / "Elsewhere" / "Internal notes")]
 
 
 def test_an_unreadable_mail_shows_its_error_and_only_closes(tk_root: tk.Tk) -> None:

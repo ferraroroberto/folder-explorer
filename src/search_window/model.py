@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Protocol, Union
 
 from src.archive_window.model import mail_date, plural, win_path
 from src.search_window.client import ApiError, SearchClient, Unreachable
@@ -29,6 +29,12 @@ HINTS = {FOLDERS: "Type part of a folder name. Every word must match.",
 EMPTY = {FOLDERS: "No folder matches every word.", EMAILS: "No emails match. Use fewer words."}
 
 Segments = tuple[tuple[str, bool], ...]
+
+
+class FolderSource(Protocol):
+    """Anything that answers a folder search in ``GET /api/search/folders``'s shape: the client, or the archive window's local source."""
+
+    def folders(self, query: str) -> dict[str, Any]: ...
 
 
 class Status(enum.Enum):
@@ -157,8 +163,11 @@ class Answer:
     notes: tuple[str, ...] = ()
 
 
-def fetch(client: SearchClient, tab: str, query: str) -> Answer:
-    """Ask the API for ``query`` on ``tab``. Safe on a worker thread: it touches no window state."""
+def fetch(client: Union[SearchClient, FolderSource], tab: str, query: str) -> Answer:
+    """Ask the API for ``query`` on ``tab``. Safe on a worker thread: it touches no window state.
+
+    A ``FolderSource`` answers the Folders tab only.
+    """
     if not words(query):
         return Answer(tab, query, Status.HINT, message=HINTS[tab])
     try:

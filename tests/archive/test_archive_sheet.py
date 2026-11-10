@@ -92,6 +92,55 @@ def test_a_mail_already_filed_is_not_filed_twice(cfg: dict, archive_root: Path) 
     assert exc.value.code == ERR_ALREADY and "001 - Twice.msg" in str(exc.value)
 
 
+def test_a_mail_filed_a_moment_ago_is_flagged_already_archived_with_no_scan_between(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Just filed")
+    first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    assert archive_sheet.suggest(client, cfg, item)["already_archived"] == first["files"][0]
+    with pytest.raises(SheetError) as exc:
+        archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    assert exc.value.code == ERR_ALREADY
+
+
+def test_the_row_written_at_filing_carries_the_ids_the_lookup_uses(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Row check", sender="lead@example.invalid")
+    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    conn = open_index(cfg)
+    try:
+        rows = conn.execute("SELECT file_path, folder_path, filename, subject, sender, message_id, to_addrs "
+                            "FROM emails").fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["file_path"] == doc["files"][0] and row["filename"] == "001 - Row check.msg"
+    assert row["folder_path"] == str(archive_root.resolve())
+    assert (row["subject"], row["sender"], row["message_id"]) == ("Row check", "lead@example.invalid", "kick@example.invalid")
+    # Left unset so the email stage reads the file once and fills the rest.
+    assert row["to_addrs"] is None
+
+
+def test_the_email_stage_completes_the_row_filing_wrote_instead_of_adding_another(cfg: dict, archive_root: Path) -> None:
+    from src.email.manifest import Manifest, MsgFile
+    from src.email.stage import Stage
+
+    client, item = _client_with("Stage meets row")
+    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    path = doc["files"][0]
+    facts = {"subject": "Stage meets row", "sender": "lead@example.invalid", "recipients": "to@example.invalid",
+             "to_addrs": "to@example.invalid", "cc_addrs": "", "date_sent": "", "body_preview": "x", "flag_status": 0,
+             "message_id": "kick@example.invalid", "attachment_names": "", "has_attachments": 0}
+    st = Path(path).stat()
+    conn = open_index(cfg)
+    try:
+        counts = Stage(conn, None, lambda p, n: facts).run([Manifest(str(archive_root), [MsgFile(path, st.st_size, int(st.st_mtime), False)], True)])
+        conn.commit()
+        rows = conn.execute("SELECT file_path, to_addrs FROM emails").fetchall()
+    finally:
+        conn.close()
+    assert counts.changed == 1 and counts.new == 0
+    assert [(r["file_path"], r["to_addrs"]) for r in rows] == [(path, "to@example.invalid")]
+
+
 def test_an_explicit_duplicate_files_a_numbered_second_copy_and_overwrites_nothing(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Twice")
     first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)

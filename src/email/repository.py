@@ -1,10 +1,12 @@
 """What the batch verbs ask of the email index: lookups by Message-ID, folder rows, and folder scores.
 
 The verbs open this app's own ``emails.sqlite3`` (``src/email/schema.py``)
-through ``open_index``. Besides the email stage, two verbs write to it, and
-only to keep it true about files they just changed: ``revert`` drops the row
-of a ``.msg`` it deleted, and ``renumber`` points a row at the name it gave
-the file. Neither indexes a new mail; that stays the stage's job.
+through ``open_index``. Besides the email stage, some callers write to it, and
+only to keep it true about files they just changed: filing a mail records the
+row of the ``.msg`` it saved (``record_filed``, from the live mail's own facts,
+so no file is opened), ``revert`` drops the row of a ``.msg`` it deleted, and
+``renumber`` points a row at the name it gave the file. The stage stays the
+one reader of a ``.msg`` and completes a filed row on its next run.
 """
 
 from __future__ import annotations
@@ -71,6 +73,27 @@ def _build_fts_query(text: str) -> str:
     return " OR ".join('"%s"' % t for t in unique[:30])
 
 
+def record_filed_mail(repo: EmailRepository, mail: Any, email_path: str) -> bool:
+    """Put the ``.msg`` just saved from ``mail`` in the index, so it reads as archived at once; False when that failed.
+
+    Filing has already succeeded by now, so a failure here is logged and reported, never raised: the
+    email stage would index the file on its next run.
+    """
+    if not mail.message_id:
+        logger.info("ℹ️ archive: %s has no Message-ID, so no index row was written", os.path.basename(email_path))
+        return False
+    try:
+        repo.record_filed(email_path, subject=mail.subject, sender=mail.sender, recipients=mail.recipients,
+                          date_sent=mail.date_sent.isoformat() if mail.date_sent else "", message_id=mail.message_id)
+        repo.commit()
+    except Exception as exc:
+        logger.warning("⚠️ archive: the index row for %s was not written (%s: %s)", os.path.basename(email_path),
+                       type(exc).__name__, exc)
+        return False
+    logger.info("ℹ️ archive: index row written for %s", os.path.basename(email_path))
+    return True
+
+
 class EmailRepository:
     """A thin repository over one connection; one per thread, as SQLite connections are not shared."""
 
@@ -97,6 +120,22 @@ class EmailRepository:
         return self._retry_locked(lambda: self._conn.execute(
             "UPDATE emails SET file_path = ?, filename = ? WHERE file_path = ?",
             (new_path, os.path.basename(new_path), old_path)).rowcount, "update_path")
+
+    def record_filed(self, file_path: str, *, subject: str, sender: str, recipients: str, date_sent: str,
+                     message_id: str) -> None:
+        """Index a ``.msg`` just filed, from the live mail's facts, so the next lookup by Message-ID finds it.
+
+        ``file_mtime`` is 0 and ``to_addrs`` stays NULL: the stage sees a changed file and reads it once,
+        filling the rest, instead of skipping a row that only holds what Outlook told us. Caller commits.
+        """
+        self._retry_locked(lambda: self._conn.execute(
+            "INSERT INTO emails (file_path, folder_path, filename, subject, sender, recipients, date_sent, "
+            "file_mtime, message_id, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, datetime('now')) "
+            "ON CONFLICT(file_path) DO UPDATE SET subject = excluded.subject, sender = excluded.sender, "
+            "recipients = excluded.recipients, date_sent = excluded.date_sent, file_mtime = 0, "
+            "message_id = excluded.message_id, to_addrs = NULL, size = NULL, indexed_at = datetime('now')",
+            (file_path, os.path.dirname(file_path), os.path.basename(file_path), subject, sender, recipients,
+             date_sent, message_id)), "record_filed")
 
     def commit(self) -> None:
         self._retry_locked(self._conn.commit, "commit")

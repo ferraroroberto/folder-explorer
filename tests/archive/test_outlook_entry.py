@@ -294,7 +294,8 @@ def test_find_in_mailbox_opens_the_live_copy(fake: SimpleNamespace) -> None:
 def test_the_archive_routes_answer_the_pc_only(fake: SimpleNamespace) -> None:
     with TestClient(app, client=REMOTE) as c:
         for method, path in (("post", "/api/archive/current"), ("post", "/api/archive/handoff"), ("get", "/api/archive/pending"),
-                             ("post", "/api/archive/file"), ("get", "/api/archive/folders"), ("post", "/api/archive/explorer")):
+                             ("post", "/api/archive/file"), ("get", "/api/archive/folders"), ("get", "/api/archive/subfolders"),
+                             ("post", "/api/archive/explorer")):
             kwargs = {"json": {}} if method == "post" else {}
             assert getattr(c, method)(path, headers={"Authorization": "Bearer nope"}, **kwargs).status_code in (401, 403)
 

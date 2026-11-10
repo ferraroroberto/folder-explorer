@@ -8,6 +8,7 @@ from contextlib import ExitStack
 from typing import Any, Optional
 
 from src import folder_search, store
+from src.folder_search import item_path
 from src.email.search import EmailIndexHolder
 from src.email.settings import is_under, under_any
 from src.index import IndexPool
@@ -15,8 +16,8 @@ from src.roots import Root, resolve_roots
 
 logger = logging.getLogger(__name__)
 
-# Folders the Archive sheet offers when its "Another email folder" box is searched.
-EMAIL_FOLDER_HITS = 8
+# Folders the Archive sheet lists at once, for a search and for a folder stepped into; more words narrow the list.
+SHEET_FOLDER_ROWS = 8
 
 POOL = IndexPool()
 EMAILS = EmailIndexHolder()
@@ -90,6 +91,19 @@ def folder_hits(cfg: dict[str, Any], q: str, prune: Optional[bool] = None, skip:
                                     onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
 
 
+def _subfolders(cfg: dict[str, Any], root: Root, scan: dict[str, Any], path: str, fid: int) -> list[dict[str, Any]]:
+    """The direct subfolders of folder ``fid`` of ``scan`` (at ``path``), heaviest first, shaped like a folder search hit."""
+    skip = cfg["folder_search"]["skip_levels"]
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        kids = index.children(fid, "size", None, cfg["explore"]["show_hidden"])["children"]
+    out = []
+    for kid in kids:
+        child = os.path.join(path, kid["name"])
+        out.append({**kid, "root": root.key, "path": child, "display": folder_search.display_path(child, skip)})
+    return out
+
+
 def folder_children(cfg: dict[str, Any], path: str) -> list[dict[str, Any]]:
     """The direct subfolders of the scanned folder at ``path``, heaviest first, shaped like a folder search hit.
 
@@ -104,15 +118,54 @@ def folder_children(cfg: dict[str, Any], path: str) -> list[dict[str, Any]]:
     scan = store.current_index(root.key)
     if scan is None:
         return []
-    skip = cfg["folder_search"]["skip_levels"]
+    return _subfolders(cfg, root, scan, path, place["id"])
+
+
+class ScanChanged(Exception):
+    """A folder id was read from a scan that is no longer the root's current one, so it could name another folder now."""
+
+
+def sheet_hit(hit: dict[str, Any], scan_id: int, email_roots: list[str]) -> dict[str, Any]:
+    """One folder as the Archive sheet lists it: its path and name, its place in the scan, and whether a mail may be filed in it."""
+    return {"path": hit["path"], "name": hit["name"], "fileable": under_any(hit["path"], email_roots),
+            "location": {"root": hit["root"], "scan_id": scan_id, "id": hit["id"]}}
+
+
+def _sheet_page(hits: list[dict[str, Any]]) -> dict[str, Any]:
+    """The first rows of ``hits`` with the folders a mail can go in first, each group in its own order, and how many there were."""
+    ordered = sorted(hits, key=lambda h: not h["fileable"])
+    return {"folders": ordered[:SHEET_FOLDER_ROWS], "total": len(ordered)}
+
+
+def sheet_folders(cfg: dict[str, Any], query: str) -> dict[str, Any]:
+    """The Archive sheet's folder search: Quick search's own, every scanned folder, those inside the email folders first.
+
+    A folder outside ``email.roots`` is listed too, marked ``fileable: false``: it can be stepped into and shown
+    in File Explorer, never filed in (the filer refuses it).
+    """
+    email_roots = list((cfg.get("email") or {}).get("roots") or [])
+    scan_ids = {root.key: scan["id"] for root, scan, _ in _open_scans(cfg)}
+    return _sheet_page([sheet_hit(r, scan_ids[r["root"]], email_roots) for r in folder_hits(cfg, query)["results"]])
+
+
+def sheet_subfolders(cfg: dict[str, Any], root_key: str, scan_id: int, folder_id: int) -> dict[str, Any]:
+    """The subfolders of the folder a sheet row names by root, scan id and folder id, in the sheet's shape.
+
+    Never takes a path from the client: the path is rebuilt from the scan. ``KeyError`` when the root, the scan or
+    the folder is unknown, ``ScanChanged`` when ``scan_id`` is not the root's current scan.
+    """
+    root = next((r for r in resolve_roots(cfg["roots"]) if r.key == root_key), None)
+    scan = store.current_index(root.key) if root else None
+    if root is None or scan is None:
+        raise KeyError("no such root")
+    if scan_id != scan["id"]:
+        raise ScanChanged(root_key)
     index, lock = POOL.get(store.index_dir() / scan["index_file"])
     with lock:
-        kids = index.children(place["id"], "size", None, cfg["explore"]["show_hidden"])["children"]
-    out = []
-    for kid in kids:
-        child = os.path.join(path, kid["name"])
-        out.append({**kid, "root": root.key, "path": child, "display": folder_search.display_path(child, skip)})
-    return out
+        path = item_path(root, index, "folder", folder_id)
+    email_roots = list((cfg.get("email") or {}).get("roots") or [])
+    kids = [sheet_hit(k, scan["id"], email_roots) for k in _subfolders(cfg, root, scan, path, folder_id)]
+    return {"path": path, **_sheet_page(kids)}
 
 
 class LocalFolders:
@@ -130,17 +183,3 @@ class LocalFolders:
 
     def children(self, path: str) -> list[dict[str, Any]]:
         return folder_children(self.cfg, path)
-
-
-def email_folder_hits(cfg: dict[str, Any], query: str, limit: int) -> list[dict[str, Any]]:
-    """The folder search's hits inside the email folders, each with its place in the scan.
-
-    The Archive sheet's "Another email folder" box offers these: the same matcher and options as Quick search,
-    kept to the folders a mail can be filed in.
-    """
-    email_roots = list((cfg.get("email") or {}).get("roots") or [])
-    scan_ids = {root.key: scan["id"] for root, scan, _ in _open_scans(cfg)}
-    hits = [{"path": r["path"], "name": r["name"],
-             "location": {"root": r["root"], "scan_id": scan_ids[r["root"]], "id": r["id"]}}
-            for r in folder_hits(cfg, query)["results"] if under_any(r["path"], email_roots)]
-    return hits[:limit]

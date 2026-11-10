@@ -23,7 +23,7 @@ MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "
 # The sheet caps to the viewport and scrolls its card, so on a phone these sit below its fold by design.
 _FOLD = "below the fold of the scrolling sheet on a phone"
 BELOW_FOLD = {sel: _FOLD for sel in ("#archiveDialog #archMacro", "#archiveDialog .arch-row > button", "#archiveDialog #archSearch",
-                                     "#archiveDialog #archFound button", "#archiveDialog #archExplorer", "#archiveDialog #archCat", "#archiveDialog #archDate > button")}
+                                     "#archiveDialog #archFound button", "#archiveDialog #archFound .arch-pick", "#archiveDialog #archExplorer", "#archiveDialog #archCat", "#archiveDialog #archDate > button")}
 
 
 def _suggestion(rel: str, label: str, tone: str, note: str, seq: str, score: float, folder_id: int) -> dict[str, Any]:
@@ -43,6 +43,12 @@ PREPARED = {
         _suggestion("Internal/Meetings", "Topic", "", "", "118", 0.3, 23),
     ],
 }
+
+
+def _found(rel: str, folder_id: int, fileable: bool = True, root: str = ROOT) -> dict[str, Any]:
+    """A folder as the sheet's search and step in list it."""
+    return {"path": root + "/" + rel, "name": rel.split("/")[-1], "fileable": fileable,
+            "location": {"root": "invented-root", "scan_id": 7, "id": folder_id}}
 
 
 def _json(route: Route, body: Any) -> None:
@@ -131,8 +137,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     _archive_ready(page)
     page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
     page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
-    page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": [{"path": ROOT + "/Clients/Northwind/2026", "name": "2026",
-                                                                           "location": {"root": "invented-root", "scan_id": 7, "id": 40}}]}))
+    page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": [_found("Clients/Northwind/2026", 40)], "total": 1}))
     opened: list[dict[str, Any]] = []
     page.route("**/api/open", lambda r: opened.append(r.request.post_data_json) or _json(r, {"status": "opened"}))
 
@@ -179,7 +184,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
     _lint_both_themes(page, allow=BELOW_FOLD)
     sheet.locator("#archSearch").fill("northwind")
-    sheet.locator("#archFound button").click()
+    sheet.locator("#archFound .arch-pick").click()
     expect(options.first.locator(".chip")).to_have_text("Chosen")
     sheet.locator("#archiveGo").click()
     expect(sheet).to_be_hidden()
@@ -289,4 +294,82 @@ def test_the_macro_hand_off_shows_the_mail_first_fills_its_folders_in_and_a_fail
     preview = page.locator("#previewSheetBody" if browser_name == "webkit" else "#previewDock")
     preview.locator('[data-act="mailbox"]').click()
     expect(page.locator(".toast")).to_contain_text("Opened in Outlook from Archive")
+    assert errors == []
+
+
+def test_a_found_folder_can_be_stepped_into_and_back_and_the_mail_filed_there_while_outside_folders_stay_greyed(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    filed: list[dict[str, Any]] = []
+    asked: list[str] = []
+    tree = {
+        40: [_found("Clients/Northwind/2026", 41), _found("Clients/Northwind/2025", 42)],
+        41: [_found("Clients/Northwind/2026/Invoices", 43)],
+        50: [_found("Pictures/Trips", 51, fileable=False, root="/archive")],
+    }
+    hits = [_found("Clients/Northwind", 40), _found("Pictures", 50, fileable=False, root="/archive")]
+    _archive_ready(page)
+    page.route("**/api/archive/pending*", lambda r: _json(r, {"mail": None}))
+    page.route("**/api/archive/current", lambda r: _json(r, PREPARED))
+    page.route("**/api/archive/folders?*", lambda r: _json(r, {"folders": hits, "total": 12}))
+
+    def subfolders(route: Route) -> None:
+        query = route.request.url.split("/api/archive/subfolders?")[1]
+        asked.append(query)
+        folder_id = int(dict(pair.split("=") for pair in query.split("&"))["id"])
+        _json(route, {"path": "unused", "folders": tree.get(folder_id, []), "total": len(tree.get(folder_id, []))})
+    page.route("**/api/archive/subfolders?*", subfolders)
+
+    def file_mail(route: Route) -> None:
+        filed.append(route.request.post_data_json)
+        _json(route, {"ok": True, "folder_path": filed[-1]["folder"], "files": [filed[-1]["folder"] + "/005 - Kickoff agenda.msg"],
+                      "categorized": True, "indexing": True, "error": None})
+    page.route("**/api/archive/file", file_mail)
+    opened: list[dict[str, Any]] = []
+    page.route("**/api/open", lambda r: opened.append(r.request.post_data_json) or _json(r, {"status": "opened"}))
+
+    page.goto(app_url + "/")
+    page.locator("#openArchive").click()
+    sheet = page.locator("#archiveDialog")
+    expect(sheet).to_be_visible()
+    found = sheet.locator("#archFound")
+    picks = found.locator(".arch-pick")
+    sheet.locator("#archSearch").fill("northwind")
+    expect(picks).to_have_count(2)
+    expect(found).to_contain_text("12 folders, first 2 shown")
+    # The outside folder is listed, marked, and cannot be filed in; it can still be shown in File Explorer.
+    expect(picks.nth(1).locator(".chip")).to_have_text("Outside the email folders")
+    picks.nth(1).click()
+    expect(found.locator("#archHere")).to_be_disabled()
+    expect(found).to_contain_text("pick a folder inside them to archive")
+    found.locator("#archFoundOpen").click()
+    expect(page.locator(".toast")).to_contain_text("Opened in File Explorer")
+    assert opened == [{"root": "invented-root", "scan_id": 7, "kind": "folder", "id": 50, "verb": "explore"}]
+    # Step into the email folder, then one level deeper, then back out twice.
+    found.locator("[data-step]").first.click()
+    expect(found.locator(".arch-crumb-path")).to_have_text("Northwind")
+    expect(picks).to_have_count(2)
+    expect(picks.first.locator(".ao-name")).to_have_text("2026")
+    found.locator("[data-step]").first.click()
+    expect(found.locator(".arch-crumb-path")).to_have_text("Northwind › 2026")
+    expect(picks.first.locator(".ao-name")).to_have_text("Invoices")
+    found.locator("[data-step]").first.click()
+    expect(found).to_contain_text("No subfolders.")
+    found.locator("#archBack").click()
+    found.locator("#archBack").click()
+    expect(found.locator(".arch-crumb")).to_have_count(1)
+    expect(found.locator(".arch-crumb-path")).to_have_text("Northwind")
+    found.locator("#archBack").click()
+    expect(found.locator(".arch-crumb")).to_have_count(0)
+    expect(picks).to_have_count(2)
+    assert asked == ["root=invented-root&scan_id=7&id=40", "root=invented-root&scan_id=7&id=41", "root=invented-root&scan_id=7&id=43"]
+    # Archive here files at once in the folder reached by stepping in, with the sheet's own choices.
+    sheet.locator('[data-date="on"]').click()
+    found.locator("[data-step]").first.click()
+    picks.nth(1).click()
+    expect(sheet.locator("#archiveGo")).to_have_text("Archive to Northwind\\2025")
+    sheet.evaluate("d => { [d, ...d.querySelectorAll('*')].forEach((e) => { e.scrollTop = 0; }); window.scrollTo(0, 0); }")
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    found.locator("#archHere").click()
+    expect(sheet).to_be_hidden()
+    assert filed == [{"token": "invented-token", "folder": ROOT + "/Clients/Northwind/2025", "category": "Archived", "date_prefix": "on"}]
     assert errors == []

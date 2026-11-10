@@ -32,7 +32,7 @@ from typing import Any, Callable, Optional
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from app.webapp.auth import is_pc_itself
-from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits, locate_folder
+from app.webapp.state import ScanChanged, locate_folder, sheet_folders, sheet_subfolders
 from src import config, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
@@ -173,7 +173,7 @@ def with_locations(doc: dict[str, Any]) -> dict[str, Any]:
 def ranked_doc(doc: dict[str, Any], data: EmailData) -> dict[str, Any]:
     """``doc`` (a document still ranking) with its folders, ranked in this process, whose index is warm.
 
-    A ranking that fails offers no folder, so the sheet still files through "Another email folder".
+    A ranking that fails offers no folder, so the sheet still files through "Find a folder".
     """
     try:
         return archive_sheet.ranked(config.load(), doc, data)
@@ -314,9 +314,29 @@ def explorer(request: Request) -> dict[str, Any]:
 
 @router.get("/archive/folders")
 def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, Any]:
-    """Folders inside the email folders that Quick search finds for the same words, for "Another email folder"."""
+    """Every folder Quick search finds for the same words, those a mail can be filed in first, for "Find a folder".
+
+    Each folder says ``fileable`` (inside the email folders) and carries its place in the scan; ``total`` counts
+    every match, of which the first rows are listed.
+    """
     _pc_only(request)
-    return {"folders": email_folder_hits(config.load(), q, EMAIL_FOLDER_HITS)}
+    return sheet_folders(config.load(), q)
+
+
+@router.get("/archive/subfolders")
+def subfolders(request: Request, root: str = Query(..., max_length=200), scan_id: int = Query(...),
+               id: int = Query(...)) -> dict[str, Any]:
+    """The subfolders of the folder a listed row names by its place in the scan, in the same shape as ``/archive/folders``.
+
+    Never takes a path: the folder is looked up by root, scan id and folder id, and 409 says a newer scan replaced it.
+    """
+    _pc_only(request)
+    try:
+        return sheet_subfolders(config.load(), root, scan_id, id)
+    except ScanChanged as exc:
+        raise HTTPException(status_code=409, detail="the index changed since this list was found: search again") from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="no such folder") from exc
 
 
 @router.get("/archive/macro")

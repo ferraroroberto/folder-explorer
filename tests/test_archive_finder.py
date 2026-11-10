@@ -10,9 +10,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.webapp.server import app
 from app.webapp.state import (
+    SHEET_FOLDER_ROWS,
     LocalFolders,
-    email_folder_hits,
     folder_children,
     folder_hits,
 )
@@ -20,6 +21,8 @@ from src import config
 from src.archive_window.finder import NO_SUBFOLDERS, ROWS_SHOWN, Finder
 from src.search_window.model import FOLDERS, Status, fetch
 from tests.test_search_window import _client, api  # noqa: F401 - the scanned drive fixture, shared
+
+REMOTE = ("100.64.0.7", 50000)
 
 QUERIES = ("harbour", "photos 2025", "invoices;documents", "BUDGET", "northwind", "2025")
 
@@ -112,9 +115,61 @@ def test_only_the_first_rows_are_listed_and_the_count_says_so() -> None:
     assert finder.selected == ROWS_SHOWN - 1
 
 
-def test_the_sheets_box_offers_the_same_search_kept_to_the_email_folders(api: TestClient) -> None:  # noqa: F811
+def _hits(api: TestClient, query: str) -> dict:  # noqa: F811
+    r = api.get("/api/archive/folders", params={"q": query})
+    assert r.status_code == 200
+    return r.json()
+
+
+def _kids(api: TestClient, place: dict) -> object:  # noqa: F811
+    return api.get("/api/archive/subfolders", params={"root": place["root"], "scan_id": place["scan_id"], "id": place["id"]})
+
+
+def test_the_sheets_search_lists_every_folder_the_email_folders_first_and_marks_the_rest(api: TestClient) -> None:  # noqa: F811
     cfg = config.load()
     mail = cfg["email"]["roots"][0]
-    hits = email_folder_hits(cfg, "2025", 8)
-    assert [h["path"] for h in hits] == [r["path"] for r in folder_hits(cfg, "2025")["results"] if r["path"].startswith(mail)][:8]
-    assert [h["name"] for h in hits] == ["Northwind"], "a folder of people folds as Quick search folds it"
+    page = _hits(api, "2025")
+    assert [(h["name"], h["fileable"]) for h in page["folders"]][0] == ("Northwind", True), "a folder of people folds as Quick search folds it"
+    assert any(h["name"] == "2025" and not h["fileable"] for h in page["folders"])
+    assert [h["fileable"] for h in page["folders"]] == sorted((h["fileable"] for h in page["folders"]), reverse=True)
+    assert all(h["fileable"] == h["path"].startswith(mail) for h in page["folders"])
+    assert page["total"] == len(folder_hits(cfg, "2025")["results"]) and len(page["folders"]) <= SHEET_FOLDER_ROWS
+    assert all(set(h["location"]) == {"root", "scan_id", "id"} for h in page["folders"])
+
+
+def test_the_sheet_steps_into_a_folder_by_its_place_in_the_scan_and_out_again(api: TestClient) -> None:  # noqa: F811
+    north = next(h for h in _hits(api, "northwind")["folders"] if h["name"] == "Northwind")
+    r = _kids(api, north["location"])
+    assert r.status_code == 200
+    body = r.json()
+    assert body["path"] == north["path"] and body["total"] == 2
+    assert {h["name"] for h in body["folders"]} == {"ana@example.com", "leo@example.org"} and all(h["fileable"] for h in body["folders"])
+    assert all(h["path"].startswith(north["path"] + "\\") for h in body["folders"])
+    ana = next(h for h in body["folders"] if h["name"] == "ana@example.com")
+    deeper = _kids(api, ana["location"]).json()
+    assert [h["name"] for h in deeper["folders"]] == ["2025"] and _kids(api, deeper["folders"][0]["location"]).json()["folders"] == []
+
+
+def test_a_folder_outside_the_email_folders_can_be_stepped_into_but_is_not_fileable(api: TestClient) -> None:  # noqa: F811
+    photos = next(h for h in _hits(api, "photos")["folders"] if h["name"] == "Photos")
+    assert photos["fileable"] is False
+    kids = _kids(api, photos["location"]).json()["folders"]
+    assert kids and not any(h["fileable"] for h in kids)
+
+
+def test_the_subfolders_route_names_a_folder_by_id_never_by_a_path(api: TestClient, tmp_path: Path) -> None:  # noqa: F811
+    north = next(h for h in _hits(api, "northwind")["folders"] if h["name"] == "Northwind")["location"]
+    # A path in the request names nothing: the answer is the folder the ids name.
+    sneaky = api.get("/api/archive/subfolders", params={**north, "path": str(tmp_path), "folder": str(tmp_path)})
+    assert sneaky.status_code == 200 and str(tmp_path) not in sneaky.text
+    assert api.get("/api/archive/subfolders", params={"root": north["root"], "scan_id": north["scan_id"]}).status_code == 422
+    assert _kids(api, {**north, "scan_id": north["scan_id"] + 1}).status_code == 409, "an id from another scan could name another folder"
+    assert _kids(api, {**north, "id": 10**9}).status_code == 404
+    assert _kids(api, {**north, "root": "no-such-root"}).status_code == 404
+
+
+def test_the_subfolders_route_answers_the_pc_only(api: TestClient) -> None:  # noqa: F811
+    north = next(h for h in _hits(api, "northwind")["folders"] if h["name"] == "Northwind")["location"]
+    with TestClient(app, client=REMOTE) as remote:
+        r = remote.get("/api/archive/subfolders", params=north, headers={"Authorization": "Bearer nope"})
+    assert r.status_code in (401, 403)

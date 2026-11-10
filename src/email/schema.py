@@ -9,8 +9,9 @@ attachment flag and the file size sit alongside. ``email_failures`` remembers
 each file that would not read, with the size and modified time it had, so it
 is not read again until it changes.
 
-The email stage (``src/email/stage.py``) is the only writer; every reader
-opens the file ``mode=ro``.
+The email stage (``src/email/stage.py``) is the only writer that reads a ``.msg``;
+filing, ``revert`` and ``renumber`` also write the row of a file they just changed
+(``src/email/repository.py``). Every reader opens the file ``mode=ro``.
 """
 
 from __future__ import annotations

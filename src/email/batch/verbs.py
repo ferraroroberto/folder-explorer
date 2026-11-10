@@ -112,7 +112,7 @@ from src.email.batch.move import (
 from src.email.mailboxes import Mailbox, MailboxRegistry
 from src.email.naming import normalize_message_id
 from src.email.renumber import RenumberResult, renumber_folder
-from src.email.repository import EmailRepository, open_index
+from src.email.repository import EmailRepository, open_index, record_filed_mail
 from src.email.suggester import EmailData, SuggestionEngine
 from src.outlook.mapi import MailboxNotInOutlookError
 
@@ -595,6 +595,7 @@ def _archive_decision(
         }
         return False
 
+    record_filed_mail(repo, mail, archived.email_path)
     result["sequence_number"] = archived.sequence_number
     # Filled in before the move on purpose: if the move fails these files
     # exist and the caller must be able to revert them.

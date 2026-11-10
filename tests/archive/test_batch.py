@@ -266,6 +266,15 @@ def test_apply_writes_the_bundle_moves_the_mail_and_tags_it(cfg, archive_root):
     assert result["entry_id"] == "entry-a@example.invalid-in-Archive"
 
 
+def test_apply_makes_the_filed_mail_known_to_the_next_plan_with_no_scan_between(cfg, archive_root):
+    dest = archive_root / "Project Alpha"
+    client = FakeOutlookClient([_mail("a@example.invalid", "Project Alpha weekly update")])
+    doc = batch.apply(client, cfg, [{"message_id": "a@example.invalid", "folder_path": str(dest)}])
+    filed = doc["results"][0]["files"][0]
+    again = FakeOutlookClient([_mail("a@example.invalid", "Project Alpha weekly update")])
+    assert batch.plan(again, cfg, candidates=1)["mails"][0]["already_archived"] == filed
+
+
 def test_apply_uses_the_per_decision_date_prefix_over_the_config(cfg, archive_root):
     """The caller owns the naming form; the global toggle is not consulted."""
     dest = archive_root / "Project Alpha"

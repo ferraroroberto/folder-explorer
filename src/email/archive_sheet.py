@@ -20,7 +20,7 @@ from typing import Any, Callable, Optional
 from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
 from src.email.archive_settings import get_outlook_category
-from src.email.repository import EmailRepository, open_index
+from src.email.repository import EmailRepository, open_index, record_filed_mail
 from src.email.suggester import EmailData, RankedSuggestion, SuggestionEngine
 from src.explorer_window import ExplorerUnavailableError, get_current_explorer_folder
 from src.stage_timer import StageTimer
@@ -264,6 +264,11 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
     except Exception as exc:
         logger.exception("❌ archive sheet: saving the mail failed")
         raise SheetError(ERR_ARCHIVE, MESSAGES[ERR_ARCHIVE] + " " + type(exc).__name__ + ": " + str(exc)) from exc
+    conn = open_index(cfg)
+    try:
+        record_filed_mail(EmailRepository(conn), mail, archived.email_path)
+    finally:
+        conn.close()
     doc: dict[str, Any] = {"ok": True, "folder_path": str(folder), "files": [archived.email_path, *archived.attachment_paths],
                            "category": category or "", "categorized": False, "error": None}
     if category:

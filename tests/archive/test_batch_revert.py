@@ -60,9 +60,8 @@ def test_revert_deletes_the_files_and_puts_the_mail_back(cfg, archive_root):
     assert client.folders[None] == [item]
     assert client.folders["Archive"] == []
     assert item.Categories == ""
-    # No row was ever indexed for this mail (no scan ran), so there is
-    # nothing to remove -- this is not the stale-index regression below.
-    assert result["index_rows_removed"] == 0
+    # Applying wrote the mail's index row, and reverting takes it out again.
+    assert result["index_rows_removed"] == 1
 
 
 def _index_decoy_row(cfg, applied, subject):

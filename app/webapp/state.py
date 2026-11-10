@@ -8,9 +8,9 @@ from contextlib import ExitStack
 from typing import Any, Optional
 
 from src import folder_search, store
-from src.folder_search import item_path
 from src.email.search import EmailIndexHolder
 from src.email.settings import is_under, under_any
+from src.folder_search import item_path
 from src.index import IndexPool
 from src.roots import Root, resolve_roots
 

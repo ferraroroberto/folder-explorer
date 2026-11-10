@@ -10,27 +10,29 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
+from src.archive_window.finder import FinderSource
 from src.archive_window.theme import palette
 
 logger = logging.getLogger(__name__)
 
 
 def show_window(doc: dict[str, Any], on_file: Callable[[str, Optional[str], bool, str], dict[str, Any]],
-                find_folders: Optional[Callable[[str], list[dict[str, Any]]]] = None, dark: Optional[bool] = None,
+                folders: Optional[FinderSource] = None, dark: Optional[bool] = None,
                 current_explorer: Optional[Callable[[], dict[str, Any]]] = None,
                 rank: Optional[Callable[[], list[dict[str, Any]]]] = None,
                 progress: Optional[Callable[[str], None]] = None) -> None:
     """Show the window until it is closed or the mail is filed.
 
-    ``on_file(folder, category, duplicate, date_prefix)`` files the mail. ``find_folders(query)`` turns on the
-    "Another email folder" search (hits are ``{"path", "name"}``); ``dark`` forces a theme, ``None`` follows Windows.
+    ``on_file(folder, category, duplicate, date_prefix)`` files the mail. ``folders`` turns on "Find a folder": its
+    ``folders(query)`` answers as ``GET /api/search/folders`` does and ``children(path)`` lists a folder's subfolders
+    (``finder.py``). ``dark`` forces a theme, ``None`` follows Windows.
     ``current_explorer()`` turns on the Explorer button: it answers ``{"ok": true, "folder_path"}`` or the sheet's error document.
     ``rank()`` gives the folders for a document still ranking: the window shows first and fills them in from a
     worker thread. ``progress(stage)`` hears ``window_shown`` and then ``suggestions_shown``, for the timings.
     """
     from src.archive_window.view import ArchiveView  # noqa: PLC0415 - tkinter only when a window opens
 
-    window = ArchiveView(doc, on_file, find_folders, palette(dark), current_explorer=current_explorer)
+    window = ArchiveView(doc, on_file, folders, palette(dark), current_explorer=current_explorer)
     window.build()
     if progress:
         window.root.after_idle(lambda: progress("window_shown"))

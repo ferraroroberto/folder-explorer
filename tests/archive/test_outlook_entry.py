@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import re
 import subprocess
 import threading
 import time
@@ -23,6 +24,7 @@ from app import outlook
 from app.webapp.routers import archive as archive_routes
 from app.webapp.server import app
 from src import config
+from src.archive_window.finder import Finder
 from src.email import archive_sheet
 from src.email import body as child
 from src.email.archive_sheet import (
@@ -43,6 +45,7 @@ from tests.archive.batch_support import (
     _seed_index,
 )
 from tests.conftest import write_config
+from tests.test_search_window import _scan
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.7", 50000)
@@ -155,8 +158,40 @@ def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamesp
     with TestClient(app, client=LOCAL) as c:
         _route_handoff(monkeypatch, c)
         assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
-    assert seen["doc"]["ok"] and callable(seen["find"]) and seen["result"]["ok"] and not seen["result"]["categorized"]
+    assert seen["doc"]["ok"] and callable(seen["find"].folders) and seen["result"]["ok"] and not seen["result"]["categorized"]
     assert Path(seen["result"]["files"][0]).is_file() and fake.item.Categories == ""
+
+
+def test_a_folder_the_window_finds_takes_the_mail_like_any_filing(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Find a folder, then Archive here: the bridge's own search, then the same filer as every other filing."""
+    (fake.root / "Clients" / "Harbour works").mkdir(parents=True)
+    (fake.root.parent / "Elsewhere" / "Harbour photos").mkdir(parents=True)
+    seen: dict = {}
+
+    def window(doc: dict, on_file, folders, current_explorer=None, rank=None, progress=None) -> None:  # type: ignore[no-untyped-def]
+        finder = Finder(folders, doc["roots"])
+        finder.search("harbour")
+        seen["found"] = [(f.name, f.fileable) for f in finder.found()]
+        here = finder.current(0)
+        seen["first"] = on_file(here.row.path, "Filed", False, "on")
+        seen["again"] = on_file(here.row.path, None, False, "auto")
+        seen["copy"] = on_file(here.row.path, None, True, "off")
+
+    monkeypatch.setattr("src.archive_window.show_window", window)
+    # The disk walk alone: its email stage would reach the spawn this fixture records for filings.
+    monkeypatch.setattr("src.scan_runner.index_emails_after", lambda trigger: None)
+    with TestClient(app, client=LOCAL) as c:
+        _scan(c)
+        _route_handoff(monkeypatch, c)
+        outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID)
+    dest = fake.root / "Clients" / "Harbour works"
+    assert seen["found"] == [("Harbour works", True), ("Harbour photos", False)]
+    first = Path(seen["first"]["files"][0])
+    assert seen["first"]["ok"] and seen["first"]["categorized"] and fake.item.Categories == "Filed"
+    assert first.parent == dest.resolve() and re.match(r"^\d{4}-\d{2}-\d{2} - 001 - Kickoff agenda\.msg$", first.name), first.name
+    assert ("archive", str(dest.resolve())) in fake.spawned
+    assert not seen["again"]["ok"] and seen["again"]["error"]["code"] == "already_archived"
+    assert seen["copy"]["ok"] and Path(seen["copy"]["files"][0]).name == "002 - Kickoff agenda.msg"
 
 
 def _window_recorder(monkeypatch: pytest.MonkeyPatch) -> list[dict]:

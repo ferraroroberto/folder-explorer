@@ -1,4 +1,4 @@
-"""Process-wide webapp state: the open-index pool, the open email index, and their housekeeping."""
+"""Process-wide webapp state: the open-index pool, the open email index, their housekeeping, and the shared folder search."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from src.roots import Root, resolve_roots
 
 logger = logging.getLogger(__name__)
 
-# Folders offered when the Archive sheet's or window's "Another email folder" box is searched.
+# Folders the Archive sheet offers when its "Another email folder" box is searched.
 EMAIL_FOLDER_HITS = 8
 
 POOL = IndexPool()
@@ -63,24 +63,84 @@ def locate_folder(roots: list[Root], path: str) -> Optional[dict[str, Any]]:
     return None
 
 
-def email_folder_hits(cfg: dict[str, Any], query: str, limit: int) -> list[dict[str, Any]]:
-    """Folders inside the email folders whose path holds every word of ``query``, each with its place in the scan.
-
-    The Archive sheet's "Another email folder" box and the macro's fallback window search the same way.
-    """
-    email_roots = list((cfg.get("email") or {}).get("roots") or [])
-    entries = []
-    scan_ids = {}
+def _open_scans(cfg: dict[str, Any]) -> list[tuple[Root, dict[str, Any], tuple[Any, Any]]]:
+    """Each configured root with a finished scan, its scan row and its pooled index and lock."""
+    out = []
     for root in resolve_roots(cfg["roots"]):
         scan = store.current_index(root.key)
         if scan is not None:
-            entries.append((root, POOL.get(store.index_dir() / scan["index_file"])))
-            scan_ids[root.key] = scan["id"]
+            out.append((root, scan, POOL.get(store.index_dir() / scan["index_file"])))
+    return out
+
+
+def folder_hits(cfg: dict[str, Any], q: str, prune: Optional[bool] = None, skip: Optional[int] = None,
+                onedrive: Optional[bool] = None) -> dict[str, Any]:
+    """The folder search with the settings' options: ``GET /api/search/folders``, the archive window and sheet all ask here.
+
+    ``prune``, ``skip`` and ``onedrive`` override ``folder_search``'s own choices for one search.
+    """
+    opts = cfg["folder_search"]
+    entries = _open_scans(cfg)
     with ExitStack() as stack:
-        for _, (_, lock) in entries:
+        for _, _, (_, lock) in entries:
             stack.enter_context(lock)
-        found = folder_search.search([(root, ix) for root, (ix, _) in entries], query, False, 0, limit=200)
+        return folder_search.search([(root, ix) for root, _, (ix, _) in entries], q,
+                                    opts["prune_people"] if prune is None else prune,
+                                    opts["skip_levels"] if skip is None else skip,
+                                    onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
+
+
+def folder_children(cfg: dict[str, Any], path: str) -> list[dict[str, Any]]:
+    """The direct subfolders of the scanned folder at ``path``, heaviest first, shaped like a folder search hit.
+
+    Looked up by path in the root's current scan, so a newer scan between the search and the step in
+    can't swap the folder; empty when no scan holds it.
+    """
+    roots = resolve_roots(cfg["roots"])
+    place = locate_folder(roots, path)
+    if place is None:
+        return []
+    root = next(r for r in roots if r.key == place["root"])
+    scan = store.current_index(root.key)
+    if scan is None:
+        return []
+    skip = cfg["folder_search"]["skip_levels"]
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        kids = index.children(place["id"], "size", None, cfg["explore"]["show_hidden"])["children"]
+    out = []
+    for kid in kids:
+        child = os.path.join(path, kid["name"])
+        out.append({**kid, "root": root.key, "path": child, "display": folder_search.display_path(child, skip)})
+    return out
+
+
+class LocalFolders:
+    """The folder search and a folder's subfolders from this process's own index pool.
+
+    The archive window opens in the Outlook bridge's process, often with no web app running, so it
+    searches here rather than over HTTP, through the same ``folder_hits`` the search route calls.
+    """
+
+    def __init__(self, cfg: dict[str, Any]) -> None:
+        self.cfg = cfg
+
+    def folders(self, query: str) -> dict[str, Any]:
+        return folder_hits(self.cfg, query)
+
+    def children(self, path: str) -> list[dict[str, Any]]:
+        return folder_children(self.cfg, path)
+
+
+def email_folder_hits(cfg: dict[str, Any], query: str, limit: int) -> list[dict[str, Any]]:
+    """The folder search's hits inside the email folders, each with its place in the scan.
+
+    The Archive sheet's "Another email folder" box offers these: the same matcher and options as Quick search,
+    kept to the folders a mail can be filed in.
+    """
+    email_roots = list((cfg.get("email") or {}).get("roots") or [])
+    scan_ids = {root.key: scan["id"] for root, scan, _ in _open_scans(cfg)}
     hits = [{"path": r["path"], "name": r["name"],
              "location": {"root": r["root"], "scan_id": scan_ids[r["root"]], "id": r["id"]}}
-            for r in found["results"] if under_any(r["path"], email_roots)]
+            for r in folder_hits(cfg, query)["results"] if under_any(r["path"], email_roots)]
     return hits[:limit]

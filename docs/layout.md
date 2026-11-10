@@ -21,7 +21,7 @@ folder-explorer/
 │       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
-│       ├── state.py            # the open-index pool, its housekeeping and the email-folder search
+│       ├── state.py            # the open-index pool, its housekeeping, and the folder search the route, the sheet and the window share
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
@@ -38,7 +38,8 @@ folder-explorer/
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's Archive window (Tk), shown by default or when no page is open on this PC: model (what each
-│   │                           #   control shows and does, no Tk), theme (the app's tokens.css), view (the widgets)
+│   │                           #   control shows and does, no Tk), finder (Find a folder: Quick search's folder search, browsing,
+│   │                           #   which folders can take the mail; no Tk), theme (the app's tokens.css), view (the widgets)
 │   ├── search_window/          # the tray's Quick search window (Tk): model (rows and states, no Tk), client (the web app's
 │   │                           #   local API, its only source), view (the widgets, the archive window's theme)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)

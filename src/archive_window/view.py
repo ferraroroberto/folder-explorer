@@ -15,6 +15,7 @@ from tkinter import filedialog
 from typing import Any, Callable, Optional
 
 from src import desktop
+from src.archive_window.finder import OUTSIDE, Finder, FinderSource, Found
 from src.archive_window.model import (
     DATE_CHOICES,
     EXPLORER_CHIP,
@@ -42,12 +43,14 @@ logger = logging.getLogger(__name__)
 
 # How long the window stays up after a filing, so the result can be read.
 CLOSE_AFTER_MS = 1800
-# How long typing in "Another email folder" pauses before it searches.
+# How long typing in "Find a folder" pauses before it searches.
 DEBOUNCE_MS = 200
 WIDTH = 640
 _WRAP = WIDTH - 2 * SPACE_MD - 24
-PLACEHOLDER = "Another email folder"
+PLACEHOLDER = "Find a folder"
 EXPLORER_BUTTON = "Current Explorer folder"
+FOUND_CHIP, FOUND_NOTE = "Found", "found by the folder search"
+ARCHIVE_HERE, OPEN_HERE, STEP_IN, BACK = "Archive here", "Open in Explorer", "Subfolders ›", "← Back"
 
 # How often Tk's thread looks for the worker's ranking; short, as the ranking itself takes tens of ms.
 RANK_POLL_MS = 15
@@ -55,7 +58,6 @@ RANK_FAILED = "Couldn't rank the folders. Find one below."
 
 OnFile = Callable[[str, Optional[str], bool, str], dict[str, Any]]
 Rank = Callable[[], list[dict[str, Any]]]
-FindFolders = Callable[[str], list[dict[str, Any]]]
 CurrentExplorer = Callable[[], dict[str, Any]]
 
 
@@ -87,11 +89,12 @@ class Segmented(tk.Frame):
 
 
 class ArchiveView:
-    def __init__(self, doc: dict[str, Any], on_file: OnFile, find_folders: Optional[FindFolders], pal: Palette,
+    def __init__(self, doc: dict[str, Any], on_file: OnFile, folders: Optional[FinderSource], pal: Palette,
                  root: Optional[tk.Tk] = None, current_explorer: Optional[CurrentExplorer] = None) -> None:
-        self.doc, self.on_file, self.find_folders, self.pal = doc, on_file, find_folders, pal
+        self.doc, self.on_file, self.pal = doc, on_file, pal
         self.current_explorer = current_explorer
         self.model = ModelView(doc) if doc.get("ok") else None
+        self.finder = Finder(folders, self.model.roots) if folders is not None and self.model is not None else None
         # A caller that opens many windows in one process (the tests) passes the one root it owns.
         self.root = root or tk.Tk()
         self.root.title("Archive mail")
@@ -277,6 +280,11 @@ class ArchiveView:
         self.entry.pack(side="left", fill="x", expand=True, ipady=6)
         self.entry.bind("<FocusIn>", self._clear_placeholder)
         self.entry.bind("<FocusOut>", self._restore_placeholder)
+        for key, act in (("<Down>", lambda: self._move(1)), ("<Up>", lambda: self._move(-1)), ("<Return>", self._archive_here)):
+            self.entry.bind(key, lambda _e, a=act: (a(), "break")[1])
+        self.entry.bind("<Right>", self._key_right)
+        self.entry.bind("<Left>", self._key_back)
+        self.entry.bind("<BackSpace>", self._key_back)
         self.query.trace_add("write", lambda *_a: self._schedule_search())
         self.found = tk.Frame(self.frame, bg=pal.card)
         self.found.pack(fill="x")
@@ -336,10 +344,12 @@ class ArchiveView:
         self._paint_summary()
 
     def _open(self, option: Option) -> None:
-        if not option.open_target:
-            return
+        if option.open_target:
+            self._show_in_explorer(option.open_target)
+
+    def _show_in_explorer(self, folder: str) -> None:
         try:
-            desktop.open_in_explorer(option.open_target)
+            desktop.open_in_explorer(folder)
             self._say("Opened in File Explorer", self.pal.muted)
         except (OSError, FileNotFoundError) as exc:
             self._say(str(exc) or "File Explorer couldn't open the folder", self.pal.danger_text)
@@ -405,10 +415,10 @@ class ArchiveView:
     def _take(self, path: str, chip: str = "Chosen", note: str = "picked from the folder index") -> None:
         assert self.model is not None
         self.model.pick_extra(path, chip, note)
-        for child in self.found.winfo_children():
-            child.destroy()
         self._paint_options()
         self._paint_summary()
+
+    # ------------------------------------------------------------ find a folder
 
     def _schedule_search(self) -> None:
         if self.search_job:
@@ -417,25 +427,119 @@ class ArchiveView:
 
     def _search(self) -> None:
         self.search_job = None
-        text = self.query.get()
+        if self.finder is None:
+            return
+        text = "" if self.placeholder else self.query.get()
+        if text.strip() or self.finder.query.strip():
+            self.finder.search(text)
+        self._paint_found()
+
+    def _paint_found(self) -> None:
+        """The search's folders, or the subfolders of the folder stepped into, with the actions for the selected one."""
         for child in self.found.winfo_children():
             child.destroy()
-        if self.find_folders is None or not text.strip() or self.placeholder:
+        finder, pal = self.finder, self.pal
+        if finder is None or not (finder.browsing or finder.query.strip()):
             return
-        try:
-            hits = self.find_folders(text)
-        except Exception as exc:  # noqa: BLE001 - a search failure is shown, never fatal to the window
-            logger.exception("❌ archive window: the folder search failed")
-            self._label(self.found, "%s: %s" % (type(exc).__name__, exc), SIZE_SMALL, fg=self.pal.danger_text)
+        if finder.browsing:
+            crumb = tk.Frame(self.found, bg=pal.card)
+            crumb.pack(fill="x", pady=(4, 0))
+            tk.Button(crumb, text=BACK, command=self._back, font=_font(SIZE_SMALL), relief="flat", bd=0, bg=pal.card, fg=pal.accent_text,
+                      cursor="hand2", activebackground=pal.neutral_soft).pack(side="left", padx=(0, SPACE_SM))
+            self._label(crumb, " › ".join(finder.crumbs()), SIZE_SMALL, True, side="left", fill="x", expand=True)
+        message = finder.message()
+        if message:
+            self._label(self.found, message, SIZE_SMALL, fg=pal.danger_text if finder.failed() else pal.muted, pady=(4, 0))
+        for i, found in enumerate(finder.shown()):
+            self._found_row(i, found, i == finder.selected)
+        if finder.count_line():
+            self._label(self.found, finder.count_line(), SIZE_CAPTION, fg=pal.muted, pady=(2, 0))
+        here = finder.current()
+        if here is None:
             return
-        if not hits:
-            self._label(self.found, "No email folder matches every word.", SIZE_SMALL, fg=self.pal.muted, pady=(4, 0))
-        assert self.model is not None
-        for hit in hits:
-            btn = tk.Button(self.found, text=under_root(hit["path"], self.model.roots), anchor="w", relief="flat", bd=0, bg=self.pal.card,
-                            fg=self.pal.ink, font=_font(SIZE_SMALL, mono=True), activebackground=self.pal.accent_soft, cursor="hand2",
-                            command=lambda p=hit["path"]: self._take(p), padx=SPACE_SM, pady=4)
-            btn.pack(fill="x")
+        bar = tk.Frame(self.found, bg=pal.card)
+        bar.pack(fill="x", pady=(4, 0))
+        self.here_button = self._button(bar, ARCHIVE_HERE, self._archive_here)
+        self.here_button.configure(state="normal" if here.fileable and not self.busy else "disabled")
+        self.here_button.pack(side="left")
+        self._button(bar, OPEN_HERE, self._explore_found).pack(side="left", padx=(SPACE_SM, 0))
+        self._button(bar, STEP_IN, self._enter).pack(side="left", padx=(SPACE_SM, 0))
+
+    def _found_row(self, i: int, found: Found, on: bool) -> None:
+        pal = self.pal
+        bg = pal.accent_soft if on else pal.card
+        row = tk.Frame(self.found, bg=bg, padx=SPACE_SM, pady=2, cursor="hand2", highlightthickness=1,
+                       highlightbackground=pal.accent if on else pal.card)
+        row.pack(fill="x")
+        step = tk.Button(row, text="›", font=_font(SIZE_TITLE), relief="flat", bd=0, bg=bg, fg=pal.accent_text, cursor="hand2",
+                         activebackground=pal.neutral_soft, command=lambda: self._enter(i))
+        step.pack(side="right")
+        top = tk.Frame(row, bg=bg)
+        top.pack(fill="x")
+        tk.Label(top, text=found.name, bg=bg, fg=pal.ink if found.fileable else pal.muted, font=_font(SIZE_SMALL, True),
+                 anchor="w").pack(side="left")
+        if not found.fileable:
+            tk.Label(top, text=OUTSIDE, bg=pal.neutral_soft, fg=pal.muted, font=_font(SIZE_CAPTION), padx=SPACE_SM).pack(side="left", padx=SPACE_SM)
+        roots = self.model.roots if self.model else []
+        tk.Label(row, text=under_root(found.row.path, roots), bg=bg, fg=pal.muted, font=_font(SIZE_CAPTION, mono=True),
+                 wraplength=_WRAP - 60, justify="left", anchor="w").pack(fill="x")
+        for widget in self._descendants(row):
+            if widget is not step:
+                widget.bind("<Button-1>", lambda _e, k=i: self._select(k))
+                widget.bind("<Double-Button-1>", lambda _e, k=i: self._enter(k))
+
+    def _select(self, index: int) -> None:
+        if self.finder is not None:
+            self.finder.current(index)
+            self._paint_found()
+
+    def _move(self, delta: int) -> None:
+        if self.finder is not None:
+            self.finder.move(delta)
+            self._paint_found()
+
+    def _enter(self, index: Optional[int] = None) -> None:
+        if self.finder is not None:
+            self.finder.enter(index)
+            self._paint_found()
+
+    def _back(self) -> None:
+        if self.finder is not None and self.finder.back():
+            self._paint_found()
+
+    def _key_right(self, _e: object) -> Optional[str]:
+        """→ at the end of the box steps into the selected folder; elsewhere it moves the cursor."""
+        if self.finder is None or self.finder.current() is None or self.entry.index("insert") < len(self.query.get()):
+            return None
+        self._enter()
+        return "break"
+
+    def _key_back(self, event: Any) -> Optional[str]:
+        """← at the start of the box, or Backspace in an empty one, steps back up while browsing."""
+        if self.finder is None or not self.finder.browsing:
+            return None
+        empty = self.placeholder or not self.query.get()
+        at_start = self.entry.index("insert") == 0
+        if not (empty or (getattr(event, "keysym", "") == "Left" and at_start)):
+            return None
+        self._back()
+        return "break"
+
+    def _explore_found(self) -> None:
+        here = self.finder.current() if self.finder else None
+        if here is not None:
+            self._show_in_explorer(here.row.path)
+
+    def _archive_here(self) -> None:
+        """File the mail in the selected folder at once, with the window's category, copy and date-prefix choices."""
+        here = self.finder.current() if self.finder else None
+        if here is None or self.busy:
+            return
+        if not here.fileable:
+            self._say(OUTSIDE + ": pick a folder inside them to archive.", self.pal.danger_text)
+            return
+        self._take(here.row.path, FOUND_CHIP, FOUND_NOTE)
+        self._archive()
 
     # ------------------------------------------------------------ filing
 
@@ -443,7 +547,8 @@ class ArchiveView:
         assert self.model is not None
         request = self.model.request()
         if request is None:
-            self._say("Pick a folder first.", self.pal.danger_text)
+            self._say("Pick a folder first." if self.model.selected() is None else "Turn on “Archive a copy anyway” to file it again.",
+                      self.pal.danger_text)
             return
         self.busy = True
         self._paint_summary()

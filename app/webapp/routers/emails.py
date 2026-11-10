@@ -12,10 +12,11 @@ from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.webapp.state import EMAILS
-from src import config, store
+from src import config
 from src.email import indexer
 from src.email.settings import EmailPart, email_part, is_under
 from src.roots import resolve_roots
+from src.run_state import RunState
 
 router = APIRouter(prefix="/api/email")
 
@@ -52,10 +53,12 @@ def status() -> dict[str, Any]:
         with index.lock:
             indexed = index.count()
     failed, _ = _failures(part, 0)
+    held = indexer.lock_held()
+    run = indexer.email_state(held)
     return {
         "ready": part.ready, "problem": part.problem, "own": part.own, "stage_problem": part.stage_problem,
-        "budget_mb": cfg["email"]["download_budget_mb"], "roots": part.roots, "folders": cfg["email"]["roots"], "running": indexer.is_running(),
-        "indexed": indexed, "failed": failed, "runs": store.email_runs(10),
+        "budget_mb": cfg["email"]["download_budget_mb"], "roots": part.roots, "folders": cfg["email"]["roots"], "running": run.running,
+        "indexed": indexed, "failed": failed, "runs": indexer.history(10, held), **run.as_dict(),
     }
 
 
@@ -73,8 +76,11 @@ def index_now(body: dict[str, Any] = Body(default={})) -> JSONResponse:
     scope = body.get("root") or None
     if scope is not None and not (isinstance(scope, str) and any(is_under(scope, f) for f in part.roots)):
         raise HTTPException(status_code=400, detail="that folder is not inside an email folder")
-    if indexer.is_running():
+    run = indexer.activity()
+    if run.state is RunState.RUNNING:
         raise HTTPException(status_code=409, detail="the email index is already being updated")
+    if run.state is RunState.UNKNOWN:
+        raise HTTPException(status_code=503, detail="Can't tell whether an email run is going: " + (run.reason or ""))
     # A whole-index run lists the folders now: a mail filed since the last scan is not in its index.
     indexer.spawn("app", scope, fresh=scope is None)
     return JSONResponse({"started": True, "scope": scope or "all"}, status_code=202)

@@ -19,16 +19,18 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Optional
 
+from src.run_state import RunState
 from src.runtime_data import runtime_data_dir
 
 logger = logging.getLogger(__name__)
 
 APP = "folder-explorer"
 
-STATUS_RUNNING = "running"
-STATUS_OK = "ok"
-STATUS_FAILED = "failed"
-STATUS_INTERRUPTED = "interrupted"
+# The texts a row's ``status`` column holds: the run state's own vocabulary, spelled once in src/run_state.py.
+STATUS_RUNNING = RunState.RUNNING.value
+STATUS_OK = RunState.OK.value
+STATUS_FAILED = RunState.FAILED.value
+STATUS_INTERRUPTED = RunState.INTERRUPTED.value
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scans (
@@ -158,6 +160,12 @@ def latest_scan(root_key: str) -> Optional[dict[str, Any]]:
         return _row(conn.execute("SELECT * FROM scans WHERE root_key = ? ORDER BY id DESC LIMIT 1", (root_key,)).fetchone())
 
 
+def newest_scan() -> Optional[dict[str, Any]]:
+    """The most recent scan of any root, whatever its status."""
+    with connect() as conn:
+        return _row(conn.execute("SELECT * FROM scans ORDER BY id DESC LIMIT 1").fetchone())
+
+
 def current_index(root_key: str) -> Optional[dict[str, Any]]:
     """The newest scan of ``root_key`` that finished ``ok`` and whose index file exists."""
     with connect() as conn:
@@ -267,6 +275,13 @@ def settle_email_runs() -> int:
     with connect() as conn:
         return conn.execute("UPDATE email_runs SET status = ?, finished_at = ?, message = ? WHERE status = ?",
                             (STATUS_INTERRUPTED, time.time(), "the run stopped before it finished", STATUS_RUNNING)).rowcount
+
+
+def email_history() -> tuple[int, int]:
+    """How many email runs are recorded and how many of them finished ``ok``."""
+    with connect() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n, COALESCE(SUM(status = ?), 0) AS ok FROM email_runs", (STATUS_OK,)).fetchone()
+    return int(row["n"]), int(row["ok"])
 
 
 def email_runs(limit: int = 10) -> list[dict[str, Any]]:

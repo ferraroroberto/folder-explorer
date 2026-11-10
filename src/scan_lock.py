@@ -7,6 +7,7 @@ exits, crashed or not, so a dead scan can never leave the lock stuck.
 
 from __future__ import annotations
 
+import errno
 import os
 import sys
 from pathlib import Path
@@ -15,9 +16,16 @@ from typing import IO, Optional
 
 from src import runtime_files
 
+# What a byte-range lock that another process holds raises; any other error says nothing about the holder.
+_HELD = (errno.EACCES, errno.EAGAIN, errno.EDEADLK)
+
 
 class ScanBusy(RuntimeError):
-    """Another scan holds the lock."""
+    """The lock could not be taken; ``held`` is whether the error proves another process holds it."""
+
+    def __init__(self, message: str, held: bool = True) -> None:
+        super().__init__(message)
+        self.held = held
 
 
 class ScanLock:
@@ -42,7 +50,7 @@ class ScanLock:
                 fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
             fh.close()
-            raise ScanBusy("another scan is running") from exc
+            raise ScanBusy("another scan is running", held=exc.errno in _HELD) from exc
         fh.seek(0)
         fh.truncate()
         fh.write(str(os.getpid()).encode("ascii"))
@@ -76,12 +84,14 @@ class ScanLock:
         self.release()
 
 
-def is_locked(path: Path) -> bool:
-    """True when some process holds the scan lock right now."""
+def probe_lock(path: Path) -> Optional[bool]:
+    """Whether some process holds the lock right now; ``None`` when the lock file could not be probed."""
     probe = ScanLock(path)
     try:
         probe.acquire()
-    except ScanBusy:
-        return True
+    except ScanBusy as exc:
+        return True if exc.held else None
+    except OSError:
+        return None
     probe.release()
     return False

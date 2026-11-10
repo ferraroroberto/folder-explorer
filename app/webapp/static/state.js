@@ -22,6 +22,7 @@ export const state = {
   mode: 'direct',
   pct: 1,
   scanning: false,
+  scanUnknown: false,
 };
 
 export const rootInfo = () => state.roots.find((r) => r.key === state.root) || null;

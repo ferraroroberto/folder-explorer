@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import ExitStack
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -19,9 +19,9 @@ from app.webapp.state import EMAILS, POOL
 from src import config, folder_search, scan_runner, search_api, store
 from src.email import indexer
 from src.email.search import SORTS
-from src.email.settings import email_part
+from src.email.settings import EmailPart, email_part
 from src.roots import Root, resolve_roots
-from src.scan_lock import is_locked
+from src.run_state import Derived
 from src.search_api import DEFAULT_LIMIT, MAX_LIMIT, OK, doc
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,16 @@ def _answer(body: dict[str, Any]) -> JSONResponse:
     return JSONResponse(body, status_code=search_api.HTTP_STATUS[body["state"]])
 
 
-def _scanning() -> bool:
-    return is_locked(scan_runner.lock().path)
+def _scan() -> Derived:
+    return scan_runner.scan_state(scan_runner.scan_lock_held())
+
+
+def _emails(cfg: dict[str, Any], roots: list[Root]) -> tuple[EmailPart, tuple[str, Optional[str]]]:
+    """The email part and its search state with the reason; the run is read only when the answer depends on it."""
+    part = email_part(cfg, roots)
+    if part.ready:
+        return part, search_api.emails_state(part, None, indexer.first_build(part.own))
+    return part, search_api.emails_state(part, indexer.activity(), None)
 
 
 def _roots(cfg: dict[str, Any]) -> tuple[list[Root], list[tuple[Root, dict[str, Any]]]]:
@@ -50,10 +58,10 @@ def status() -> dict[str, Any]:
     """Each part's state, so a caller can tell "not set up" and "building" from "no match"."""
     cfg = config.load()
     roots, scanned = _roots(cfg)
-    scanning = _scanning()
-    f_state, f_reason = search_api.folders_state(len(roots), len(scanned), scanning)
-    part = email_part(cfg, roots)
-    e_state, e_reason = search_api.emails_state(part, indexer.is_running())
+    scan = _scan()
+    f_state, f_reason = search_api.folders_state(len(roots), len(scanned), scan)
+    part, (e_state, e_reason) = _emails(cfg, roots)
+    run = indexer.activity()
     count = 0
     if e_state == OK and part.index_path is not None:
         try:
@@ -64,8 +72,8 @@ def status() -> dict[str, Any]:
             logger.warning("⚠️ v1 search status: the email index could not be read: %s", exc)
             e_state, e_reason = search_api.ERROR, "the email index could not be read: " + str(exc)
     return doc(OK, folders={"state": f_state, "reason": f_reason, "roots": len(roots), "scanned": len(scanned),
-                            "scanning": scanning},
-               emails={"state": e_state, "reason": e_reason, "count": count})
+                            "scanning": scan.running, "run": scan.state.value},
+               emails={"state": e_state, "reason": e_reason, "count": count, "run": run.state.value})
 
 
 @router.get("/folders")
@@ -76,7 +84,7 @@ def folders(q: str = "", limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
                              "missing": [], "page": search_api.page_link("folders", q)}
     cfg = config.load()
     roots, scanned = _roots(cfg)
-    state, reason = search_api.folders_state(len(roots), len(scanned), _scanning() if not scanned else False)
+    state, reason = search_api.folders_state(len(roots), len(scanned), _scan() if not scanned else None)
     if state != OK:
         return _answer(doc(state, reason, **empty))
     opts = cfg["folder_search"]
@@ -102,8 +110,7 @@ def emails(q: str = "", sort: str = Query("relevance", pattern=_SORT_PATTERN), o
     empty: dict[str, Any] = {"query": q, "hits": [], "total": 0, "notes": [], "facets": None,
                              "marks": search_api.MARKS, "page": search_api.page_link("emails", q)}
     cfg = config.load()
-    part = email_part(cfg, resolve_roots(cfg["roots"]))
-    state, reason = search_api.emails_state(part, indexer.is_running())
+    part, (state, reason) = _emails(cfg, resolve_roots(cfg["roots"]))
     if state != OK or part.index_path is None:  # a ready part always names its index file
         return _answer(doc(state, reason, **empty))
     try:

@@ -6,11 +6,16 @@ live in one place. Every answer carries ``schema_version`` and a ``state``:
 
 - ``ok``: the part searched (no match is still ``ok``, with an empty list);
 - ``not-configured``: this PC cannot search that part yet, ``reason`` says why;
-- ``indexing``: the part has nothing to search yet and its first index is being built;
+- ``indexing``: the part has nothing to search yet and its first index is being built (for email, until the
+  first run has finished ``ok``, though the index file exists from that run's start);
 - ``error``: the index is there but could not be read, ``reason`` carries the error.
 
 A caller tells "folder-explorer is down" by the request failing, never by an
-empty list, and tells the other three cases apart by ``state``.
+empty list, and tells the other three cases apart by ``state``. A part that is
+``not-configured`` because its first run failed, stopped or could not be told
+says so in ``reason``, and the status answer carries the run's own ``run`` state
+(``idle``, ``running``, ``ok``, ``failed``, ``interrupted`` or ``unknown``, see
+``docs/run-state.md``) so a caller never matches the prose.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from urllib.parse import quote
 
 from src.email.search import MARK_END, MARK_START
 from src.email.settings import EmailPart
+from src.run_state import Derived, RunState
 
 SCHEMA_VERSION = 1
 OK, NOT_CONFIGURED, INDEXING, ERROR = "ok", "not-configured", "indexing", "error"
@@ -46,24 +52,46 @@ def page_link(mode: str, q: str) -> str:
     return "/#search?mode=" + mode + "&q=" + quote(q.strip(), safe="")
 
 
-def folders_state(configured_roots: int, scanned_roots: int, scanning: bool) -> tuple[str, Optional[str]]:
-    """Whether folder search can answer, from the roots set up, the roots with a finished scan and a running scan."""
+def _unfinished(what: str, run: Derived) -> str:
+    """Why the first ``what`` has not produced anything to search, in the words of the run's state."""
+    if run.state is RunState.FAILED:
+        return "the first %s failed: %s" % (what, run.reason)
+    if run.state is RunState.INTERRUPTED:
+        return "the first %s did not finish: %s" % (what, run.reason)
+    return "can't tell whether the first %s is still going: %s" % (what, run.reason)
+
+
+def folders_state(configured_roots: int, scanned_roots: int, scan: Optional[Derived]) -> tuple[str, Optional[str]]:
+    """Whether folder search can answer, from the roots set up, the roots with a finished scan and the scan state.
+
+    ``scan`` is only read when no root has a finished scan; ``None`` then reads as no scan having run.
+    """
     if scanned_roots:
         return OK, None
     if not configured_roots:
         return NOT_CONFIGURED, "no folders to scan are set up here"
-    if scanning:
+    if scan is not None and scan.state is RunState.RUNNING:
         return INDEXING, "the first scan is running"
+    if scan is not None and scan.state in (RunState.FAILED, RunState.INTERRUPTED, RunState.UNKNOWN):
+        return NOT_CONFIGURED, _unfinished("scan", scan)
     return NOT_CONFIGURED, "no root has a finished scan yet"
 
 
-def emails_state(part: EmailPart, indexing: bool) -> tuple[str, Optional[str]]:
-    """Whether email search can answer, from the email part's settings and whether the email stage is running."""
-    if part.ready:
+def emails_state(part: EmailPart, run: Optional[Derived], first_build: Optional[Derived]) -> tuple[str, Optional[str]]:
+    """Whether email search can answer, from the email part's settings and the email run state.
+
+    ``run`` is read only when the part is not ready; ``first_build`` is the run state while this app's own
+    index has no run that finished ``ok`` (``indexer.first_build``), else ``None``.
+    """
+    if not part.ready:
+        if run is not None and run.state is RunState.RUNNING and part.roots:
+            return INDEXING, "the email index is being built"
+        return NOT_CONFIGURED, part.problem
+    if first_build is None:
         return OK, None
-    if indexing and part.roots:
-        return INDEXING, "the email index is being built"
-    return NOT_CONFIGURED, part.problem
+    if first_build.state is RunState.RUNNING:
+        return INDEXING, "the first email index is being built"
+    return NOT_CONFIGURED, _unfinished("email index run", first_build)
 
 
 def folder_hit(hit: dict[str, Any]) -> dict[str, Any]:

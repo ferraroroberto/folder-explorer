@@ -12,9 +12,9 @@ from tests.e2e._shot import settle
 
 
 def _running(base: dict[str, Any], counts: dict[str, int]) -> dict[str, Any]:
-    run = {"id": 99, "trigger": "app", "scope": "all", "status": "running", "started_at": 1_700_000_000, "finished_at": None,
+    run = {"id": 99, "trigger": "app", "scope": "all", "status": "running", "state": "running", "reason": None, "started_at": 1_700_000_000, "finished_at": None,
            "counts": counts, "message": None}
-    return dict(base, running=True, runs=[run])
+    return dict(base, running=True, state="running", reason=None, runs=[run])
 
 
 def test_a_running_index_shows_a_bar_and_counts_that_move(page: Page, app_url: str) -> None:

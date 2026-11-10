@@ -37,12 +37,12 @@ function progress(c) {
 }
 
 function runRow(r) {
-  const live = r.status === 'running';
-  const warn = r.status === 'failed' || r.status === 'interrupted';
+  const live = r.state === 'running';
+  const warn = r.state === 'failed' || r.state === 'interrupted' || r.state === 'unknown';
   const scope = r.scope === 'all' ? 'Every email folder' : shortPath(r.scope);
   return '<li class="run-row"><span class="mark' + (live ? ' is-live' : warn ? ' is-warn' : '') + '" aria-hidden="true"></span><span>' +
     '<strong>' + esc(scope + ' · ' + fmtAgo(r.started_at)) + '</strong>' +
-    esc((live ? 'Indexing now' : r.message || r.status) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) +
+    esc((live ? 'Indexing now' : r.message || r.reason || r.state) + (r.trigger === 'cli' ? ' · nightly or command line' : '')) +
     (live ? progress(r.counts || {}) : '') + '</span></li>';
 }
 
@@ -61,11 +61,13 @@ function render() {
     stat(fmtNum(body.failed), 'Failed reads', body.failed ? 'tone-danger-text' : '', body.failed ? 'failures' : '');
   $('emailScope').innerHTML = body.roots.map((r) => '<option value="' + esc(r) + '" title="' + esc(r) + '">' + esc(shortPath(r)) + '</option>').join('');
   const off = body.stage_problem;
-  $('indexEmails').disabled = !!off || body.running;
-  $('indexOne').disabled = !!off || body.running || !body.roots.length;
+  const unsure = body.state === 'unknown';
+  $('indexEmails').disabled = !!off || body.running || unsure;
+  $('indexOne').disabled = !!off || body.running || unsure || !body.roots.length;
   $('indexEmails').textContent = body.running ? 'Indexing…' : 'Index emails now';
   $('emailNote').textContent = !body.folders.length ? 'No email folders yet: add one in Settings, Email folders.'
     : !body.ready ? 'Not set up here: ' + body.problem + '.' : off ? 'Indexing is off here: ' + off + '.'
+    : unsure ? 'Cannot tell whether an index run is going: ' + body.reason + '.'
     : 'Folders, exclusions and the download limit are in Settings.';
   $('emailRuns').innerHTML = body.runs.length ? body.runs.map(runRow).join('') : '<li class="rows-note">No runs yet.</li>';
 }

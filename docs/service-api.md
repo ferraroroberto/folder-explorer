@@ -34,11 +34,23 @@ Each part's state, for a settings card or a health line. Always `state: "ok"` (t
 
 ```json
 {"schema_version": 1, "state": "ok", "reason": null,
- "folders": {"state": "ok", "reason": null, "roots": 3, "scanned": 3, "scanning": false},
- "emails": {"state": "ok", "reason": null, "count": 1234}}
+ "folders": {"state": "ok", "reason": null, "roots": 3, "scanned": 3, "scanning": false, "run": "ok"},
+ "emails": {"state": "ok", "reason": null, "count": 1234, "run": "ok"}}
 ```
 
-`roots` is the roots set up, `scanned` those with a finished scan, `scanning` whether a scan runs now (a scan in progress still answers from the last finished index). `count` is the mails in the email index.
+`roots` is the roots set up, `scanned` those with a finished scan, `scanning` whether a scan runs now (a scan in progress still answers from the last finished index). `count` is the mails in the email index. `run` is the part's run state (`idle`, `running`, `ok`, `failed`, `interrupted` or `unknown`, [run-state.md](run-state.md)): a caller reads it instead of matching the `reason` text.
+
+A part with nothing to search yet says why in `reason`, and `run` tells the cases apart:
+
+| `state` | `run` | `reason` starts |
+| --- | --- | --- |
+| `indexing` | `running` | `the first scan is running`, or `the first email index is being built` (email stays `indexing` until a run has finished `ok`, though the index file exists from the run's start) |
+| `not-configured` | `failed` | `the first scan failed: ...`, `the first email index run failed: ...` |
+| `not-configured` | `interrupted` | `the first scan did not finish: ...`, `the first email index run did not finish: ...` (the process died) |
+| `not-configured` | `unknown` | `can't tell whether the first scan is still going: ...` (the lock could not be read) |
+| `not-configured` | `idle` | `no root has a finished scan yet`: nothing has been scanned |
+
+An email index no run built (imported) or one owned by another app (`email.index_path`) is `ok` as it is.
 
 ## `GET /api/v1/search/folders`
 

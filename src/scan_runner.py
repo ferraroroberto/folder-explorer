@@ -16,7 +16,8 @@ from src import config, store
 from src.email import indexer
 from src.email.settings import email_part
 from src.roots import Root, resolve_roots
-from src.scan_lock import ScanBusy, ScanLock
+from src.run_state import Derived, derive_run_state
+from src.scan_lock import ScanBusy, ScanLock, probe_lock
 from src.scanner import exclude_keys, scan_to_index
 
 logger = logging.getLogger(__name__)
@@ -104,21 +105,43 @@ def index_emails_after(trigger: str) -> None:
     logger.info("ℹ️ email stage after the %s scan exited %d", trigger, code)
 
 
-def settle_if_idle() -> bool:
+def settle_if_idle() -> Optional[bool]:
     """Mark dead ``running`` scans interrupted, only when no scan holds the lock.
 
-    Returns whether a scan is running (the lock was busy).
+    Returns what the lock showed: ``True`` held (a scan is running), ``False`` free (stale rows settled),
+    ``None`` when the lock could not be read (nothing is settled, since a live scan cannot be ruled out).
     """
     guard = lock()
     try:
         guard.acquire()
-    except ScanBusy:
-        return True
+    except ScanBusy as exc:
+        return True if exc.held else None
+    except OSError as exc:
+        logger.warning("⚠️ the scan lock could not be read: %s", exc)
+        return None
     try:
         store.settle_interrupted()
     finally:
         guard.release()
     return False
+
+
+def scan_lock_held() -> Optional[bool]:
+    """Whether a scan holds the lock now; ``None`` when the lock could not be read."""
+    return probe_lock(lock().path)
+
+
+def scan_state(lock_held: Optional[bool]) -> Derived:
+    """Whether a scan is running, from the newest scan row and the lock observation ``lock_held``."""
+    newest = store.newest_scan()
+    return derive_run_state(newest["status"] if newest else None, newest["message"] if newest else None,
+                            lock_held, any_run=True)
+
+
+def scan_activity() -> tuple[Derived, list[dict[str, Any]]]:
+    """The scan state now, and the rows of the scan running (none unless the state is ``running``)."""
+    state = scan_state(scan_lock_held())
+    return state, store.running_scans() if state.running else []
 
 
 def start_background(root_keys: Optional[list[str]], trigger: str, on_done: Optional[Callable[[], None]] = None) -> threading.Thread:

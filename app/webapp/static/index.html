@@ -552,7 +552,15 @@
     </div>
     <div class="prose">
       <p>An <strong>Archive</strong> button on Outlook's ribbon files the selected or open mail. It starts folder-explorer's windowless archive entry with the mail's ID and returns straight away, so Outlook never waits on it.</p>
-      <p>The Archive sheet then opens in the app. If the app isn't open in a browser on this PC, a small window shows the same suggestions instead.</p>
+    </div>
+    <div class="row row-stack">
+      <div class="row-line">
+        <span>Prefer the window over the web app</span>
+        <span class="switch-slot" id="preferWindowSlot" data-track="macro-prefer-window"></span>
+      </div>
+      <p class="row-note" id="preferWindowNote"></p>
+    </div>
+    <div class="prose">
       <p>The new Outlook for Windows runs neither macros nor COM, so archiving needs Outlook (classic). Set up once per PC, in this order:</p>
     </div>
     <ol class="setup-steps">

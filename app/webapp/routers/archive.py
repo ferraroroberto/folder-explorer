@@ -330,4 +330,5 @@ def macro(request: Request) -> dict[str, Any]:
     return {
         "text": "\n".join(line for line in text.splitlines() if not line.startswith("Attribute ")).strip() + "\n",
         "setup": macro_home.setup(PROJECT_ROOT) if is_pc_itself(request) else None,
+        "prefer_window": config.load()["macro"]["prefer_window"],
     }

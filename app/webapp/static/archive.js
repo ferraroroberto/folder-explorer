@@ -11,6 +11,7 @@ import { api, getJSON, postJSON } from './api.js';
 import { mailDate } from './search-state.js';
 import { bar, esc, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { bindCodeListing } from './_vendored/code-listing/code-listing.js';
 
 const $ = (id) => document.getElementById(id);
@@ -333,12 +334,37 @@ function renderSetup(setup) {
   el.classList.toggle('is-warn', setup.state !== 'ok');
 }
 
+let preferSwitch = null;
+
+function renderPreferWindow(on) {
+  if (!preferSwitch) {
+    preferSwitch = switchEl(on, { label: 'Prefer the window over the web app', onToggle: savePreferWindow });
+    $('preferWindowSlot').appendChild(preferSwitch);
+  }
+  setSwitch(preferSwitch, on);
+  $('preferWindowNote').textContent = on
+    ? 'On: the Archive button in Outlook opens the small window, even when the app is open in a browser, and starts faster.'
+    : 'Off: the Archive button hands the mail to the app when it is open in a browser on this PC, and opens the window when it is not.';
+}
+
+async function savePreferWindow(next) {
+  try {
+    const body = await postJSON('/api/config', { macro: { prefer_window: next } });
+    renderPreferWindow(body.config.macro.prefer_window);
+  } catch (e) {
+    showToast('Could not save: ' + e.message, 'error');
+    return;
+  }
+  showToast(next ? 'Outlook Archive opens the window' : 'Outlook Archive uses the app when it is open');
+}
+
 // The variable can change while the page stays open, so the sheet asks again each time it opens.
 async function openMacro() {
   try {
     const doc = await getJSON('/api/archive/macro');
     $('macroText').textContent = doc.text;
     renderSetup(doc.setup);
+    renderPreferWindow(doc.prefer_window);
   } catch (e) {
     showToast(e.message, 'error');
     return;

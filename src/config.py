@@ -58,6 +58,9 @@ DEFAULTS: dict[str, Any] = {
     # Opening a folder on this PC: whether it shows in the foremost open File Explorer window
     # (faster, but that window loses what it showed) instead of a new one. Off by default.
     "desktop": {"reuse_explorer_window": False},
+    # The Outlook macro's Archive button: on opens the small Archive window even when a page is open
+    # (and skips the hand-off wait); off hands the mail to an open page and opens the window only without one.
+    "macro": {"prefer_window": True},
     # The archive verbs (python -m app.cli email batch): the file-name form
     # (date_prefix true, false or "auto" to follow the destination folder),
     # the longest path the archiver writes, and the folder suggester's limits.
@@ -108,6 +111,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
     cfg["explore"] = _clean_explore(raw.get("explore"))
     cfg["desktop"] = _clean_desktop(raw.get("desktop"))
+    cfg["macro"] = _clean_macro(raw.get("macro"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
@@ -197,6 +201,13 @@ def _clean_desktop(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_macro(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["macro"])
+    if isinstance(raw, dict) and isinstance(raw.get("prefer_window"), bool):
+        out["prefer_window"] = raw["prefer_window"]
+    return out
+
+
 def load() -> dict[str, Any]:
     """The effective settings: the file's valid keys over the defaults."""
     path = config_path()
@@ -241,6 +252,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             if not (isinstance(value, dict) and set(value) == {"reuse_explorer_window"}
                     and isinstance(value["reuse_explorer_window"], bool)):
                 raise ValueError("desktop takes reuse_explorer_window, true or false")
+        if key == "macro":
+            if not (isinstance(value, dict) and set(value) == {"prefer_window"} and isinstance(value["prefer_window"], bool)):
+                raise ValueError("macro takes prefer_window, true or false")
         out[key] = value
     return out
 

@@ -1,9 +1,10 @@
 """``python -m app.outlook``: the Outlook bridge, each verb in its own process with its own COM apartment.
 
     pythonw -m app.outlook archive --entry-id <id> --store-id <id>
-        the Outlook macro's entry, fire and forget: reads the mail, then hands it to the
-        Archive sheet of an app open on this PC, or shows the same suggestions in a small
-        window when no page is open
+        the Outlook macro's entry, fire and forget: reads the mail, then shows the same
+        suggestions in a small window (``macro.prefer_window``, on by default), or, with that
+        off, hands it to the Archive sheet of an app open on this PC and opens the window
+        only when no page is open
     python -m app.outlook prepare --current [--defer-ranking]
     python -m app.outlook prepare --entry-id <id> --store-id <id> [--defer-ranking]
         the Archive sheet's opening document for the open or selected mail, or for one mail;
@@ -217,7 +218,7 @@ def _post_json(url: str, doc: dict[str, Any], timeout: float) -> tuple[int, dict
 
 
 def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[StageTimer] = None) -> int:
-    """The macro's entry: the sheet in the app when a page is open, otherwise the fallback window.
+    """The macro's entry: the window when ``macro.prefer_window`` is on, else the sheet in an open page, else the window.
 
     The mail goes out before any ranking: the app's page shows it at once and the server ranks
     it with its warm index; the window shows it at once and ranks in the background.
@@ -225,11 +226,15 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[S
     timer = timer or StageTimer("archive")
     with _apartment():
         doc = _guarded(lambda: prepare(cfg, entry_id, store_id, defer_ranking=True, timer=timer))
-        shown = hand_to_page(dict(doc, from_macro=True), cfg)
-        timer.mark("handoff")
-        if shown:
-            timer.log(logger)
-            return EXIT_OK
+        if cfg["macro"]["prefer_window"]:
+            # No hand-off: a page never sees the mail, and the entry skips the wait for the app's answer.
+            logger.info("ℹ️ archive: the window opens because macro.prefer_window is on")
+        else:
+            shown = hand_to_page(dict(doc, from_macro=True), cfg)
+            timer.mark("handoff")
+            if shown:
+                timer.log(logger)
+                return EXIT_OK
         from app.webapp.state import EMAIL_FOLDER_HITS, email_folder_hits  # noqa: PLC0415 - only the window searches here
         from src.archive_window import show_window  # noqa: PLC0415 - tkinter only when no page is open
 

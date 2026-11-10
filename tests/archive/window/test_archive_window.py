@@ -280,7 +280,7 @@ def test_find_a_folder_lists_the_email_folders_first_and_greys_the_others(window
     _type(view, "int")
     assert [f.name for f in view.finder.found()] == ["Internal", "Internal notes"]
     shown = _texts(view.found)
-    assert shown.count(OUTSIDE) == 1 and "2 folders" in shown and ARCHIVE_HERE in shown
+    assert shown.count(OUTSIDE) == 1 and "2 folders" in shown and ARCHIVE_HERE in _texts(view.actions)
     assert str(view.here_button.cget("state")) == "normal"
     view._move(1)
     assert str(view.here_button.cget("state")) == "disabled"

@@ -39,7 +39,7 @@ folder-explorer/
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's Archive window (Tk), shown by default or when no page is open on this PC: model (what each
 │   │                           #   control shows and does, no Tk), finder (Find a folder: Quick search's folder search, browsing,
-│   │                           #   which folders can take the mail; no Tk), theme (the app's tokens.css), view (the widgets)
+│   │                           #   which folders can take the mail; no Tk), theme (the app's tokens.css), work_area (the monitor's work area), view (the widgets; keeps the window and its buttons inside the work area)
 │   ├── search_window/          # the tray's Quick search window (Tk): model (rows and states, no Tk), client (the web app's
 │   │                           #   local API, its only source), view (the widgets, the archive window's theme)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)

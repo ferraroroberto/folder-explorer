@@ -13,7 +13,17 @@ from dataclasses import dataclass
 from typing import Any, Optional, Protocol
 
 from src.email.settings import under_any
-from src.search_window.model import FOLDERS, HINTS, Answer, FolderSource, Row, Status, fetch, folder_row, plain
+from src.search_window.model import (
+    FOLDERS,
+    HINTS,
+    Answer,
+    FolderSource,
+    Row,
+    Status,
+    fetch,
+    folder_row,
+    plain,
+)
 
 logger = logging.getLogger(__name__)
 

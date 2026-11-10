@@ -10,7 +10,12 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.webapp.state import LocalFolders, email_folder_hits, folder_children, folder_hits
+from app.webapp.state import (
+    LocalFolders,
+    email_folder_hits,
+    folder_children,
+    folder_hits,
+)
 from src import config
 from src.archive_window.finder import NO_SUBFOLDERS, ROWS_SHOWN, Finder
 from src.search_window.model import FOLDERS, Status, fetch

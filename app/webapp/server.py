@@ -26,6 +26,7 @@ from app.webapp import auth
 from app.webapp.build import BUILD_INFO, STATIC_DIR
 from app.webapp.routers import (
     archive,
+    archive_v1,
     browse,
     emails,
     scans,
@@ -107,6 +108,7 @@ def create_app() -> FastAPI:
     app.include_router(scans.router)
     app.include_router(search.router)
     app.include_router(search_v1.router)
+    app.include_router(archive_v1.router)
     app.include_router(emails.router)
     app.include_router(archive.router)
     # Local-only view/tap log, under the same sign-in rule as every other route.

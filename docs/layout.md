@@ -25,7 +25,8 @@ folder-explorer/
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
-│       │                       #   versioned search API other apps call, docs/service-api.md)
+│       │                       #   versioned search API other apps call, docs/service-api.md), archive_v1 (the archive
+│       │                       #   verbs over HTTP, each run as the CLI's child)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
@@ -33,6 +34,7 @@ folder-explorer/
 │   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
 │   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
 │   ├── search_api.py           # the v1 search contract: its states, hit shapes and the page link
+│   ├── archive_api.py          # the v1 archive contract: outcomes, acknowledged vs confirmed, the envelope
 │   ├── this_pc.py              # is a client address one of this machine's own addresses (the PC through its tailnet name)
 │   ├── stage_timer.py          # per-stage millisecond breadcrumbs (the macro's entry, the ranking) and the process's age
 │   ├── archive_window/         # the macro's fallback Archive window (Tk) when no page is open on this PC: model (what each
@@ -71,7 +73,7 @@ folder-explorer/
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, scanning.md, service-api.md (the v1 search API), and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, scanning.md, service-api.md (the v1 search and archive API), and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

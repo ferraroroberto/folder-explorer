@@ -1,4 +1,4 @@
-"""The Settings sheet: remote access, the schedule and the download budget, then the folder lists (add and remove a scan root and an email folder, a refusal), and Scans without settings."""
+"""The Settings sheet: remote access, the schedule and the download budget, then the folder lists (add and remove a scan root and an email folder, a refusal), Scans without settings, and the tray-click switch."""
 
 from __future__ import annotations
 
@@ -92,3 +92,26 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
     _remove(page, roots, str(extra))
     expect(roots.locator(".action-row")).to_have_count(before)
     expect(roots.locator(".folder-error")).to_be_empty()
+
+
+def test_the_tray_click_switch_saves_with_a_toast_and_says_what_a_click_opens(page: Page, app_url: str) -> None:
+    if app_url.endswith(":%d" % LIVE_PORT):
+        pytest.skip("the switch writes the settings: never on the live app")
+    page.goto(app_url + "/")
+    page.locator("#paneSearch .home-settings").click()
+    sheet = page.locator("#settingsDialog")
+    expect(sheet).to_be_visible()
+    tray = sheet.locator("#trayClickSlot [role=switch]")
+    expect(tray).to_have_attribute("aria-checked", "true")
+    expect(sheet.locator("#trayClickNote")).to_contain_text("opens the small Quick search window")
+    try:
+        tray.click()
+        expect(tray).to_have_attribute("aria-checked", "false")
+        expect(page.locator(".toast")).to_contain_text("Tray click opens the app")
+        expect(sheet.locator("#trayClickNote")).to_contain_text("Quick search stays in the tray menu")
+        assert page.request.get(app_url + "/api/config").json()["config"]["tray"] == {"left_click": "open_app"}
+        tray.click()
+        expect(tray).to_have_attribute("aria-checked", "true")
+        expect(page.locator(".toast")).to_contain_text("Tray click opens Quick search")
+    finally:
+        page.request.post(app_url + "/api/config", data={"tray": {"left_click": "quick_search"}})

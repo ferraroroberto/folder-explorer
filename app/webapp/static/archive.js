@@ -22,7 +22,7 @@ const PENDING_WAIT_S = 20;
 const HELD_MS = 1000;
 // How long a page waits before asking again when it can't hold a poll open (hidden, an error, a quick answer).
 const PENDING_MS = 3000;
-// How long typing in "Another email folder" pauses before it searches.
+// How long typing in "Find a folder" pauses before it searches.
 const DEBOUNCE_MS = 200;
 // Below this blended score a suggestion is a weak guess, and its % chip says so.
 const WEAK_SCORE = 0.35;
@@ -33,7 +33,7 @@ const A = {
   doc: null, // the prepared mail, as /api/archive/current or the hand-off gives it
   fromMacro: false,
   choice: 0,
-  extra: null, // a folder picked from "Another email folder"
+  extra: null, // a folder picked from "Find a folder"
   category: '',
   copy: false, // the user asked for another copy of a mail that is already archived
   datePrefix: 'auto', // auto (the folder's own form), on or off
@@ -42,7 +42,12 @@ const A = {
   opening: false,
   error: null,
   lastFiled: '',
-  found: [], // the last "Another email folder" answer
+  query: '', // what "Find a folder" holds
+  found: null, // its last answer: {folders, total}, or null before a search
+  trail: [], // the folders stepped into from it: {name, folders, total}, the last one listed
+  sel: -1, // the listed folder the actions apply to
+  stepping: false, // the server is listing a folder's subfolders
+  foundNote: '', // why the list could not be filled, said in its place
   reading: false, // the server is asking Windows for the front File Explorer folder
   explorerError: null, // why the Explorer folder could not be offered: {title, message}
 };
@@ -57,6 +62,7 @@ const EXPLORER_TITLES = {
 let pollTimer = null;
 let polling = false; // a hand-off poll is in flight
 let searchTimer = null;
+let searchSeq = 0; // the newest search or step in; an older answer arriving late is dropped
 
 const lastTwo = (path) => (path || '').split(/[\\/]/).filter(Boolean).slice(-2).join('\\');
 
@@ -180,8 +186,9 @@ function renderArchive() {
       : d.ranking ? '<p class="row-note" id="archRanking">Finding folders…</p>'
         : '<p class="row-note">No folder matches this mail yet. Find one below.</p>') +
     '<div class="arch-other"><label class="search-field">' + glyph('search') +
-    '<input type="search" id="archSearch" placeholder="Another email folder" aria-label="Find another email folder" autocomplete="off" spellcheck="false" data-track="archive-search"></label>' +
-    '<ul class="arch-found" id="archFound"></ul>' +
+    '<input type="search" id="archSearch" placeholder="Find a folder" aria-label="Find a folder" autocomplete="off" spellcheck="false" value="' + esc(A.query) +
+    '" data-track="archive-search"></label>' +
+    '<ul class="arch-found" id="archFound">' + foundHtml() + '</ul>' +
     '<button type="button" class="button-surface" id="archExplorer" title="Use the folder open in the front File Explorer window"' + (A.reading ? ' disabled' : '') +
     ' data-track="archive-explorer">' + glyph('folder-open') + (A.reading ? 'Reading File Explorer…' : 'Current Explorer folder') + '</button>' +
     (A.explorerError ? errorBlock(A.explorerError.title, A.explorerError.message, false) : '') + '</div>' +
@@ -210,6 +217,13 @@ function showSheet(doc, fromMacro) {
   A.busy = false;
   A.reading = false;
   A.explorerError = null;
+  A.query = '';
+  A.found = null;
+  A.trail = [];
+  A.sel = -1;
+  A.stepping = false;
+  A.foundNote = '';
+  searchSeq++;
   A.category = doc.ok ? doc.category || '' : '';
   renderArchive();
   if (!$('archiveDialog').open) $('archiveDialog').showModal();
@@ -267,27 +281,119 @@ async function openFolder(o) {
   }
 }
 
-async function findFolders(q) {
-  const list = $('archFound');
-  if (!list) return;
-  if (!q.trim()) { list.innerHTML = ''; return; }
-  let found = [];
-  try {
-    found = (await getJSON('/api/archive/folders?q=' + encodeURIComponent(q))).folders;
-  } catch (e) {
-    list.innerHTML = '<li><p class="row-note">' + esc(e.message) + '</p></li>';
-    return;
+/** The folders listed now: the last one stepped into, else the search's own. */
+const listed = () => (A.trail.length ? A.trail[A.trail.length - 1] : A.found) || { folders: [], total: 0 };
+
+/** The list under the search box: the breadcrumb while stepped in, the folders, and the actions for the selected one. */
+function foundHtml() {
+  // Nothing to say before the first answer: a hint of "no match" while the search is still out would be wrong.
+  if (!A.trail.length && (!A.query.trim() || (!A.found && !A.foundNote))) return '';
+  const { folders, total } = listed();
+  const out = [];
+  if (A.trail.length) {
+    out.push('<li class="arch-crumb"><button type="button" class="icon-button" id="archBack" aria-label="Back" title="Back" data-track="archive-back">' + glyph('chevron-left') +
+      '</button><span class="arch-crumb-path">' + esc(A.trail.map((l) => l.name).join(' › ')) + '</span></li>');
   }
-  if ($('archSearch') && $('archSearch').value !== q) return;
-  A.found = found;
-  list.innerHTML = found.length ? found.map((f, i) => '<li><button type="button" data-found="' + i + '" data-track="archive-found">' + esc(underRoot(f.path)) + '</button></li>').join('')
-    : '<li><p class="row-note">No email folder matches every word.</p></li>';
+  const note = A.foundNote || (folders.length ? '' : A.trail.length ? 'No subfolders.' : 'No folder matches every word.');
+  if (note) out.push('<li><p class="row-note' + (A.foundNote ? ' tone-danger-text' : '') + '">' + esc(note) + '</p></li>');
+  folders.forEach((f, i) => {
+    out.push('<li class="arch-found-row"><button type="button" class="arch-pick' + (f.fileable ? '' : ' is-outside') + '" data-found="' + i + '" aria-pressed="' + (i === A.sel) +
+      '" data-track="archive-found"><span class="ao-name">' + esc(f.name) + '</span>' + (f.fileable ? '' : '<span class="chip">Outside the email folders</span>') +
+      '<span class="ao-path">' + esc(underRoot(f.path)) + '</span></button>' +
+      '<button type="button" class="icon-button" data-step="' + i + '" aria-label="Subfolders of ' + esc(f.name) + '" title="Subfolders"' + (A.stepping ? ' disabled' : '') +
+      ' data-track="archive-step-in">' + glyph('chevron-right') + '</button></li>');
+  });
+  if (total > folders.length) out.push('<li><p class="row-note">' + plural(total, 'folder') + ', first ' + folders.length + ' shown</p></li>');
+  const here = folders[A.sel];
+  if (here) {
+    out.push('<li class="arch-found-actions"><button type="button" class="button-tint" id="archHere" data-track="archive-here"' +
+      (here.fileable && !A.busy ? '' : ' disabled') + '>Archive here</button>' +
+      '<button type="button" class="button-surface" id="archFoundOpen" data-track="archive-found-open">' + glyph('folder-open') + 'Open in File Explorer</button></li>');
+    if (!here.fileable) out.push('<li><p class="row-note">Outside the email folders: pick a folder inside them to archive.</p></li>');
+  }
+  return out.join('');
 }
 
-function pickFound(f) {
-  A.extra = { folder_path: f.path, why: [{ label: 'Chosen', tone: '' }], note: 'picked from the folder index', saved_as: null, location: f.location };
-  A.choice = 0;
+async function findFolders(q) {
+  const seq = ++searchSeq;
+  A.query = q;
+  A.trail = [];
+  A.sel = -1;
+  A.foundNote = '';
+  A.stepping = false;
+  if (!q.trim()) {
+    A.found = null;
+    paintFound();
+    return;
+  }
+  try {
+    const found = await getJSON('/api/archive/folders?q=' + encodeURIComponent(q));
+    if (seq !== searchSeq) return;
+    A.found = found;
+  } catch (e) {
+    if (seq !== searchSeq) return;
+    A.found = null;
+    A.foundNote = e.message;
+  }
+  paintFound();
+}
+
+/** Repaint only the folder list, so typing in the box and its focus are left alone. */
+function paintFound() {
+  const list = $('archFound');
+  if (list) list.innerHTML = foundHtml();
+}
+
+/** Step into a listed folder's subfolders: the server looks it up by its place in the scan. */
+async function stepIn(i) {
+  const f = listed().folders[i];
+  if (!f || A.stepping) return;
+  const seq = ++searchSeq;
+  A.stepping = true;
+  paintFound();
+  const place = f.location;
+  try {
+    const r = await getJSON('/api/archive/subfolders?root=' + encodeURIComponent(place.root) + '&scan_id=' + place.scan_id + '&id=' + place.id);
+    if (seq !== searchSeq) return;
+    A.trail.push({ name: f.name, folders: r.folders, total: r.total });
+    A.sel = -1;
+    A.foundNote = '';
+  } catch (e) {
+    if (seq !== searchSeq) return;
+    A.foundNote = e.message;
+  }
+  A.stepping = false;
+  paintFound();
+}
+
+function stepBack() {
+  if (!A.trail.length) return;
+  searchSeq++;
+  A.stepping = false;
+  A.trail.pop();
+  A.sel = -1;
+  A.foundNote = '';
+  paintFound();
+}
+
+/** Select a listed folder; one a mail can go in also becomes the chosen folder, which the button below names. */
+function pickFound(i) {
+  const f = listed().folders[i];
+  if (!f) return;
+  A.sel = i;
+  if (f.fileable) {
+    A.extra = { folder_path: f.path, why: [{ label: 'Chosen', tone: '' }], note: 'picked from the folder index', saved_as: null, location: f.location };
+    A.choice = 0;
+  }
   renderArchive();
+}
+
+/** File the mail in the selected folder at once, with the sheet's category, copy and date-prefix choices. */
+function archiveHere() {
+  const f = listed().folders[A.sel];
+  if (!f || !f.fileable || A.busy) return;
+  pickFound(A.sel);
+  doArchive();
 }
 
 /** Offer the folder open in the front File Explorer window; the full path is shown with it and the user still presses Archive. */
@@ -382,15 +488,11 @@ function takeHandoff(doc) {
   }
   // The user closed the sheet before the folders came: leave it closed.
   if (!$('archiveDialog').open) return;
-  // Keep what the user already typed in "Another email folder" across the repaint.
-  const search = $('archSearch');
-  const typed = search ? search.value : '';
-  const focused = search && document.activeElement === search;
+  // The box and the list are drawn from A.query and the folders found, so only the focus needs keeping.
+  const focused = document.activeElement === $('archSearch');
   A.doc = doc;
   renderArchive();
-  const again = $('archSearch');
-  if (again && typed) again.value = typed;
-  if (again && focused) again.focus();
+  if (focused) $('archSearch').focus();
 }
 
 async function pollPending() {
@@ -440,13 +542,18 @@ export function initArchive() {
     else if (el.id === 'rankInfo') $('rankNote').hidden = !$('rankNote').hidden;
     else if (el.dataset.openChoice) openFolder(options()[Number(el.dataset.openChoice)]);
     else if (el.dataset.date) { A.datePrefix = el.dataset.date; renderArchive(); }
-    else if (el.dataset.found) pickFound(A.found[Number(el.dataset.found)]);
+    else if (el.dataset.found) pickFound(Number(el.dataset.found));
+    else if (el.dataset.step) stepIn(Number(el.dataset.step));
+    else if (el.id === 'archBack') stepBack();
+    else if (el.id === 'archHere') archiveHere();
+    else if (el.id === 'archFoundOpen') openFolder(listed().folders[A.sel]);
     else if (el.id === 'archExplorer') useExplorerFolder();
     else if (el.id === 'archRetry') { $('archiveDialog').close(); openArchive(); }
     else if (el.id === 'archMacro') openMacro();
   });
   body.addEventListener('input', (ev) => {
     if (ev.target.id !== 'archSearch') return;
+    A.query = ev.target.value;
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => findFolders(ev.target.value), DEBOUNCE_MS);
   });

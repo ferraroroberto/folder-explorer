@@ -12,7 +12,13 @@ import requests
 from src.archive_window import theme
 from src.search_window import QuickSearch
 from src.search_window.client import UNREACHABLE, SearchClient
-from src.search_window.model import EMAILS, MARK_END, MARK_START, QuickSearchModel, Status
+from src.search_window.model import (
+    EMAILS,
+    MARK_END,
+    MARK_START,
+    QuickSearchModel,
+    Status,
+)
 from src.search_window.view import QuickSearchView
 
 

@@ -13,9 +13,26 @@ import threading
 import tkinter as tk
 from typing import Callable, Optional
 
-from src.archive_window.theme import FONT, MONO, SIZE_BODY, SIZE_CAPTION, SIZE_SMALL, SPACE_MD, SPACE_SM, Palette
+from src.archive_window.theme import (
+    FONT,
+    MONO,
+    SIZE_BODY,
+    SIZE_CAPTION,
+    SIZE_SMALL,
+    SPACE_MD,
+    SPACE_SM,
+    Palette,
+)
 from src.archive_window.view import Segmented
-from src.search_window.model import TABS, Answer, QuickSearchModel, Row, Segments, Status, fetch
+from src.search_window.model import (
+    TABS,
+    Answer,
+    QuickSearchModel,
+    Row,
+    Segments,
+    Status,
+    fetch,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -22,6 +22,8 @@ from src import config
 from src.search_window.client import UNREACHABLE, ApiError, SearchClient, Unreachable
 from src.search_window.model import (
     EMAILS as EMAIL_TAB,
+)
+from src.search_window.model import (
     EMPTY,
     FOLDERS,
     HINTS,

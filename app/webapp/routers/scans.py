@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 from app.webapp.state import refresh_pool
 from src import config, scan_runner, store
 from src.roots import Root, resolve_roots
-from src.scan_lock import ScanBusy, is_locked
+from src.run_state import RunState, derive_run_state
+from src.scan_lock import ScanBusy
 
 router = APIRouter(prefix="/api")
 
@@ -23,27 +24,30 @@ def _pick(row: Optional[dict[str, Any]], fields: tuple[str, ...]) -> Optional[di
     return {k: row[k] for k in fields} if row else None
 
 
-def describe_root(root: Root) -> dict[str, Any]:
+def describe_root(root: Root, lock_held: Optional[bool]) -> dict[str, Any]:
     current = store.current_index(root.key)
     latest = store.latest_scan(root.key)
-    running = latest if latest and latest["status"] == store.STATUS_RUNNING else None
+    derived = derive_run_state(latest["status"] if latest else None, latest["message"] if latest else None, lock_held)
+    running = latest if derived.state is RunState.RUNNING else None
     # The last attempt failed or stopped, so the index shown is older than it.
-    failed = latest if latest and latest["status"] in (store.STATUS_FAILED, store.STATUS_INTERRUPTED) else None
+    failed = latest if derived.state in (RunState.FAILED, RunState.INTERRUPTED) else None
     return {
         **root.as_dict(),
         "exists": os.path.isdir(root.path),
         "current": _pick(current, _RESULT_FIELDS),
         "running": _pick(running, _RESULT_FIELDS),
-        "failed": {"status": failed["status"], "message": failed["message"], "at": failed["finished_at"]} if failed else None,
+        "failed": {"status": derived.state.value, "message": derived.reason, "at": failed["finished_at"]} if failed else None,
+        **derived.as_dict(),
     }
 
 
 @router.get("/roots")
 def roots() -> dict[str, Any]:
     resolved = resolve_roots(config.load()["roots"])
-    scanning = scan_runner.settle_if_idle()
+    held = scan_runner.settle_if_idle()
+    scan = scan_runner.scan_state(held)
     refresh_pool(resolved)
-    return {"roots": [describe_root(r) for r in resolved], "scanning": scanning}
+    return {"roots": [describe_root(r, held) for r in resolved], "scanning": scan.running, **scan.as_dict()}
 
 
 @router.post("/scan")
@@ -63,5 +67,5 @@ def start_scan(body: Optional[dict[str, Any]] = Body(default=None)) -> JSONRespo
 
 @router.get("/scan")
 def scan_progress() -> dict[str, Any]:
-    running = [_pick(r, _RESULT_FIELDS + ("root_key",)) for r in store.running_scans()]
-    return {"scanning": is_locked(scan_runner.lock().path), "running": running}
+    scan, rows = scan_runner.scan_activity()
+    return {"scanning": scan.running, "running": [_pick(r, _RESULT_FIELDS + ("root_key",)) for r in rows], **scan.as_dict()}

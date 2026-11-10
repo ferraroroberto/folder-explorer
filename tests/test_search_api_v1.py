@@ -11,7 +11,8 @@ from fastapi.testclient import TestClient
 from app.webapp.routers import search_v1
 from app.webapp.server import app
 from app.webapp.state import EMAILS
-from src import search_api
+from src import scan_runner, search_api
+from src.email import indexer
 from src.email.query import compile_query
 from tests.conftest import write_config
 from tests.email_fixture import build_email_index
@@ -57,10 +58,8 @@ def test_not_configured_is_a_state_never_an_empty_result(isolated: Path) -> None
 def test_a_first_index_being_built_reads_indexing(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = build_tree(isolated / "Invented drive")
     write_config(isolated, roots=[str(root)], email={"index_path": str(isolated / "missing.db"), "roots": [str(root)]})
-    monkeypatch.setattr(search_v1, "_scanning", lambda: True)
-    monkeypatch.setattr(search_v1.indexer, "is_running", lambda: True)
     EMAILS.close()
-    with TestClient(app, client=LOCAL) as c:
+    with TestClient(app, client=LOCAL) as c, scan_runner.lock(), indexer.lock():
         folders = c.get("/api/v1/search/folders", params={"q": "garden"})
         assert folders.status_code == 503 and folders.json()["state"] == "indexing"
         emails = c.get("/api/v1/search/emails", params={"q": "budget"})
@@ -70,8 +69,8 @@ def test_a_first_index_being_built_reads_indexing(isolated: Path, monkeypatch: p
 def test_folders_answer_in_the_documented_shape(drive: Path) -> None:
     with TestClient(app, client=LOCAL) as c:
         status = c.get("/api/v1/search/status").json()
-        assert status["folders"] == {"state": "ok", "reason": None, "roots": 1, "scanned": 1, "scanning": False}
-        assert status["emails"] == {"state": "ok", "reason": None, "count": 5}
+        assert status["folders"] == {"state": "ok", "reason": None, "roots": 1, "scanned": 1, "scanning": False, "run": "ok"}
+        assert status["emails"] == {"state": "ok", "reason": None, "count": 5, "run": "idle"}
         body = c.get("/api/v1/search/folders", params={"q": "garden"}).json()
         assert set(body) == STATE_KEYS | {"query", "results", "total", "truncated", "needs_rescan", "missing", "page"}
         assert body["state"] == "ok" and body["page"] == "/#search?mode=folders&q=garden"

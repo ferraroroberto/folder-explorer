@@ -41,6 +41,14 @@ reason = "Add beside a folder path field is a utility button at the field's heig
 rule   = "COMP-16"
 reason = "The Settings sheet has no footer commit: Add saves a folder as it is added, and it stays the same height as the field beside it, so the larger Show macro button is not a rival to a commit"
 
+# Whether a scan or an email run is running, finished, failed or died: one derive function over the
+# run row and its lock (docs/run-state.md). tests/test_run_state.py carries the transition proof.
+[[state_machines]]
+name   = "run-state"
+module = "src/run_state.py"
+type   = "RunState"
+derive = "derive_run_state"
+
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]

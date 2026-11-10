@@ -58,7 +58,8 @@ folder-explorer/
 │   ├── index.py                # every query over an index, and the open-index pool
 │   ├── store.py                # scan history and current index per root (state.sqlite3)
 │   ├── scan_runner.py          # one-at-a-time scan runs, the background worker and the schedule
-│   ├── scan_lock.py            # the cross-process scan lock
+│   ├── scan_lock.py            # the cross-process scan lock and its free / held / unreadable probe
+│   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
 │   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
 │   ├── config.py               # config.json with defaults and validation
 │   ├── atomic_write.py         # the one atomic text writer (config.json, .env): unique temp, cleanup on failure; swap_in renames a built file

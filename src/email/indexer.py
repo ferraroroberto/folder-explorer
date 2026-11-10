@@ -27,7 +27,8 @@ from src.email.stage import Reader, Stage
 from src.index import Index, open_index
 from src.no_window import NO_WINDOW
 from src.roots import Root, resolve_roots
-from src.scan_lock import ScanBusy, ScanLock, is_locked
+from src.run_state import Derived, derive_run_state
+from src.scan_lock import ScanBusy, ScanLock, probe_lock
 from src.scanner import exclude_keys
 
 logger = logging.getLogger(__name__)
@@ -120,8 +121,38 @@ def summary(counts: dict[str, int]) -> str:
     return text
 
 
-def is_running() -> bool:
-    return is_locked(store.data_dir() / "email.lock")
+def email_state(held: Optional[bool]) -> Derived:
+    """Whether an email run is running, from the newest run row and the lock observation ``held``."""
+    [newest] = store.email_runs(1) or [None]
+    return derive_run_state(newest["status"] if newest else None, newest["message"] if newest else None,
+                            held, any_run=True)
+
+
+def lock_held() -> Optional[bool]:
+    """Whether an email run holds the lock now; ``None`` when the lock could not be read."""
+    return probe_lock(lock().path)
+
+
+def activity() -> Derived:
+    """The email run state now: the newest run row read against the email lock."""
+    return email_state(lock_held())
+
+
+def history(limit: int, held: Optional[bool]) -> list[dict[str, Any]]:
+    """The newest runs first, each with the ``state`` and ``reason`` its row and the lock ``held`` give."""
+    return [{**r, **derive_run_state(r["status"], r["message"], held).as_dict()} for r in store.email_runs(limit)]
+
+
+def first_build(own: bool) -> Optional[Derived]:
+    """The run state while this app's own index has been started but no run has finished ``ok``; else ``None``.
+
+    The index file exists from the first run's start, so its presence says nothing about whether it is
+    complete. An index no run built (imported) or one owned by another app is taken as it is.
+    """
+    if not own:
+        return None
+    recorded, finished_ok = store.email_history()
+    return activity() if recorded and not finished_ok else None
 
 
 def spawn(trigger: str, scope: Optional[str] = None, fresh: bool = False) -> "subprocess.Popen[bytes]":

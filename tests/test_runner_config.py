@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from src import config, roots, scan_runner, store
-from src.scan_lock import ScanBusy, ScanLock, is_locked
+from src.scan_lock import ScanBusy, ScanLock, probe_lock
 from tests.conftest import write_config
 from tests.fixture_tree import FILES, build_tree
 
@@ -56,13 +56,13 @@ def test_a_prune_mid_rescan_keeps_the_index_being_finished(isolated: Path, monke
 def test_second_scan_is_refused_while_the_lock_is_held(isolated: Path) -> None:
     write_config(isolated, roots=[str(build_tree(isolated / "Invented"))])
     with ScanLock(scan_runner.lock().path):
-        assert is_locked(scan_runner.lock().path)
+        assert probe_lock(scan_runner.lock().path) is True
         with pytest.raises(ScanBusy):
             scan_runner.run_scans()
         with pytest.raises(ScanBusy):
             scan_runner.start_background(None, "app")
         assert scan_runner.settle_if_idle() is True
-    assert not is_locked(scan_runner.lock().path)
+    assert probe_lock(scan_runner.lock().path) is False
 
 
 def test_unknown_root_key_is_rejected(isolated: Path) -> None:

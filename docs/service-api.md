@@ -1,15 +1,15 @@
-# Search API (v1)
+# Service API (v1)
 
-folder-explorer is the fleet's one folder and email search. Another app on this PC calls it over HTTP instead of keeping its own index. The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them.
+folder-explorer is the fleet's one folder and email search and its one archive. Another app on this PC calls it over HTTP instead of keeping its own index or spawning its CLI. Search comes first; the archive verbs follow it, under [Archive](#archive). The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them.
 
 ## Calling it
 
 - Base: `http(s)://127.0.0.1:8453` (HTTPS when remote access is on; the certificate names the tailnet host, so a loopback caller skips verification or calls the tailnet name).
 - A caller on this PC (loopback, or this PC's own tailnet or LAN address) needs no sign-in. Any other device sends `Authorization: Bearer <token>` from `/api/login`, like the page.
-- Every route is a read: none writes the index, the email database or a user file.
-- folder-explorer down shows as a failed request (connection refused, timeout). An answer always says which case it is through `state`; an empty list with `state: "ok"` really is "no match".
+- The search routes are reads: none writes the index, the email database or a user file. The archive routes write, and answer a caller on this PC only.
+- folder-explorer down shows as a failed request (connection refused, timeout). A search answer always says which case it is through `state`; an empty list with `state: "ok"` really is "no match".
 
-## The envelope
+## The search envelope
 
 Every answer is one JSON object that starts with:
 
@@ -101,3 +101,61 @@ Relevance is `bm25(emails_fts, 10, 3, 3, 1)` (subject, sender, recipients, previ
 | `attachments`, `size` | the attachment count and bytes, or `null` on an index without those fields |
 
 `notes` lists operators the index has no field for (left out, never faked) and a query the index refused. A caller wanting a mail's full text or an Outlook action uses this app's page, through `page`.
+
+
+## Archive
+
+`src/archive_api.py` owns the outcomes and the envelope; `tests/archive/api/test_archive_api_v1.py` pins them.
+
+Each route runs the CLI's own verb (`python -m app.cli email batch <verb>`, or `email index`) as a windowless child with a timeout, so the semantics are the CLI's (`app/cli/email_batch.py`) and an Outlook dialog hangs that child, never the server. One Outlook verb runs at a time; a second call while one runs answers `busy`. The routes answer a caller on this PC only (anything else is `not_this_pc`, 403), and an instance started with `FOLDER_EXPLORER_OUTLOOK=off` refuses them (`outlook_off`, 503). Bodies are JSON; an unknown field or a value out of range answers 422 (FastAPI's validation body, no envelope) before any child runs.
+
+### The answer
+
+Every route answers one object:
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version` | `1` |
+| `verb` | `plan`, `apply`, `revert` or `index` |
+| `outcome` | `done`, `not-found`, `refused` or `error` |
+| `code` | why the outcome is not `done`, else `null`: the archiver's own error code (`bad_input`, `mailbox_unknown`, `outlook_unavailable`, `run_failed`, a mail's `not_in_inbox`, …) or this API's (below) |
+| `reason` | the same in plain text, else `null` |
+| `acknowledged` | the archiver answered with its document, so the call was received and ran to its end |
+| `confirmed` | `apply` / `revert`: the `message_id` of every mail whose own result is `ok` |
+| `failed` | `apply` / `revert`: `{message_id, code}` of every mail that is not |
+| `result` | the archiver's own document, unchanged (`mails`, `results`, `renumbered`, …), or `null` when it gave none |
+
+Acknowledged and confirmed are separate on purpose. `acknowledged: true` says the verb ran; a mail is filed only when it is in `confirmed`. `acknowledged: false` (`timeout`, `no_answer`, `spawn_failed`, `schema_mismatch`) says nobody can tell what was written: `plan` again before retrying, never assume either way. After an `apply`, `POST /api/v1/archive/index` for each folder filed into is what confirms the email index holds the new mails.
+
+| `outcome` | HTTP | When |
+| --- | --- | --- |
+| `done` | 200 | the verb ran and every mail in it is confirmed (a `plan` is `done` when it listed) |
+| `not-found` | 404 | what the call named is not there: an unknown mailbox (`mailbox_unknown`, `mailbox_not_in_outlook`), a `plan` that named only mails the folder does not hold, an `apply` / `revert` whose every mail is not where the verb looks (`not_in_inbox`, `not_in_sent`, `not_in_archive_folder`) |
+| `refused` | 422 / 503 / 409 / 403 | declined before anything was touched: `bad_input` (422), the archiver cannot start (`config_missing`, `mailbox_registry_invalid`, `outlook_unavailable`, `com_unavailable`, `outlook_off`: 503), `busy` (409), `not_this_pc` (403) |
+| `error` | 207 / 502 / 504 / 500 | it ran and did not end well: `partial` (207, some mails confirmed, the rest in `failed`), `failed` (502, none confirmed), `timeout` (504), `no_answer` / `spawn_failed` / `schema_mismatch` (502), `run_failed` or an unknown code (500, the walk broke part-way: mails may be filed, plan again) |
+
+### `POST /api/v1/archive/plan`
+
+Ranks archive folders for the mails of the Inbox, or of Sent Items. `result` is the CLI's plan document.
+
+| Field | Default | |
+| --- | --- | --- |
+| `candidates` | 10 | ranked folders per mail, 0 to 100; 0 lists the mails with no ranking |
+| `message_ids` | `[]` | plan only these mails, looked up by Internet Message-ID |
+| `since` | none | local time, `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM` |
+| `search` | `[]` | text the subject, sender, recipients or preview must hold; all must match |
+| `ref` | none | only the mail stamped with this `X-Archive-Ref` |
+| `folder` | `inbox` | or `sent` |
+| `mailbox` | registry default | an alias of `mailboxes.json` |
+
+### `POST /api/v1/archive/apply`
+
+Files each decided mail: writes its `.msg` into the folder, moves it out of the Inbox and tags it. Body: `decisions` (the CLI's list of `{message_id, folder_path, date_prefix: true|false|"auto", source?}`; a `folder_path` outside the email folders fails that mail as `bad_decision` and writes nothing), `renumber` (default `false`: renumber each folder written into and report the old-to-new map under `result.renumbered`), `category`, `mailbox`.
+
+### `POST /api/v1/archive/revert`
+
+Undoes an apply: deletes the files and puts each mail back in the Inbox. Body: `items` (`[{message_id, files}]`; an `apply` result's `results` works as is), `renumber`, `category` (the one the apply used), `mailbox`.
+
+### `POST /api/v1/archive/index`
+
+Re-indexes one folder inside the email folders (`email index --root`), so the email index confirms what an `apply` filed there. It takes the email lock only, never waiting behind a disk scan. Body: `root` (a folder path), `wait` (seconds to wait for another email run, default 60, at most 600). `result` is `null`: the outcome is the answer. `done` means indexed; `busy` (409) another email run held the lock past `wait`; `not_in_email_folder` (422) the folder is outside the email folders; `email_index_not_set_up` (503); `failed` (500) the re-index broke.

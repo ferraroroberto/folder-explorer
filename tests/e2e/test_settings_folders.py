@@ -115,3 +115,23 @@ def test_the_tray_click_switch_saves_with_a_toast_and_says_what_a_click_opens(pa
         expect(page.locator(".toast")).to_contain_text("Tray click opens Quick search")
     finally:
         page.request.post(app_url + "/api/config", data={"tray": {"left_click": "quick_search"}})
+
+
+def test_the_archive_category_switch_is_off_by_default_and_saves(page: Page, app_url: str) -> None:
+    if app_url.endswith(":%d" % LIVE_PORT):
+        pytest.skip("the switch writes the settings: never on the live app")
+    page.goto(app_url + "/")
+    page.locator("#paneSearch .home-settings").click()
+    sheet = page.locator("#settingsDialog")
+    expect(sheet).to_be_visible()
+    category = sheet.locator("#archiveCategorySlot [role=switch]")
+    expect(category).to_have_attribute("aria-label", "Add an Outlook category when archiving")
+    expect(category).to_have_attribute("aria-checked", "false")
+    expect(sheet.locator("#archiveCategoryNote")).to_contain_text("show no category row")
+    try:
+        category.click()
+        expect(category).to_have_attribute("aria-checked", "true")
+        expect(sheet.locator("#archiveCategoryNote")).to_contain_text("stamp it on the mail")
+        assert page.request.get(app_url + "/api/config").json()["config"]["outlook"]["add_category"] is True
+    finally:
+        page.request.post(app_url + "/api/config", data={"outlook": {"add_category": False}})

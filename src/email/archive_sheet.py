@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional
 
 from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
-from src.email.archive_settings import get_outlook_category
+from src.email.archive_settings import get_outlook_add_category, get_outlook_category
 from src.email.repository import EmailRepository, open_index, record_filed_mail
 from src.email.suggester import EmailData, RankedSuggestion, SuggestionEngine
 from src.explorer_window import ExplorerUnavailableError, get_current_explorer_folder
@@ -162,6 +162,7 @@ def opening(client: Any, cfg: dict[str, Any], item: Any, where: str = "",
         timer.mark("filed_lookup")
     data = EmailData(subject=mail.subject, sender=mail.sender, recipients=mail.recipients,
                      date_sent=mail.date_sent, message_id=mail.message_id)
+    add_category = get_outlook_add_category(cfg)
     doc = {
         "ok": True,
         "mail": {"message_id": mail.message_id, "subject": mail.subject, "sender": mail.sender,
@@ -170,7 +171,8 @@ def opening(client: Any, cfg: dict[str, Any], item: Any, where: str = "",
         "already_archived": filed,
         "suggestions": [],
         "ranking": True,
-        "category": get_outlook_category(cfg),
+        "add_category": add_category,
+        "category": get_outlook_category(cfg) if add_category else "",
         "roots": [str(r) for r in roots],
     }
     return doc, data
@@ -246,6 +248,10 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
     """
     if date_prefix not in DATE_PREFIX_CHOICES:
         raise ValueError("unknown date prefix choice: " + str(date_prefix))
+    if category and not get_outlook_add_category(cfg):
+        # The server owns the switch, so an older window or page that still sends one stamps nothing.
+        logger.info("ℹ️ archive sheet: outlook.add_category is off, so the requested category is not stamped")
+        category = None
     roots = mounted_roots(cfg)
     folder, refusal = resolve_under_roots(folder_path, roots)
     if folder is None:

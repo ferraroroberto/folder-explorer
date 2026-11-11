@@ -86,6 +86,11 @@ def get_outlook_category(cfg: dict[str, Any]) -> str:
     return _text(cfg, "outlook", "category") or DEFAULT_ARCHIVED_CATEGORY
 
 
+def get_outlook_add_category(cfg: dict[str, Any]) -> bool:
+    """Whether the Archive window and sheet offer the archived category and filing stamps it (off unless set)."""
+    return _section(cfg, "outlook").get("add_category") is True
+
+
 def get_outlook_dismiss_category(cfg: dict[str, Any]) -> str:
     """The category ``dismiss`` stamps on a mail it moved without keeping a file."""
     return _text(cfg, "outlook", "dismiss_category") or DEFAULT_DISMISSED_CATEGORY

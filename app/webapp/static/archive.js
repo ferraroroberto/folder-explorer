@@ -192,9 +192,9 @@ function renderArchive() {
     '<button type="button" class="button-surface" id="archExplorer" title="Use the folder open in the front File Explorer window"' + (A.reading ? ' disabled' : '') +
     ' data-track="archive-explorer">' + glyph('folder-open') + (A.reading ? 'Reading File Explorer…' : 'Current Explorer folder') + '</button>' +
     (A.explorerError ? errorBlock(A.explorerError.title, A.explorerError.message, false) : '') + '</div>' +
-    '<div class="row"><span>Outlook category</span><select class="select-native" id="archCat" aria-label="Outlook category" data-track="archive-category">' +
-    (d.category ? '<option value="' + esc(d.category) + '"' + (A.category === d.category ? ' selected' : '') + '>' + esc(d.category) + '</option>' : '') +
-    '<option value=""' + (A.category ? '' : ' selected') + '>No category</option></select></div>' +
+    (d.add_category ? '<div class="row"><span>Outlook category</span><select class="select-native" id="archCat" aria-label="Outlook category" data-track="archive-category">' +
+      (d.category ? '<option value="' + esc(d.category) + '"' + (A.category === d.category ? ' selected' : '') + '>' + esc(d.category) + '</option>' : '') +
+      '<option value=""' + (A.category ? '' : ' selected') + '>No category</option></select></div>' : '') +
     datePrefixHtml() +
     '<div class="row"><span>Saved as</span><span class="row-value mono">' + esc(savedAs(choice)) + '</span></div>' +
     '<div class="arch-foot">' + glyph('mail') + '<span>Outlook macro: archive straight from Outlook\'s ribbon.</span>' +
@@ -224,7 +224,7 @@ function showSheet(doc, fromMacro) {
   A.stepping = false;
   A.foundNote = '';
   searchSeq++;
-  A.category = doc.ok ? doc.category || '' : '';
+  A.category = doc.ok && doc.add_category ? doc.category || '' : '';
   renderArchive();
   if (!$('archiveDialog').open) $('archiveDialog').showModal();
 }

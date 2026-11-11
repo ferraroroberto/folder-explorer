@@ -61,12 +61,31 @@ def test_no_mounted_email_folder_is_its_own_error(cfg: dict, tmp_path: Path) -> 
 
 
 def test_filing_saves_the_mail_and_tags_it_without_moving_it(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["add_category"] = True
     client, item = _client_with("Kickoff agenda")
     dest = archive_root / "Project Alpha" / "2026"
     doc = archive_sheet.file_mail(client, cfg, item, str(dest), "Filed")
     assert doc["ok"] and doc["categorized"] and item.Categories == "Filed"
     assert Path(doc["files"][0]).name == "001 - Kickoff agenda.msg" and Path(doc["files"][0]).is_file()
     assert client.moves == [] and client.folders[None] == [item]
+
+
+def test_with_the_switch_off_the_document_offers_no_category_and_filing_stamps_none(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Kickoff agenda")
+    doc = archive_sheet.suggest(client, cfg, item, "Inbox")
+    assert doc["add_category"] is False and doc["category"] == ""
+    # An older window or page still sends the category it was once offered: the server stamps nothing.
+    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root), "Filed by batch")
+    assert filed["ok"] and filed["category"] == "" and not filed["categorized"] and item.Categories == ""
+
+
+def test_with_the_switch_on_the_document_offers_the_configured_category(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["add_category"] = True
+    client, item = _client_with("Kickoff agenda")
+    doc = archive_sheet.suggest(client, cfg, item, "Inbox")
+    assert doc["add_category"] is True and doc["category"] == "Filed by batch"
+    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root), doc["category"])
+    assert filed["categorized"] and item.Categories == "Filed by batch"
 
 
 def test_filing_with_no_category_leaves_the_mail_untagged(cfg: dict, archive_root: Path) -> None:
@@ -163,6 +182,7 @@ def test_an_explicit_duplicate_files_a_numbered_second_copy_and_overwrites_nothi
 
 
 def test_a_category_outlook_refuses_still_reports_the_files(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["add_category"] = True
     client, item = _client_with("No tag")
     client.category_should_fail = True
     doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), "Filed")

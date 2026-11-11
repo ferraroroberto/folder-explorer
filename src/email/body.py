@@ -65,6 +65,16 @@ def run_child(cmd: list[str], timeout: float) -> "subprocess.CompletedProcess[st
                           timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL)
 
 
+def start_child(cmd: list[str]) -> "subprocess.Popen[str]":
+    """Start one of this app's own modules like ``run_child`` does, for a caller that reads its stdout line by line.
+
+    Its stderr is dropped: the child logs to its own file, and an unread pipe would stall it.
+    """
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
+    return subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            stdin=subprocess.DEVNULL, text=True, encoding="utf-8", creationflags=NO_WINDOW)
+
+
 def failed(code: str, detail: str = "") -> Body:
     return Body(False, error=code, message=MESSAGES.get(code, detail or "The mail couldn't be read."))
 

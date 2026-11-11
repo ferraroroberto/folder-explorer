@@ -12,6 +12,7 @@ import io
 import json
 import re
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -72,6 +73,7 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     client = _LiveCopyClient([item])
     spawned: list[tuple[str, str]] = []
     shown: list[object] = []
+    notices: list[tuple[str, str]] = []
     monkeypatch.setattr(outlook, "_apartment", contextlib.nullcontext)
     monkeypatch.setattr(outlook.bridge, "pywin32_installed", lambda: True)
     monkeypatch.setattr(outlook.bridge, "attach", lambda: object())
@@ -82,17 +84,32 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr("src.email.indexer.spawn", lambda trigger, scope: spawned.append((trigger, scope)))
     monkeypatch.setattr(archive_routes, "PREPARED", archive_routes._Prepared())
     monkeypatch.setattr(archive_routes, "bridge", _in_process)
+    monkeypatch.setattr(archive_routes, "bridge_file", _in_process_file)
+    monkeypatch.setattr(archive_routes, "FOLLOW_UPS", archive_routes._FollowUps())
+    monkeypatch.setattr("src.archive_window.show_notice", lambda title, text: notices.append((title, text)))
     # The server ranks a handed-over mail on a thread; here it ranks before the hand-off answers, so a test reads one document.
     monkeypatch.setattr(archive_routes, "_rank_later", lambda work: work())
-    return SimpleNamespace(root=root, cfg=cfg, item=item, client=client, spawned=spawned, shown=shown)
+    return SimpleNamespace(root=root, cfg=cfg, item=item, client=client, spawned=spawned, shown=shown, notices=notices)
 
 
-def _in_process(args: list[str], timeout: float) -> dict:
-    """The server's child, run here: ``app.outlook`` with the fake layer, its one document parsed."""
+def _child_lines(args: list[str]) -> list[dict]:
+    """The server's child, run here: ``app.outlook`` with the fake layer, each document it printed."""
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         outlook.main(args)
-    return json.loads(out.getvalue())
+    return [json.loads(line) for line in out.getvalue().splitlines()]
+
+
+def _in_process(args: list[str], timeout: float) -> dict:
+    return _child_lines(args)[0]
+
+
+def _in_process_file(args: list[str], timeout: float, follow_up_timeout: float, on_follow_up) -> dict:  # type: ignore[no-untyped-def]
+    """``bridge_file`` run here: the save's document answers, the follow-up's reaches ``on_follow_up`` before it does."""
+    lines = _child_lines(args)
+    if len(lines) > 1:
+        on_follow_up(lines[1])
+    return lines[0]
 
 
 def _route_handoff(monkeypatch: pytest.MonkeyPatch, c: TestClient) -> None:
@@ -114,9 +131,12 @@ def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNam
         dest = handed["suggestions"][0]["folder_path"]
         assert dest == str(fake.root / "Project Alpha")
         filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "category": "Filed"}).json()
-        assert filed["ok"] and filed["categorized"] and fake.item.Categories == "Filed"
+        assert filed["ok"] and filed["follow_up"] and fake.item.Categories == "Filed"
         assert Path(filed["files"][0]).name == "001 - Kickoff agenda.msg" and Path(filed["files"][0]).is_file()
         assert fake.spawned == [("archive", str(Path(dest).resolve()))]
+        after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()
+        assert after == {"done": True, "result": {"ok": True, "error": None, "categorized": True, "indexing": True}}
+        assert c.get("/api/archive/followup", params={"token": handed["token"]}).status_code == 404
         again = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest})
         assert again.status_code == 404
 
@@ -132,7 +152,9 @@ def test_with_the_switch_off_the_sheet_offers_no_category_and_the_server_stamps_
         assert handed["add_category"] is False and handed["category"] == ""
         dest = handed["suggestions"][0]["folder_path"]
         filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "category": "Filed"}).json()
-        assert filed["ok"] and not filed["categorized"] and filed["category"] == "" and fake.item.Categories == ""
+        assert filed["ok"] and filed["category"] == "" and fake.item.Categories == ""
+        after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()["result"]
+        assert after["ok"] and not after["categorized"]
 
 
 def test_the_setting_saves_alone_and_keeps_the_other_outlook_keys(fake: SimpleNamespace, tmp_path: Path) -> None:
@@ -152,7 +174,7 @@ def test_the_setting_saves_alone_and_keeps_the_other_outlook_keys(fake: SimpleNa
 
 def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     asked: list[list[str]] = []
-    monkeypatch.setattr(archive_routes, "bridge", lambda args, timeout: asked.append(args) or _in_process(args, timeout))
+    monkeypatch.setattr(archive_routes, "bridge_file", lambda args, *rest: asked.append(args) or _in_process_file(args, *rest))
     with TestClient(app, client=LOCAL) as c:
         _route_handoff(monkeypatch, c)
         dest = str(fake.root / "Project Alpha")
@@ -188,8 +210,87 @@ def test_with_no_page_open_the_fallback_window_files_the_mail(fake: SimpleNamesp
     with TestClient(app, client=LOCAL) as c:
         _route_handoff(monkeypatch, c)
         assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
-    assert seen["doc"]["ok"] and callable(seen["find"].folders) and seen["result"]["ok"] and not seen["result"]["categorized"]
+    assert seen["doc"]["ok"] and callable(seen["find"].folders) and seen["result"]["ok"]
     assert Path(seen["result"]["files"][0]).is_file() and fake.item.Categories == ""
+    assert fake.spawned == [("archive", str(Path(seen["result"]["folder_path"])))] and fake.notices == []
+
+
+def test_the_window_closes_on_the_save_and_a_failure_after_it_gets_its_own_notice(
+        fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[str] = []
+
+    def window(doc: dict, on_file, find_folders, current_explorer=None, rank=None, progress=None) -> None:  # type: ignore[no-untyped-def]
+        saved = on_file(str(fake.root / "Project Alpha"), "Filed", False, "auto")
+        events.append("saved" if Path(saved["files"][0]).is_file() else "not saved")
+        events.append("closed")  # returning is the window's mainloop ending
+
+    def no_index(trigger: str, scope: str) -> None:
+        events.append("index")
+        raise OSError("no process")
+
+    monkeypatch.setattr("src.archive_window.show_window", window)
+    monkeypatch.setattr("src.email.indexer.spawn", no_index)
+    monkeypatch.setattr(fake.client, "set_category", lambda item, name: events.append("category"))
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        assert outlook.archive(fake.cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+    assert events == ["saved", "closed", "category", "index"], "tagging and indexing wait until the window is gone"
+    assert len(fake.notices) == 1 and "indexing" in fake.notices[0][1] and "Project Alpha" in fake.notices[0][1]
+
+
+# A stand-in for the ``file`` child: the save's line at once, the follow-up's once the gate file exists (or never).
+_FILE_CHILD = """
+import json, os, sys, time
+print(json.dumps({"ok": True, "folder_path": "F", "files": ["F/001 - x.msg"], "category": "", "error": None}), flush=True)
+mode, gate = sys.argv[1], sys.argv[2]
+if mode == "quiet":
+    sys.exit(0)
+end = time.monotonic() + 20
+while not os.path.exists(gate) and time.monotonic() < end:
+    time.sleep(0.01)
+print(json.dumps({"ok": True, "error": None, "categorized": False, "indexing": True}), flush=True)
+"""
+
+
+_START_CHILD = child.start_child
+
+
+def _scripted_child(monkeypatch: pytest.MonkeyPatch, mode: str, gate: Path) -> None:
+    monkeypatch.setattr(child, "start_child", lambda cmd: _START_CHILD([sys.executable, "-c", _FILE_CHILD, mode, str(gate)]))
+
+
+def test_the_server_answers_on_the_save_and_hears_the_follow_up_after(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    gate = tmp_path / "gate"
+    _scripted_child(monkeypatch, "gated", gate)
+    heard: list[dict] = []
+    done = threading.Event()
+    doc = archive_routes.bridge_file(["file"], 30, 30, lambda after: heard.append(after) or done.set())
+    assert doc["files"] == ["F/001 - x.msg"] and heard == [], "the page has its answer while the follow-up is still running"
+    gate.touch()
+    assert done.wait(30) and heard == [{"ok": True, "error": None, "categorized": False, "indexing": True}]
+
+
+def test_a_follow_up_that_hangs_or_stops_silently_is_reported_not_confirmed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for mode, code in (("gated", ERR_TIMEOUT), ("quiet", "failed")):
+        _scripted_child(monkeypatch, mode, tmp_path / "never")
+        heard: list[dict] = []
+        done = threading.Event()
+        doc = archive_routes.bridge_file(["file"], 30, 0.5, lambda after: heard.append(after) or done.set())
+        assert doc["ok"] and done.wait(30)
+        assert heard[0]["ok"] is False and heard[0]["error"]["code"] == code and "aren't confirmed" in heard[0]["error"]["message"]
+
+
+def test_the_follow_up_route_says_running_then_gives_the_result_once(fake: SimpleNamespace) -> None:
+    follow = archive_routes.FOLLOW_UPS
+    with TestClient(app, client=LOCAL) as c:
+        assert c.get("/api/archive/followup", params={"token": "t1"}).status_code == 404
+        follow.start("t1")
+        assert c.get("/api/archive/followup", params={"token": "t1"}).json() == {"done": False}
+        follow.finish("t1", {"ok": False, "error": {"code": "category_failed", "message": "no tag"}})
+        assert c.get("/api/archive/followup", params={"token": "t1", "wait": 1}).json()["result"]["error"]["message"] == "no tag"
+        assert c.get("/api/archive/followup", params={"token": "t1"}).status_code == 404
+    with TestClient(app, client=REMOTE) as c:
+        assert c.get("/api/archive/followup", params={"token": "t1"}, headers={"Authorization": "Bearer nope"}).status_code in (401, 403)
 
 
 def test_a_folder_the_window_finds_takes_the_mail_like_any_filing(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -217,7 +318,7 @@ def test_a_folder_the_window_finds_takes_the_mail_like_any_filing(fake: SimpleNa
     dest = fake.root / "Clients" / "Harbour works"
     assert seen["found"] == [("Harbour works", True), ("Harbour photos", False)]
     first = Path(seen["first"]["files"][0])
-    assert seen["first"]["ok"] and seen["first"]["categorized"] and fake.item.Categories == "Filed"
+    assert seen["first"]["ok"] and fake.item.Categories == "Filed"
     assert first.parent == dest.resolve() and re.match(r"^\d{4}-\d{2}-\d{2} - 001 - Kickoff agenda\.msg$", first.name), first.name
     assert ("archive", str(dest.resolve())) in fake.spawned
     assert not seen["again"]["ok"] and seen["again"]["error"]["code"] == "already_archived"
@@ -362,7 +463,7 @@ def test_a_folder_that_looks_like_a_flag_is_read_as_a_folder(fake: SimpleNamespa
 
 def test_the_date_prefix_choice_reaches_the_child_and_a_bad_one_never_does(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     asked: list[list[str]] = []
-    monkeypatch.setattr(archive_routes, "bridge", lambda args, timeout: asked.append(args) or _in_process(args, timeout))
+    monkeypatch.setattr(archive_routes, "bridge_file", lambda args, *rest: asked.append(args) or _in_process_file(args, *rest))
     with TestClient(app, client=LOCAL) as c:
         _route_handoff(monkeypatch, c)
         c.get("/api/archive/pending")

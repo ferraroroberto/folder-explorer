@@ -55,6 +55,7 @@ from src.email.archive_settings import (
     get_max_path_length,
 )
 from src.outlook.client import sent_datetime
+from src.stage_timer import StageTimer
 
 logger = logging.getLogger(__name__)
 
@@ -439,6 +440,7 @@ class EmailArchiver:
         mail_item: Any,
         folder_path: str,
         subject: str,
+        timer: StageTimer | None = None,
     ) -> ArchiveResult:
         """
         Save the email and its attachments to folder_path.
@@ -448,6 +450,7 @@ class EmailArchiver:
                 (COM objects are STA — never cache one across threads).
             folder_path: Absolute path to the destination folder.
             subject: Clean subject string (used for filename).
+            timer: marks ``scan``, ``save_msg`` and ``attachments`` when given.
 
         Returns:
             ArchiveResult with paths of all saved files.
@@ -468,16 +471,23 @@ class EmailArchiver:
             _get_sent_date_prefix(mail_item) if date_prefix_enabled else None
         )
         result = ArchiveResult(sequence_number=seq)
+        if timer:
+            timer.mark("scan")
 
         # ---- save .msg ----
         result.email_path = self._save_msg(
             mail_item, folder_path, seq, subject, date_prefix
         )
+        if timer:
+            timer.mark("save_msg")
 
         # ---- save attachments ----
         result.attachment_paths = self._save_attachments(
             mail_item, folder_path, seq, date_prefix
         )
+        if timer:
+            timer.mark("attachments")
+            timer.count("attachments", len(result.attachment_paths))
 
         logger.info(
             "Archived email %s → %s (%d attachment(s))",

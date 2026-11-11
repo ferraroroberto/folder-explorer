@@ -5,6 +5,8 @@ as a windowless child with a timeout, so a COM dialog hangs the child, never
 the server. What filing a prepared mail needs (its EntryID and StoreID) stays
 here under a token; the page only ever sends back that token, a folder and a
 category, and the child checks the folder against the email folders again.
+Filing answers the page as soon as the child says the mail is on disk; the
+tagging and the indexing that follow are collected from ``/archive/followup``.
 Each offered folder carries its place in the scan (root, scan id, folder id),
 so the sheet's Open asks ``/api/open`` by id, never by a path.
 
@@ -22,6 +24,7 @@ import asyncio
 import json
 import logging
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -54,6 +57,10 @@ MACRO_FILE = PROJECT_ROOT / "assets" / "ArchiveMacro.bas"
 PREPARE_TIMEOUT_S = 45.0
 # Saving the .msg and its attachments into a OneDrive folder can take a while.
 FILE_TIMEOUT_S = 90.0
+# What follows a save (one COM call to tag the mail, one process start to index its folder).
+FOLLOW_UP_TIMEOUT_S = 60.0
+# A follow-up's result waits this long for its page to ask for it.
+FOLLOW_UP_TTL_S = 10 * 60.0
 SHOW_TIMEOUT_S = 30.0
 # Listing the shell's open windows is quick; a longer wait means the shell is stuck.
 EXPLORER_TIMEOUT_S = 15.0
@@ -121,6 +128,43 @@ class _Prepared:
 PREPARED = _Prepared()
 
 
+class _FollowUps:
+    """What followed each filing, by its token: running, or its document until the page takes it."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.items: dict[str, tuple[float, Optional[dict[str, Any]]]] = {}
+
+    def start(self, token: str) -> None:
+        now = time.monotonic()
+        with self.lock:
+            for old in [t for t, (at, _) in self.items.items() if now - at > FOLLOW_UP_TTL_S]:
+                del self.items[old]
+            self.items[token] = (now, None)
+
+    def finish(self, token: str, doc: dict[str, Any]) -> None:
+        with self.lock:
+            if token in self.items:
+                self.items[token] = (time.monotonic(), doc)
+
+    def drop(self, token: str) -> None:
+        with self.lock:
+            self.items.pop(token, None)
+
+    def take(self, token: str) -> tuple[bool, Optional[dict[str, Any]]]:
+        """Whether the token is known, and its document once it ended (given once: the entry goes with it)."""
+        with self.lock:
+            item = self.items.get(token)
+            if item is None:
+                return False, None
+            if item[1] is not None:
+                del self.items[token]
+            return True, item[1]
+
+
+FOLLOW_UPS = _FollowUps()
+
+
 def _pc_only(request: Request) -> None:
     if not is_pc_itself(request):
         raise HTTPException(status_code=403, detail="this works on the PC only")
@@ -142,6 +186,75 @@ def bridge(args: list[str], timeout: float) -> dict[str, Any]:
         return error_document(ERR_FAILED, "The Outlook bridge stopped without an answer (exit %s)." % proc.returncode)
     if not doc.get("ok"):
         logger.info("ℹ️ outlook %s: %s", args[0], (doc.get("error") or {}).get("code"))
+    return doc
+
+
+def _next_line(lines: "queue.Queue[Optional[str]]", timeout: float) -> tuple[str, Optional[str]]:
+    """The child's next stdout line: ``("line", text)``, ``("eof", None)`` or ``("timeout", None)``."""
+    try:
+        line = lines.get(timeout=timeout)
+    except queue.Empty:
+        return "timeout", None
+    return ("eof", None) if line is None else ("line", line)
+
+
+def _document(line: Optional[str]) -> Optional[dict[str, Any]]:
+    try:
+        doc = json.loads(line or "")
+    except ValueError:
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def bridge_file(args: list[str], timeout: float, follow_up_timeout: float,
+                on_follow_up: Callable[[dict[str, Any]], None]) -> dict[str, Any]:
+    """Run ``app.outlook file`` as a child and answer on its first line, the save's document.
+
+    The child goes on to tag the mail and index the folder; a thread hands its second line to
+    ``on_follow_up``, or an error document when it hangs or stops without one, so a failure after
+    the page has its answer is still heard.
+    """
+    if bridge_off():
+        return error_document(ERR_FAILED, OFF_REASON + ".")
+    proc = child.start_child([sys.executable, "-m", "app.outlook", *args])
+    lines: queue.Queue[Optional[str]] = queue.Queue()
+
+    def read() -> None:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            lines.put(line)
+        lines.put(None)
+
+    threading.Thread(target=read, name="outlook-file-read", daemon=True).start()
+    kind, line = _next_line(lines, timeout)
+    if kind == "timeout":
+        proc.kill()
+        logger.warning("⚠️ outlook file: no answer within %.0f s", timeout)
+        return error_document(ERR_TIMEOUT)
+    doc = _document(line)
+    if doc is None:
+        logger.warning("⚠️ outlook file exited %s with no document", proc.wait())
+        return error_document(ERR_FAILED, "The Outlook bridge stopped without an answer (exit %s)." % proc.returncode)
+    if not doc.get("files"):
+        logger.info("ℹ️ outlook file: %s", (doc.get("error") or {}).get("code"))
+        threading.Thread(target=proc.wait, name="outlook-file-exit", daemon=True).start()
+        return doc
+
+    def follow() -> None:
+        kind, line = _next_line(lines, follow_up_timeout)
+        after = _document(line)
+        if kind == "timeout":
+            proc.kill()
+            after = error_document(ERR_TIMEOUT, "The mail was filed, but Outlook didn't answer while tagging it, "
+                                                "so the category and the indexing aren't confirmed.")
+        elif after is None:
+            after = error_document(ERR_FAILED, "The mail was filed, but what follows the save stopped without an answer, "
+                                               "so the category and the indexing aren't confirmed.")
+        proc.wait()
+        logger.info("ℹ️ outlook file: the follow-up ended %s", "ok" if after.get("ok") else (after.get("error") or {}).get("code"))
+        on_follow_up(after)
+
+    threading.Thread(target=follow, name="outlook-file-follow-up", daemon=True).start()
     return doc
 
 
@@ -292,10 +405,40 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
             "--category=" + str(category), "--date-prefix=" + date_prefix]
     if duplicate:
         args.append("--duplicate")
-    doc = bridge(args, FILE_TIMEOUT_S)
+    token = str(body["token"])
+    started = time.monotonic()
+    FOLLOW_UPS.start(token)
+    doc = bridge_file(args, FILE_TIMEOUT_S, FOLLOW_UP_TIMEOUT_S, lambda after: FOLLOW_UPS.finish(token, after))
     if doc.get("files"):
-        PREPARED.drop(str(body["token"]))
+        PREPARED.drop(token)
+        # The page asks /archive/followup with the same token for what the tagging and the indexing came to.
+        doc["follow_up"] = True
+    else:
+        FOLLOW_UPS.drop(token)
+    logger.info("⏱️ archive file: the page had its answer in %.0f ms", (time.monotonic() - started) * 1000)
     return doc
+
+
+@router.get("/archive/followup")
+async def followup(request: Request, token: str = Query(..., max_length=64),
+                   wait: float = Query(0.0, ge=0.0, le=PENDING_WAIT_MAX_S)) -> dict[str, Any]:
+    """What followed a filing (the category, the indexing): ``{"done": false}`` while it runs, then ``{"done": true, "result"}``.
+
+    ``wait`` holds the poll open until it ends; the result is given once, and 404 says no filing under that token is known.
+    """
+    _pc_only(request)
+    deadline = time.monotonic() + wait
+    while True:
+        known, doc = FOLLOW_UPS.take(token)
+        if not known:
+            raise HTTPException(status_code=404, detail="no filing is following up under this token")
+        if doc is not None:
+            return {"done": True, "result": doc}
+        if time.monotonic() >= deadline:
+            return {"done": False}
+        await asyncio.sleep(PENDING_TICK_S)
+        if await request.is_disconnected():
+            return {"done": False}
 
 
 @router.post("/archive/explorer")

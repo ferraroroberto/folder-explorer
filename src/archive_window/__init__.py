@@ -8,6 +8,7 @@ caller's ``on_file``, which runs in this same process and COM apartment.
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Any, Callable, Optional
 
 from src.archive_window.finder import FinderSource
@@ -40,3 +41,20 @@ def show_window(doc: dict[str, Any], on_file: Callable[[str, Optional[str], bool
         window.fill_in_background(rank, progress)
     logger.info("ℹ️ archive: the fallback window is open (%s)", "dark" if window.pal.dark else "light")
     window.root.mainloop()
+
+
+# MessageBoxW flags MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST: Outlook has the focus back once the window closed.
+_MB_NOTICE = 0x30 | 0x10000 | 0x40000
+
+
+def show_notice(title: str, text: str) -> None:
+    """Tell the user something went wrong after the window closed, in a box they have to dismiss.
+
+    Off Windows there is no box, so the warning is logged alone.
+    """
+    logger.warning("⚠️ archive: %s: %s", title, text.replace("\n", " "))
+    if sys.platform != "win32":
+        return
+    import ctypes  # noqa: PLC0415
+
+    ctypes.WinDLL("user32").MessageBoxW(None, text, title, _MB_NOTICE)

@@ -250,8 +250,9 @@ async function doArchive() {
   A.error = null;
   renderArchive();
   let r;
+  const token = A.doc.token;
   try {
-    const payload = { token: A.doc.token, folder: o.folder_path, category: A.category, date_prefix: A.datePrefix };
+    const payload = { token, folder: o.folder_path, category: A.category, date_prefix: A.datePrefix };
     if (A.doc.already_archived && A.copy) payload.duplicate = true;
     r = await postJSON('/api/archive/file', payload);
   } catch (e) {
@@ -259,15 +260,38 @@ async function doArchive() {
   }
   A.busy = false;
   if (r.files && r.files.length) {
+    // The answer means the .msg is on disk: the sheet goes now, and the tag and the indexing report on their own.
     $('archiveDialog').close();
     A.lastFiled = lastTwo(r.folder_path);
     repaintCard();
-    if (r.ok) showToast('Archived to ' + A.lastFiled + (r.indexing ? '. Indexing the folder now.' : ''));
-    else showToast('Filed to ' + A.lastFiled + ', but not tagged: ' + r.error.message, 'error');
+    showToast('Archived to ' + A.lastFiled);
+    if (r.follow_up) followUp(token);
     return;
   }
   A.error = r.error || { message: 'Not archived' };
   renderArchive();
+}
+
+// Rounds of the server's longest wait (20 s each) that outlast its own limit on what follows a save.
+const FOLLOW_UP_ROUNDS = 4;
+const NOT_CONFIRMED = "The mail was filed, but its category and indexing couldn't be confirmed";
+
+/** What followed a filing: nothing to say when it went well, an error toast when it failed or can't be confirmed. */
+async function followUp(token) {
+  for (let round = 0; round < FOLLOW_UP_ROUNDS; round++) {
+    let r;
+    try {
+      r = await getJSON('/api/archive/followup?token=' + encodeURIComponent(token) + '&wait=20');
+    } catch (e) {
+      showToast(NOT_CONFIRMED + ': ' + e.message, 'error');
+      return;
+    }
+    if (r.done) {
+      if (!r.result.ok) showToast((r.result.error && r.result.error.message) || NOT_CONFIRMED + '.', 'error');
+      return;
+    }
+  }
+  showToast(NOT_CONFIRMED + ' in time.', 'error');
 }
 
 /** Show an offered folder in File Explorer, named by its place in the scan, never by its path. */

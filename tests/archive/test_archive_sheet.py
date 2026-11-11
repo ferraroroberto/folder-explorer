@@ -25,6 +25,62 @@ def _client_with(subject: str, sender: str = "lead@example.invalid") -> tuple[Fa
     return FakeOutlookClient([item]), item
 
 
+# Every step after the save but the indexer, which would start a real child here.
+_NO_INDEX = tuple(s for s in archive_sheet.FOLLOW_UP_STEPS if s.name != "index")
+
+
+def _file(client: FakeOutlookClient, cfg: dict, item: object, folder: str, category: str | None,
+          duplicate: bool = False, date_prefix: str = "auto") -> dict:
+    """A filing as a caller runs it: the save, then its follow-up, read as one document."""
+    doc, saved = archive_sheet.save_mail(client, cfg, item, folder, category, duplicate, date_prefix)
+    return {**doc, **archive_sheet.follow_up(client, saved, steps=_NO_INDEX)}
+
+
+def test_the_save_writes_the_mail_and_leaves_tagging_and_indexing_to_the_follow_up(
+        cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg["outlook"]["add_category"] = True
+    spawned: list[tuple[str, str]] = []
+    monkeypatch.setattr("src.email.indexer.spawn", lambda trigger, scope: spawned.append((trigger, scope)))
+    client, item = _client_with("Kickoff agenda")
+    doc, saved = archive_sheet.save_mail(client, cfg, item, str(archive_root), "Filed")
+    assert doc["ok"] and Path(doc["files"][0]).is_file()
+    assert item.Categories == "" and spawned == [], "nothing after the save runs while the user waits"
+    after = archive_sheet.follow_up(client, saved)
+    assert after == {"ok": True, "error": None, "categorized": True, "indexing": True}
+    assert item.Categories == "Filed" and spawned == [("archive", saved.folder_path)]
+
+
+def test_every_step_after_the_save_runs_and_each_failure_is_reported(
+        cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg["outlook"]["add_category"] = True
+
+    def no_child(trigger: str, scope: str) -> None:
+        raise OSError("no process")
+
+    monkeypatch.setattr("src.email.indexer.spawn", no_child)
+    client, item = _client_with("No tag, no index")
+    client.category_should_fail = True
+    _, saved = archive_sheet.save_mail(client, cfg, item, str(archive_root), "Filed")
+    after = archive_sheet.follow_up(client, saved)
+    assert not after["ok"] and not after["categorized"] and not after["indexing"]
+    assert after["error"]["code"] == "category_failed"
+    assert "category" in after["error"]["message"] and "indexing" in after["error"]["message"]
+
+
+def test_a_save_outlook_reports_but_that_left_no_file_is_a_failure_and_records_nothing(
+        cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, item = _client_with("Vanished")
+    monkeypatch.setattr(item, "SaveAs", lambda path, fmt: None)
+    with pytest.raises(SheetError) as refused:
+        archive_sheet.save_mail(client, cfg, item, str(archive_root), None)
+    assert refused.value.code == "archive_failed" and "isn't there" in str(refused.value)
+    conn = open_index(cfg)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM emails WHERE message_id = ?", ("kick@example.invalid",)).fetchone()[0] == 0
+    finally:
+        conn.close()
+
+
 def test_suggest_ranks_the_thread_folder_first_and_says_why(cfg: dict, archive_root: Path) -> None:
     _seed_index(cfg, archive_root, {"Project Alpha": ["Kickoff agenda", "Budget notes"], "Internal": ["Team agenda"]})
     (archive_root / "Project Alpha").mkdir()
@@ -64,7 +120,7 @@ def test_filing_saves_the_mail_and_tags_it_without_moving_it(cfg: dict, archive_
     cfg["outlook"]["add_category"] = True
     client, item = _client_with("Kickoff agenda")
     dest = archive_root / "Project Alpha" / "2026"
-    doc = archive_sheet.file_mail(client, cfg, item, str(dest), "Filed")
+    doc = _file(client, cfg, item, str(dest), "Filed")
     assert doc["ok"] and doc["categorized"] and item.Categories == "Filed"
     assert Path(doc["files"][0]).name == "001 - Kickoff agenda.msg" and Path(doc["files"][0]).is_file()
     assert client.moves == [] and client.folders[None] == [item]
@@ -75,7 +131,7 @@ def test_with_the_switch_off_the_document_offers_no_category_and_filing_stamps_n
     doc = archive_sheet.suggest(client, cfg, item, "Inbox")
     assert doc["add_category"] is False and doc["category"] == ""
     # An older window or page still sends the category it was once offered: the server stamps nothing.
-    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root), "Filed by batch")
+    filed = _file(client, cfg, item, str(archive_root), "Filed by batch")
     assert filed["ok"] and filed["category"] == "" and not filed["categorized"] and item.Categories == ""
 
 
@@ -84,13 +140,13 @@ def test_with_the_switch_on_the_document_offers_the_configured_category(cfg: dic
     client, item = _client_with("Kickoff agenda")
     doc = archive_sheet.suggest(client, cfg, item, "Inbox")
     assert doc["add_category"] is True and doc["category"] == "Filed by batch"
-    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root), doc["category"])
+    filed = _file(client, cfg, item, str(archive_root), doc["category"])
     assert filed["categorized"] and item.Categories == "Filed by batch"
 
 
 def test_filing_with_no_category_leaves_the_mail_untagged(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Untagged")
-    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    doc = _file(client, cfg, item, str(archive_root), None)
     assert doc["ok"] and not doc["categorized"] and item.Categories == ""
 
 
@@ -98,31 +154,31 @@ def test_a_folder_outside_the_email_folders_is_refused_before_anything_is_writte
     client, item = _client_with("Elsewhere")
     outside = tmp_path / "elsewhere"
     with pytest.raises(SheetError) as exc:
-        archive_sheet.file_mail(client, cfg, item, str(outside), "Filed")
+        _file(client, cfg, item, str(outside), "Filed")
     assert exc.value.code == ERR_OUTSIDE and not outside.exists() and item.saved_as == []
 
 
 def test_a_mail_already_filed_is_not_filed_twice(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Twice")
-    first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    first = _file(client, cfg, item, str(archive_root), None)
     _index_archived_file(cfg, first, message_id="kick@example.invalid", subject="Twice")
     with pytest.raises(SheetError) as exc:
-        archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+        _file(client, cfg, item, str(archive_root), None)
     assert exc.value.code == ERR_ALREADY and "001 - Twice.msg" in str(exc.value)
 
 
 def test_a_mail_filed_a_moment_ago_is_flagged_already_archived_with_no_scan_between(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Just filed")
-    first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    first = _file(client, cfg, item, str(archive_root), None)
     assert archive_sheet.suggest(client, cfg, item)["already_archived"] == first["files"][0]
     with pytest.raises(SheetError) as exc:
-        archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+        _file(client, cfg, item, str(archive_root), None)
     assert exc.value.code == ERR_ALREADY
 
 
 def test_the_row_written_at_filing_carries_the_ids_the_lookup_uses(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Row check", sender="lead@example.invalid")
-    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    doc = _file(client, cfg, item, str(archive_root), None)
     conn = open_index(cfg)
     try:
         rows = conn.execute("SELECT file_path, folder_path, filename, subject, sender, message_id, to_addrs "
@@ -143,7 +199,7 @@ def test_the_email_stage_completes_the_row_filing_wrote_instead_of_adding_anothe
     from src.email.stage import Stage
 
     client, item = _client_with("Stage meets row")
-    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    doc = _file(client, cfg, item, str(archive_root), None)
     path = doc["files"][0]
     facts = {"subject": "Stage meets row", "sender": "lead@example.invalid", "recipients": "to@example.invalid",
              "to_addrs": "to@example.invalid", "cc_addrs": "", "date_sent": "", "body_preview": "x", "flag_status": 0,
@@ -162,12 +218,12 @@ def test_the_email_stage_completes_the_row_filing_wrote_instead_of_adding_anothe
 
 def test_an_explicit_duplicate_files_a_numbered_second_copy_and_overwrites_nothing(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Twice")
-    first = archive_sheet.file_mail(client, cfg, item, str(archive_root), None)
+    first = _file(client, cfg, item, str(archive_root), None)
     _index_archived_file(cfg, first, message_id="kick@example.invalid", subject="Twice")
     first_bytes = Path(first["files"][0]).read_bytes()
     other = archive_root / "Elsewhere"
-    copy = archive_sheet.file_mail(client, cfg, item, str(other), None, duplicate=True)
-    again = archive_sheet.file_mail(client, cfg, item, str(archive_root), None, duplicate=True)
+    copy = _file(client, cfg, item, str(other), None, duplicate=True)
+    again = _file(client, cfg, item, str(archive_root), None, duplicate=True)
     assert copy["ok"] and Path(copy["files"][0]).name == "001 - Twice.msg" and Path(copy["files"][0]).parent == other.resolve()
     assert Path(again["files"][0]).name == "002 - Twice.msg" and Path(first["files"][0]).read_bytes() == first_bytes
     _index_archived_file(cfg, copy, message_id="kick@example.invalid", subject="Twice")
@@ -185,7 +241,7 @@ def test_a_category_outlook_refuses_still_reports_the_files(cfg: dict, archive_r
     cfg["outlook"]["add_category"] = True
     client, item = _client_with("No tag")
     client.category_should_fail = True
-    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), "Filed")
+    doc = _file(client, cfg, item, str(archive_root), "Filed")
     assert not doc["ok"] and doc["error"]["code"] == "category_failed" and Path(doc["files"][0]).is_file()
 
 
@@ -200,14 +256,14 @@ def test_a_folder_offered_on_topic_alone_says_so_with_its_count_and_an_example(c
 @pytest.mark.parametrize("choice, name", [("on", "2026-03-14 - 001 - Dated.msg"), ("off", "001 - Dated.msg")])
 def test_the_date_prefix_choice_names_the_filed_mail(cfg: dict, archive_root: Path, choice: str, name: str) -> None:
     client, item = _client_with("Dated")
-    doc = archive_sheet.file_mail(client, cfg, item, str(archive_root), None, date_prefix=choice)
+    doc = _file(client, cfg, item, str(archive_root), None, date_prefix=choice)
     assert Path(doc["files"][0]).name == name
 
 
 def test_an_unknown_date_prefix_choice_writes_nothing(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Dated")
     with pytest.raises(ValueError):
-        archive_sheet.file_mail(client, cfg, item, str(archive_root), None, date_prefix="sometimes")
+        _file(client, cfg, item, str(archive_root), None, date_prefix="sometimes")
     assert item.saved_as == []
 
 
@@ -215,7 +271,7 @@ def test_reopening_a_filed_mail_offers_its_folder_as_the_same_email(cfg: dict, a
     """File, index the copy as the email stage would, reopen: already archived, and its folder leads at 100%."""
     _seed_index(cfg, archive_root, {"Elsewhere": ["Quarterly figures draft"]})
     client, item = _client_with("Quarterly figures")
-    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root / "Finance"), None)
+    filed = _file(client, cfg, item, str(archive_root / "Finance"), None)
     _index_archived_file(cfg, filed, message_id="kick@example.invalid", subject="Quarterly figures")
 
     doc = archive_sheet.suggest(client, cfg, item)
@@ -229,7 +285,7 @@ def test_reopening_a_filed_mail_offers_its_folder_as_the_same_email(cfg: dict, a
 
 def test_another_mail_with_the_same_subject_is_only_the_same_subject(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Quarterly figures")
-    filed = archive_sheet.file_mail(client, cfg, item, str(archive_root / "Finance"), None)
+    filed = _file(client, cfg, item, str(archive_root / "Finance"), None)
     _index_archived_file(cfg, filed, message_id="other@example.invalid", subject="Quarterly figures")
 
     doc = archive_sheet.suggest(client, cfg, item)

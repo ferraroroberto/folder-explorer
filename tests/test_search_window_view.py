@@ -56,17 +56,6 @@ class FakeApi:
         return FakeResponse({"status": "opened"})
 
 
-@pytest.fixture(scope="module")
-def tk_root() -> Iterator[tk.Tk]:
-    try:
-        shared = tk.Tk()
-    except tk.TclError as exc:
-        pytest.skip("Tk can't open a window here: %s" % exc)
-    shared.withdraw()
-    yield shared
-    shared.destroy()
-
-
 @pytest.fixture()
 def window(tk_root: tk.Tk) -> Iterator[tuple[QuickSearchView, FakeApi]]:
     fake = FakeApi()
@@ -124,16 +113,17 @@ def test_an_unreachable_app_shows_its_own_message_not_no_matches(window: tuple[Q
     assert view.list.tag_ranges("problem")
 
 
-def test_enter_searches_a_query_not_yet_answered_then_opens_and_hides(window: tuple[QuickSearchView, FakeApi]) -> None:
+def test_enter_searches_a_query_not_yet_answered_then_opens_and_hides(window: tuple[QuickSearchView, FakeApi], monkeypatch: pytest.MonkeyPatch) -> None:
     view, fake = window
-    view.root.deiconify()
+    hidden: list[str] = []
+    monkeypatch.setattr(view.root, "withdraw", lambda: hidden.append("withdraw"))
     view.query.set("harbour")
     view.enter()
     _settle(view)
     assert view.model.is_current()
     view.enter()
     assert fake.calls[-1][:2] == ("POST", "/api/folders/open") and fake.calls[-1][2]["json"] == {"root": "inv", "id": 7}
-    assert view.root.state() == "withdrawn"
+    assert hidden == ["withdraw"]
 
 
 def test_copy_path_puts_the_whole_path_on_the_clipboard(window: tuple[QuickSearchView, FakeApi]) -> None:
@@ -144,16 +134,19 @@ def test_copy_path_puts_the_whole_path_on_the_clipboard(window: tuple[QuickSearc
     assert view.root.clipboard_get() == FOLDER_HITS[0]["path"]
 
 
-def test_hide_keeps_the_tab_and_query_for_the_next_show(window: tuple[QuickSearchView, FakeApi]) -> None:
+def test_hide_keeps_the_tab_and_query_for_the_next_show(window: tuple[QuickSearchView, FakeApi], monkeypatch: pytest.MonkeyPatch) -> None:
     view, _ = window
+    # The window is not mapped for real: `deiconify` is the one call that puts it on the desktop.
+    shown: list[str] = []
+    monkeypatch.setattr(view.root, "deiconify", lambda: shown.append("deiconify"))
     view.query.set("harbour")
     _settle(view)
     view.hide()
-    assert view.root.state() == "withdrawn"
+    assert view.root.state() == "withdrawn" and shown == []
     view.show()
-    view.root.update()
-    assert view.root.state() == "normal" and view.query.get() == "harbour" and "harbour-trip" in _text(view)
+    assert shown == ["deiconify"] and view.query.get() == "harbour" and "harbour-trip" in _text(view)
     assert view.root.attributes("-topmost") in (1, True)
+    assert view.entry.selection_get() == "harbour"
     view.hide()
 
 

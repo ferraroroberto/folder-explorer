@@ -12,7 +12,7 @@ import pytest
 from src.archive_window import theme
 from src.archive_window.finder import ROWS_SHOWN
 from src.archive_window.view import ArchiveView
-from tests.archive.window.test_archive_window import _doc, _hit, root, tk_root  # noqa: F401 - the invented mail and the shared Tk root
+from tests.archive.window.test_archive_window import _doc, _hit, root  # noqa: F401 - the invented mail
 
 # A laptop-height screen: 1080 px of work area.
 WORK = (0, 0, 1920, 1080)
@@ -40,10 +40,17 @@ def _crowded_doc(root: Path) -> dict[str, Any]:
     return doc
 
 
+def _hidden(master: tk.Tk) -> tk.Toplevel:
+    """A top-level that is never mapped: Tk still lays it out, and nothing opens on the desktop."""
+    top = tk.Toplevel(master)
+    top.withdraw()
+    return top
+
+
 @pytest.fixture()
 def crowded(root: Path, tk_root: tk.Tk) -> Iterator[ArchiveView]:  # noqa: F811
-    """A shown window over three suggestions and a long subject, with eight folders found."""
-    top = tk.Toplevel(tk_root)
+    """A window over three suggestions and a long subject, with eight folders found."""
+    top = _hidden(tk_root)
     view = ArchiveView(_crowded_doc(root), lambda *_a: {}, _Many(root), theme.palette(False), top, work_area=lambda: WORK)  # type: ignore[arg-type]
     view.close = lambda: None  # type: ignore[method-assign]
     view.build()
@@ -65,7 +72,7 @@ def test_the_window_and_its_buttons_stay_inside_the_work_area(crowded: ArchiveVi
     top = crowded.root
     assert top.winfo_rooty() >= WORK[1] and _bottom(top) <= WORK[3]
     for button in (crowded.here_button, crowded.go):
-        assert button.winfo_viewable() and _bottom(button) <= min(_bottom(top), WORK[3]), button.cget("text")
+        assert button.winfo_manager() and _bottom(button) <= min(_bottom(top), WORK[3]), button.cget("text")
 
 
 def test_every_folder_is_reached_by_the_keys_and_stays_in_view(crowded: ArchiveView) -> None:
@@ -93,7 +100,7 @@ def test_the_wheel_scrolls_the_list_and_back(crowded: ArchiveView) -> None:
 
 
 def test_a_roomy_screen_lists_every_row_without_scrolling(root: Path, tk_root: tk.Tk) -> None:  # noqa: F811
-    top = tk.Toplevel(tk_root)
+    top = _hidden(tk_root)
     tall = (0, 0, 1920, 4000)
     view = ArchiveView(_crowded_doc(root), lambda *_a: {}, _Many(root), theme.palette(False), top, work_area=lambda: tall)  # type: ignore[arg-type]
     view.close = lambda: None  # type: ignore[method-assign]

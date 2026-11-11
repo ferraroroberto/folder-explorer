@@ -37,8 +37,8 @@ function progress(c) {
 }
 
 function runRow(r) {
-  const live = r.state === 'running';
-  const warn = r.state === 'failed' || r.state === 'interrupted' || r.state === 'unknown';
+  const live = r.live;
+  const warn = r.attention;
   const scope = r.scope === 'all' ? 'Every email folder' : shortPath(r.scope);
   return '<li class="run-row"><span class="mark' + (live ? ' is-live' : warn ? ' is-warn' : '') + '" aria-hidden="true"></span><span>' +
     '<strong>' + esc(scope + ' · ' + fmtAgo(r.started_at)) + '</strong>' +

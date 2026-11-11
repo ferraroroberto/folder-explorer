@@ -63,7 +63,7 @@ On this PC the nightly scan is an app-launcher Job that runs the CLI, so the in-
 - `... email index --fresh` lists the email folders now instead of reading the last scan's index: a mail filed since that scan is only seen this way.
 - `... scan --no-email` scans the disks only.
 
-Downloaded mail stays on the disk until OneDrive frees it. The app never sets a file back to online-only, because that is a write. How a scan reads sizes without downloading anything, and the index it writes: [docs/scanning.md](docs/scanning.md). Whether a scan or an email run is running, finished, failed or died is one derived state, shown the same on every screen and route: [docs/run-state.md](docs/run-state.md).
+Downloaded mail stays on the disk until OneDrive frees it. The app never sets a file back to online-only, because that is a write. How a scan reads sizes without downloading anything, and the index it writes: [docs/scanning.md](docs/scanning.md). Whether a scan or an email run is running, finished, failed or died is one derived state, shown the same on every screen and route: [docs/run-state.md](docs/run-state.md). A mail's "Show all" load in the Search preview has its own declared state: [docs/body-state.md](docs/body-state.md).
 
 Scan output (the index, the scan history, logs, the usage log) lives in the runtime-data folder, `C:\sqlite\folder-explorer\` by default (`FLEET_DATA_ROOT` or `FOLDER_EXPLORER_DATA_DIR` move it), never in the repo.
 

@@ -19,7 +19,7 @@ export const S = {
   selected: -1,
   saved: [],
   detail: new Map(), // email row id -> /api/emails/{id}
-  body: new Map(), // email row id -> {state, data, error}
+  body: new Map(), // email row id -> {state, data, error}; moved only by body-state.js
   frame: new Map(), // email row id -> {look: 'dark' | 'light' | null (follow the app), remote: bool}
   seq: 0, // bumps per search, so a slow answer never overwrites a newer one
   tab: null, // 'search' while the tab shows; only then does the box write the URL

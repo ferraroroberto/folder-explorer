@@ -1,7 +1,4 @@
 {
   "version": 1,
-  "entries": [
-    {"key": "app/webapp/static/email-scans.js", "counts": {"state-literal": 2}},
-    {"key": "app/webapp/static/search-preview.js", "counts": {"state-literal": 5}}
-  ]
+  "entries": []
 }

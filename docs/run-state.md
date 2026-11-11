@@ -48,7 +48,7 @@ Settling a dead `running` row to `interrupted` in the database (`store.settle_in
 | --- | --- | --- |
 | `GET /api/scan` | `app/webapp/routers/scans.py` via `scan_runner.scan_activity` | `state`, `reason`; `scanning` is `state == running`, `running` lists rows only then |
 | `GET /api/roots` | `describe_root` | `state` and `reason` for the scan and for each root; `running` / `failed` stay, derived from the same state |
-| `GET /api/email/status` | `app/webapp/routers/emails.py` via `indexer.email_state` / `indexer.history` | `state`, `reason`, and a `state` / `reason` on each run |
+| `GET /api/email/status` | `app/webapp/routers/emails.py` via `indexer.email_state` / `indexer.history` | `state`, `reason`, and a `state` / `reason` / `live` / `attention` on each run (`attention` is failed, interrupted or unknown), so the Scans tab marks a run without naming a state |
 | `POST /api/email/index` | the same router | 409 while running, 503 when the lock cannot be read |
 | `GET /api/v1/search/status`, `/folders`, `/emails` | `search_api.folders_state` / `emails_state` | the `run` state beside each part, and the `indexing` / failed reasons ([service-api.md](service-api.md)) |
 | Scans and Explore tabs | `scans.js`, `email-scans.js`, `main.js` | read the fields above; an `unknown` state disables the Rescan and Index buttons |

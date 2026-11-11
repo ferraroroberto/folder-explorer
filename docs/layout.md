@@ -27,7 +27,8 @@ folder-explorer/
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
 │       │                       #   versioned search API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child)
-│       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons
+│       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
+│                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md)
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
@@ -73,7 +74,8 @@ folder-explorer/
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL
 │   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
-│                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract)
+│                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
+│                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)

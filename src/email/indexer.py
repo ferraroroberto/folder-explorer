@@ -139,8 +139,15 @@ def activity() -> Derived:
 
 
 def history(limit: int, held: Optional[bool]) -> list[dict[str, Any]]:
-    """The newest runs first, each with the ``state`` and ``reason`` its row and the lock ``held`` give."""
-    return [{**r, **derive_run_state(r["status"], r["message"], held).as_dict()} for r in store.email_runs(limit)]
+    """The newest runs first, each with the ``state`` and ``reason`` its row and the lock ``held`` give.
+
+    ``live`` and ``attention`` are the same state as two flags, so the Scans tab marks a run without naming states.
+    """
+    out = []
+    for r in store.email_runs(limit):
+        d = derive_run_state(r["status"], r["message"], held)
+        out.append({**r, **d.as_dict(), "live": d.running, "attention": d.attention})
+    return out
 
 
 def first_build(own: bool) -> Optional[Derived]:

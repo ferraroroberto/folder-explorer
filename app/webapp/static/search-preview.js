@@ -4,6 +4,7 @@
  */
 
 import { getJSON, postJSON, api } from './api.js';
+import { BodyState, bodyOf, bodyStep, canLoad } from './body-state.js';
 import { S, $, WIDE, copyText, effectiveMode, hl, mailDate, marked, shortFolder } from './search-state.js';
 import { esc, fmtBytes, fmtNum, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
@@ -79,17 +80,17 @@ function frameBlock(d, html) {
 }
 
 function bodyHtml(d) {
-  const st = S.body.get(d.id) || { state: 'idle' };
+  const st = bodyOf(S.body, d.id);
   const online = !!(d.location && d.location.file && d.location.file.online);
   if (!d.readable) return '<p class="pv-note">Show all isn\'t available: ' + esc(d.reader_problem || 'not set up here') + '.</p>';
-  if (st.state === 'idle') {
+  if (st.state === BodyState.IDLE) {
     return '<button type="button" class="button-tint" data-act="showall" data-track="show-all">' +
       (online ? glyph('download') + 'Show all · downloads from OneDrive' : 'Show all') + '</button>';
   }
-  if (st.state === 'loading') {
+  if (st.state === BodyState.LOADING) {
     return '<button type="button" class="button-tint is-busy" disabled data-track="show-all-busy">' + (online ? 'Downloading from OneDrive…' : 'Reading the mail…') + '</button>';
   }
-  if (st.state === 'error') {
+  if (st.state === BodyState.ERROR) {
     return '<div class="pv-error" role="alert">' + glyph('triangle-alert') + '<div><strong>' + esc(BODY_TITLES[st.error] || 'Couldn\'t read the mail') +
       '</strong><p>' + esc(st.message) + '</p>' +
       (st.error === 'timeout' || st.error === 'read' ? '<button type="button" class="button-ghost" data-act="showall" data-track="show-all-retry">Try again</button>' : '') +
@@ -190,21 +191,21 @@ export async function openPreviewSheet() {
 // --------------------------------------------------------------- actions
 
 async function showAll(d) {
-  const st = S.body.get(d.id);
-  if (!d.readable || (st && st.state === 'loading')) return;
-  S.body.set(d.id, { state: 'loading' });
+  if (!d.readable || !canLoad(S.body, d.id)) return;
+  bodyStep(S.body, d.id, BodyState.LOADING);
   renderPreview();
   const res = await api('/api/emails/' + d.id + '/body');
   let data = null;
   try { data = await res.json(); } catch (e) { data = null; }
-  S.body.set(d.id, res.ok ? { state: 'ok', data } : { state: 'error', error: data && data.error, message: (data && data.detail) || 'HTTP ' + res.status });
+  if (res.ok) bodyStep(S.body, d.id, BodyState.OK, { data });
+  else bodyStep(S.body, d.id, BodyState.ERROR, { error: data && data.error, message: (data && data.detail) || 'HTTP ' + res.status });
   renderPreview();
 }
 
 /** Redraw one mail's full-message block where it shows, in place, and keep the keyboard on the control that was used. */
 function refreshFrame(id, focusAct) {
   const st = S.body.get(id);
-  if (!st || st.state !== 'ok' || !st.data.html) return;
+  if (!st || st.state !== BodyState.OK || !st.data.html) return;
   for (const host of [$('previewDock'), $('previewSheetBody')]) {
     const old = host.querySelector('[data-frame="' + id + '"]');
     if (!old) continue;

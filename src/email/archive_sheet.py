@@ -3,8 +3,10 @@
 Pure orchestration over the Outlook client's surface (``read_mail``,
 ``set_category``), the suggester, the archiver and the index, so a fake client
 drives both steps in a test. The sheet replaces the old archive dialog, so
-filing writes the ``.msg`` and its attachments into an email folder and tags
-the mail; it never moves it, which stays the batch ``apply`` verb's job.
+filing writes the ``.msg`` and its attachments into an email folder
+(``save_mail``, all the user waits on), then tags the mail and queues its
+folder for indexing (``follow_up``, after the window closes); it never moves
+it, which stays the batch ``apply`` verb's job.
 Every failure is a ``SheetError`` with its own code and words, never a bare
 exception the page cannot tell apart.
 """
@@ -13,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -38,6 +41,7 @@ ERR_NO_EXPLORER = "no_explorer_folder"
 ERR_ALREADY = "already_archived"
 ERR_ARCHIVE = "archive_failed"
 ERR_CATEGORY = "category_failed"
+ERR_INDEX = "index_failed"
 ERR_NOT_IN_MAILBOX = "not_in_mailbox"
 ERR_TIMEOUT = "timeout"
 ERR_FAILED = "failed"
@@ -58,6 +62,7 @@ MESSAGES = {
     ERR_ALREADY: "This mail is already archived.",
     ERR_ARCHIVE: "The mail couldn't be saved to the folder.",
     ERR_CATEGORY: "The mail was filed, but Outlook wouldn't take the category.",
+    ERR_INDEX: "The mail was filed, but its folder wasn't queued for indexing: search finds it after the next scan.",
     ERR_NOT_IN_MAILBOX: "The live copy isn't in the Inbox, the archive folder or Sent Items any more.",
     ERR_TIMEOUT: "Outlook didn't answer in time. A dialog may be waiting in Outlook.",
     ERR_FAILED: "Something went wrong talking to Outlook.",
@@ -238,13 +243,26 @@ def rank_data(raw: Any) -> Optional[EmailData]:
         return None
 
 
-def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],
-              duplicate: bool = False, date_prefix: str = "auto") -> dict[str, Any]:
-    """Save the mail and its attachments into ``folder_path`` and tag it with ``category`` (none when blank).
+@dataclass(frozen=True)
+class Saved:
+    """A mail confirmed on disk, and what the steps after the save need of it."""
+
+    item: Any
+    folder_path: str
+    email_path: str
+    category: Optional[str]
+
+
+def save_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],
+              duplicate: bool = False, date_prefix: str = "auto",
+              timer: Optional[StageTimer] = None) -> tuple[dict[str, Any], Saved]:
+    """Save the mail and its attachments into ``folder_path``: everything the user waits on, and nothing else.
 
     A mail the index already holds is refused unless ``duplicate`` says the user asked for another copy;
     the copy still takes the folder's next sequence number, so no file is ever overwritten.
     ``date_prefix`` is one of ``DATE_PREFIX_CHOICES``: ``auto`` keeps the configured mode for the folder.
+    The ``.msg`` is confirmed on disk before this returns. Tagging with ``category`` and indexing the
+    folder are ``follow_up``'s, run once the window has closed or the page has its answer.
     """
     if date_prefix not in DATE_PREFIX_CHOICES:
         raise ValueError("unknown date prefix choice: " + str(date_prefix))
@@ -258,6 +276,8 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
         logger.warning("⚠️ archive sheet: refused a folder that is %s", refusal)
         raise SheetError(ERR_OUTSIDE)
     mail = client.read_mail(item)
+    if timer:
+        timer.mark("read_mail")
     conn = open_index(cfg)
     try:
         filed = _filed_as(EmailRepository(conn), mail.message_id)
@@ -265,26 +285,83 @@ def file_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
         conn.close()
     if filed and not duplicate:
         raise SheetError(ERR_ALREADY, "This mail is already archived as " + os.path.basename(filed) + ".")
+    if timer:
+        timer.mark("duplicate_check")
     try:
-        archived = EmailArchiver(cfg, date_prefix=DATE_PREFIX_CHOICES[date_prefix]).archive(item, str(folder), mail.subject)
+        archived = EmailArchiver(cfg, date_prefix=DATE_PREFIX_CHOICES[date_prefix]).archive(item, str(folder), mail.subject,
+                                                                                             timer)
     except Exception as exc:
         logger.exception("❌ archive sheet: saving the mail failed")
         raise SheetError(ERR_ARCHIVE, MESSAGES[ERR_ARCHIVE] + " " + type(exc).__name__ + ": " + str(exc)) from exc
+    # The window closes on this answer, so the file has to be there, not just reported saved by Outlook.
+    if not os.path.isfile(archived.email_path) or os.path.getsize(archived.email_path) == 0:
+        logger.error("❌ archive sheet: Outlook reported the save, but %s is missing or empty",
+                     os.path.basename(archived.email_path))
+        raise SheetError(ERR_ARCHIVE, MESSAGES[ERR_ARCHIVE] + " Outlook reported it saved, but the file isn't there.")
     conn = open_index(cfg)
     try:
         record_filed_mail(EmailRepository(conn), mail, archived.email_path)
     finally:
         conn.close()
-    doc: dict[str, Any] = {"ok": True, "folder_path": str(folder), "files": [archived.email_path, *archived.attachment_paths],
-                           "category": category or "", "categorized": False, "error": None}
-    if category:
-        try:
-            client.set_category(item, category)
-            doc["categorized"] = True
-        except Exception as exc:
-            logger.exception("⚠️ archive sheet: tagging the mail failed")
-            doc["ok"] = False
-            doc["error"] = {"code": ERR_CATEGORY, "message": MESSAGES[ERR_CATEGORY] + " " + type(exc).__name__}
-    logger.info("✅ archive sheet: filed %s (%d attachment(s))%s", os.path.basename(archived.email_path),
+    if timer:
+        timer.mark("record")
+    logger.info("✅ archive sheet: saved %s (%d attachment(s))%s", os.path.basename(archived.email_path),
                 len(archived.attachment_paths), ", a copy of " + os.path.basename(filed) if filed else "")
+    doc: dict[str, Any] = {"ok": True, "folder_path": str(folder), "files": [archived.email_path, *archived.attachment_paths],
+                           "category": category or "", "error": None}
+    return doc, Saved(item, str(folder), archived.email_path, category)
+
+
+def _stamp_category(client: Any, saved: Saved) -> bool:
+    if not saved.category:
+        return False
+    client.set_category(saved.item, saved.category)
+    return True
+
+
+def _queue_index(client: Any, saved: Saved) -> bool:
+    from src.email import indexer  # noqa: PLC0415 - only a filing starts the indexer; the macro's entry starts faster without it
+
+    indexer.spawn("archive", saved.folder_path)
+    return True
+
+
+@dataclass(frozen=True)
+class FollowUpStep:
+    """One step after the save: ``run`` answers whether it did anything, and raises when it failed."""
+
+    name: str
+    key: str
+    code: str
+    run: Callable[[Any, Saved], bool]
+
+
+# What runs after the save, in order, off the user's wait. Another step (moving the mail in Outlook) joins this tuple.
+FOLLOW_UP_STEPS = (
+    FollowUpStep("category", "categorized", ERR_CATEGORY, _stamp_category),
+    FollowUpStep("index", "indexing", ERR_INDEX, _queue_index),
+)
+
+
+def follow_up(client: Any, saved: Saved, steps: tuple[FollowUpStep, ...] = FOLLOW_UP_STEPS,
+              timer: Optional[StageTimer] = None) -> dict[str, Any]:
+    """Run every step after the save; one failing never stops the next, and each failure is reported.
+
+    Answers ``{"ok", <each step's key>: bool, "error": None | {"code", "message"}}``; the error carries the
+    first failure's code and every failure's words, so the user hears all of them in one notice.
+    """
+    doc: dict[str, Any] = {"ok": True, "error": None}
+    failed: list[tuple[str, str]] = []
+    for step in steps:
+        try:
+            doc[step.key] = step.run(client, saved)
+        except Exception as exc:
+            logger.exception("⚠️ archive sheet: the %s step after the save failed", step.name)
+            doc[step.key] = False
+            failed.append((step.code, MESSAGES[step.code] + " " + type(exc).__name__))
+        if timer:
+            timer.mark(step.name)
+    if failed:
+        doc["ok"] = False
+        doc["error"] = {"code": failed[0][0], "message": " ".join(message for _, message in failed)}
     return doc

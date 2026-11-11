@@ -109,12 +109,11 @@ def test_no_suggestion_leaves_nothing_to_archive(root: Path) -> None:
 
 def test_each_filing_result_has_its_own_words(root: Path) -> None:
     view = ModelView(_doc(root))
-    done = view.outcome({"ok": True, "files": ["a"], "folder_path": "/m/Clients/Northwind", "indexing": True})
-    assert (done.filed, done.ok, done.text) == (True, True, "Archived to Clients\\Northwind. Indexing the folder now.")
-    untagged = view.outcome({"ok": False, "files": ["a"], "folder_path": "/m/Internal", "error": {"message": "no tag"}})
-    assert (untagged.filed, untagged.ok, untagged.text) == (True, False, "Filed to m\\Internal, but not tagged: no tag")
+    done = view.outcome({"ok": True, "files": ["a"], "folder_path": "/m/Clients/Northwind"})
+    assert (done.filed, done.text) == (True, "Archived to Clients\\Northwind")
     refused = view.outcome({"ok": False, "error": {"message": "outside"}})
     assert (refused.filed, refused.text) == (False, "outside")
+    assert view.outcome({"ok": False}).text == "Not archived"
 
 
 def test_paths_and_dates_read_like_the_page_writes_them() -> None:
@@ -211,6 +210,9 @@ def window(root: Path, tk_root: tk.Tk, monkeypatch: pytest.MonkeyPatch) -> Itera
 
     source = _Folders(root, root.parent / "Elsewhere")
     view = _build(ArchiveView(_doc(root), on_file, source, theme.palette(False), tk_root))
+    # The shared Tk root outlives the test: a close is recorded, not done.
+    calls["closed"] = closed = []
+    view.close = lambda: closed.append(True)  # type: ignore[method-assign]
     calls["view"], calls["source"] = view, source
     yield calls
     view.frame.destroy()
@@ -249,7 +251,7 @@ def test_choosing_a_folder_and_a_date_prefix_files_with_both(window: dict[str, A
     view.category.choose("")
     view._archive()
     assert window["filed"] == [(str(root / "Internal"), None, False, "on")]
-    assert view.status.cget("text") == "Archived to Mail\\Internal"
+    assert window["closed"] == [True], "the window closes the moment the save is confirmed, with no linger"
 
 
 def test_a_failed_filing_keeps_the_window_and_the_choice(window: dict[str, Any], root: Path) -> None:
@@ -257,6 +259,7 @@ def test_a_failed_filing_keeps_the_window_and_the_choice(window: dict[str, Any],
     view.on_file = lambda *_a: {"ok": False, "error": {"message": "Outlook isn't reachable"}}
     view._archive()
     assert view.status.cget("text") == "Outlook isn't reachable" and str(view.go.cget("state")) == "normal"
+    assert window["closed"] == []
 
 
 def test_open_asks_windows_for_the_folder_and_never_a_path_outside(window: dict[str, Any], root: Path) -> None:
@@ -303,7 +306,7 @@ def test_archive_here_files_at_once_with_the_windows_choices(window: dict[str, A
     assert view.entry.bind("<Return>")
     view._archive_here()
     assert window["filed"] == [(str(root / "Internal"), None, False, "on")]
-    assert view.model.options()[0].chips == (("Found", ""),) and view.status.cget("text") == "Archived to Mail\\Internal"
+    assert view.model.options()[0].chips == (("Found", ""),) and window["closed"] == [True]
 
 
 def test_an_archived_mail_is_filed_again_only_as_a_copy(root: Path, tk_root: tk.Tk) -> None:
@@ -311,6 +314,7 @@ def test_an_archived_mail_is_filed_again_only_as_a_copy(root: Path, tk_root: tk.
     doc = _doc(root, already_archived=str(root / "Internal" / "001 - Plan.msg"))
     view = _build(ArchiveView(doc, lambda *a: filed.append(a) or {"ok": True, "files": ["a"]}, _Folders(root, root.parent),
                               theme.palette(False), tk_root))
+    view.close = lambda: None  # type: ignore[method-assign]
     _type(view, "int")
     view._archive_here()
     assert filed == [] and "Archive a copy anyway" in view.status.cget("text")
@@ -355,7 +359,8 @@ def test_the_entry_hands_the_window_a_search_and_a_filer_that_takes_every_option
     got: dict[str, Any] = {}
     monkeypatch.setattr(outlook, "hand_to_page", lambda doc, cfg: False)
     monkeypatch.setattr(outlook, "prepare", lambda cfg, e, s, defer_ranking=False, timer=None: {"ok": True})
-    monkeypatch.setattr(outlook, "file_one", lambda cfg, e, s, folder, cat, dup, dp: got.update(args=(folder, cat, dup, dp)) or {"ok": True})
+    monkeypatch.setattr(outlook, "save_one", lambda cfg, e, s, folder, cat, dup, dp, timer: got.update(args=(folder, cat, dup, dp))
+                        or ({"ok": True, "files": ["a"], "folder_path": folder}, lambda: {"ok": True}))
     monkeypatch.setattr(outlook, "_apartment", __import__("contextlib").nullcontext)
     monkeypatch.setattr(outlook, "_guarded", lambda work: work())
     monkeypatch.setattr("src.archive_window.show_window",

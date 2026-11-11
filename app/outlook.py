@@ -11,7 +11,8 @@
         --defer-ranking answers before ranking, and the server ranks with its warm index
     python -m app.outlook file --entry-id <id> --store-id <id> --folder <folder> [--category <name>] [--duplicate]
             [--date-prefix auto|on|off]
-        save that mail into an email folder, tag it, and start indexing the folder
+        save that mail into an email folder and print that document at once; then tag it, start
+        indexing the folder, and print the follow-up's document as a second line
     python -m app.outlook show --message-id <id>
         Find in mailbox: open the live copy of an archived mail in Outlook
     python -m app.outlook explorer
@@ -136,21 +137,54 @@ def prepare(cfg: dict[str, Any], entry_id: Optional[str], store_id: str, defer_r
     return doc
 
 
-def file_one(cfg: dict[str, Any], entry_id: str, store_id: str, folder: str, category: Optional[str],
-             duplicate: bool = False, date_prefix: str = "auto") -> dict[str, Any]:
-    """File the mail the ids name, then start indexing its folder so search finds it."""
-    from src.email import indexer  # noqa: PLC0415 - only filing starts the indexer; the macro's entry starts faster without it
+def save_one(cfg: dict[str, Any], entry_id: str, store_id: str, folder: str, category: Optional[str],
+             duplicate: bool = False, date_prefix: str = "auto",
+             timer: Optional[StageTimer] = None) -> tuple[dict[str, Any], Callable[[], dict[str, Any]]]:
+    """Save the mail the ids name; the save's document, and the follow-up to run once the user stopped waiting.
 
-    item = bridge.mail_by_ids(bridge.attach(), entry_id, store_id)
+    The follow-up (tag, index the folder) runs on this same thread, so it reaches the mail through the
+    apartment that read it; it logs the whole filing's timings when it ends.
+    """
+    timer = timer or StageTimer("file")
+    app = bridge.attach()
+    timer.mark("attach")
+    item = bridge.mail_by_ids(app, entry_id, store_id)
     if item is None:
         raise SheetError(ERR_GONE)
-    doc = archive_sheet.file_mail(OutlookClient(), cfg, item, folder, category, duplicate, date_prefix)
-    try:
-        indexer.spawn("archive", doc["folder_path"])
-        doc["indexing"] = True
-    except OSError as exc:
-        logger.warning("⚠️ the filed mail's folder was not indexed: %s", exc)
-        doc["indexing"] = False
+    timer.mark("get_item")
+    client = OutlookClient()
+    doc, saved = archive_sheet.save_mail(client, cfg, item, folder, category, duplicate, date_prefix, timer)
+
+    def finish() -> dict[str, Any]:
+        try:
+            return archive_sheet.follow_up(client, saved, timer=timer)
+        finally:
+            timer.log(logger)
+
+    return doc, finish
+
+
+def _file_verb(cfg: dict[str, Any], args: argparse.Namespace, timer: StageTimer) -> dict[str, Any]:
+    """``file``: print the save's document the moment the mail is on disk, then the follow-up's as a second line.
+
+    The server answers the page on the first line; it hears the second while the page already shows the result.
+    """
+    finish: list[Callable[[], dict[str, Any]]] = []
+
+    def save() -> dict[str, Any]:
+        doc, then = save_one(cfg, args.entry_id, args.store_id, args.folder, args.category or None, args.duplicate,
+                             args.date_prefix, timer)
+        finish.append(then)
+        return doc
+
+    with _apartment():
+        doc = _guarded(save)
+        _emit(doc)
+        if not finish:
+            timer.log(logger)
+            return doc
+        timer.mark("answered")
+        _emit(_guarded(finish[0]))
     return doc
 
 
@@ -236,7 +270,7 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[S
                 timer.log(logger)
                 return EXIT_OK
         from app.webapp.state import LocalFolders  # noqa: PLC0415 - only the window searches here
-        from src.archive_window import show_window  # noqa: PLC0415 - tkinter only when no page is open
+        from src.archive_window import show_notice, show_window  # noqa: PLC0415 - tkinter only when no page is open
 
         data = archive_sheet.rank_data(doc.pop("rank_input", None))
         doc.pop("ids", None)
@@ -250,11 +284,29 @@ def archive(cfg: dict[str, Any], entry_id: str, store_id: str, timer: Optional[S
             if stage == "suggestions_shown" or rank is None:
                 timer.log(logger)
 
-        show_window(doc, lambda folder, category, duplicate, date_prefix: _guarded(
-            lambda: file_one(cfg, entry_id, store_id, folder, category, duplicate, date_prefix)),
-                    LocalFolders(cfg),
+        # Each save the window made: its timings, and the follow-up that runs once the window is gone.
+        filed: list[tuple[StageTimer, Callable[[], dict[str, Any]], str]] = []
+
+        def on_file(folder: str, category: Optional[str], duplicate: bool, date_prefix: str) -> dict[str, Any]:
+            clock = StageTimer("file")
+
+            def save() -> dict[str, Any]:
+                saved, finish = save_one(cfg, entry_id, store_id, folder, category, duplicate, date_prefix, clock)
+                filed.append((clock, finish, saved["folder_path"]))
+                return saved
+
+            return _guarded(save)
+
+        show_window(doc, on_file, LocalFolders(cfg),
                     current_explorer=lambda: _guarded(lambda: archive_sheet.explorer_folder(cfg)),
                     rank=rank, progress=progress)
+        for clock, finish, folder_path in filed:
+            clock.mark("window_closed")
+            after = _guarded(finish)
+            if not after.get("ok"):
+                # The window is gone, so a failure after the save gets its own notice rather than a log line alone.
+                show_notice("Archived, with a problem",
+                            "The mail is saved in %s.\n\n%s" % (folder_path, (after.get("error") or {}).get("message", "")))
     return EXIT_OK
 
 
@@ -313,9 +365,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                                                args.defer_ranking, timer))
             timer.log(logger)
     elif args.verb == "file":
-        with _apartment():
-            doc = _guarded(lambda: file_one(cfg, args.entry_id, args.store_id, args.folder, args.category or None, args.duplicate,
-                                             args.date_prefix))
+        doc = _file_verb(cfg, args, timer)
+        return EXIT_OK if doc.get("ok") else EXIT_REFUSED
     elif args.verb == "explorer":
         with _apartment():
             doc = _guarded(lambda: archive_sheet.explorer_folder(cfg))

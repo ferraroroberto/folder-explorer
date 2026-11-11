@@ -128,10 +128,9 @@ class FileRequest:
 
 @dataclass(frozen=True)
 class Outcome:
-    """What a filing came to: ``filed`` when the files were written, ``ok`` when the tag took too."""
+    """What a save came to: ``filed`` when the ``.msg`` is on disk, and the words for it."""
 
     filed: bool
-    ok: bool
     text: str
 
 
@@ -227,11 +226,7 @@ class ModelView:
         return FileRequest(choice.folder_path, self.category or None, bool(self.filed and self.copy), self.date_prefix)
 
     def outcome(self, result: dict[str, Any]) -> Outcome:
-        """The words for a filing's result: filed and tagged, filed but not tagged, or not filed."""
-        error = (result.get("error") or {}).get("message") or "Not archived"
+        """The words for a save's result: filed (the window closes), or not filed and why."""
         if result.get("files"):
-            where = last_two(result.get("folder_path") or "")
-            if result.get("ok"):
-                return Outcome(True, True, "Archived to " + where + (". Indexing the folder now." if result.get("indexing") else ""))
-            return Outcome(True, False, "Filed to %s, but not tagged: %s" % (where, error))
-        return Outcome(False, False, error)
+            return Outcome(True, "Archived to " + last_two(result.get("folder_path") or ""))
+        return Outcome(False, (result.get("error") or {}).get("message") or "Not archived")

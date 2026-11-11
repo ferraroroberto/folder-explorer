@@ -43,8 +43,6 @@ from src.archive_window.work_area import work_area as monitor_work_area
 
 logger = logging.getLogger(__name__)
 
-# How long the window stays up after a filing, so the result can be read.
-CLOSE_AFTER_MS = 1800
 # How long typing in "Find a folder" pauses before it searches.
 DEBOUNCE_MS = 200
 WIDTH = 640
@@ -685,9 +683,10 @@ class ArchiveView:
         result = self.on_file(request.folder, request.category, request.duplicate, request.date_prefix)
         self.busy = False
         out = self.model.outcome(result)
-        self._say(out.text, self.pal.success if out.ok else self.pal.danger_text)
         if out.filed:
-            self.go.configure(state="disabled")
-            self.root.after(CLOSE_AFTER_MS, self.close)
+            # The .msg is confirmed on disk; tagging and indexing run after the window is gone, and say so if they fail.
+            logger.info("ℹ️ archive: %s", out.text)
+            self.close()
             return
+        self._say(out.text, self.pal.danger_text)
         self._paint_summary()

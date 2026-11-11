@@ -30,7 +30,7 @@ MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", 
 # Where each field of the sheet's document is shown in the window; the value names the Option or ModelView attribute.
 DOC_SHOWN = {"ok": "error block", "error": "error block", "mail": "mail card", "already_archived": "ModelView.filed",
              "suggestions": "ModelView.options", "ranking": "ModelView.ranking", "category": "ModelView.category_choices",
-             "roots": "Option.shown"}
+             "add_category": "ModelView.show_category", "roots": "Option.shown"}
 RANKING_NOTE = "Finding folders…"
 NO_MATCH_NOTE = "No folder matches this mail yet. Find one below."
 MAIL_SHOWN = {"subject": "mail card", "sender": "mail card", "date_sent": "mail card", "attachment_count": "mail card",
@@ -151,8 +151,10 @@ class ModelView:
         self.doc = doc
         self.roots = [str(r) for r in doc.get("roots") or []]
         self.filed: Optional[str] = doc.get("already_archived") or None
-        self.category_choices = [doc["category"]] if doc.get("category") else []
-        self.category = doc.get("category") or ""
+        # The switch is the server's: with it off the document carries no category and the row is not shown.
+        self.show_category = doc.get("add_category") is True
+        self.category_choices = [doc["category"]] if self.show_category and doc.get("category") else []
+        self.category = (doc.get("category") or "") if self.show_category else ""
         self.copy = False
         self.date_prefix = "auto"
         self.choice = 0

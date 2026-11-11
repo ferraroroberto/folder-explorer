@@ -10,6 +10,7 @@ import { folderList } from './folder-list.js';
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
+let categorySwitch = null;
 let traySwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
@@ -30,6 +31,10 @@ function render(body) {
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
     : 'Off: each Open starts a new File Explorer window. Turn on for a faster open that reuses the window you used last.';
+  setSwitch(categorySwitch, cfg.outlook.add_category);
+  $('archiveCategoryNote').textContent = cfg.outlook.add_category
+    ? 'On: the Archive window and sheet offer the category "' + cfg.outlook.category + '" and stamp it on the mail they file.'
+    : 'Off: the Archive window and sheet show no category row, and filing stamps none on the mail.';
   const quick = cfg.tray.left_click === 'quick_search';
   setSwitch(traySwitch, quick);
   $('trayClickNote').textContent = quick
@@ -116,6 +121,11 @@ export function initSettings(opts) {
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
+  categorySwitch = switchEl(false, {
+    label: 'Add an Outlook category when archiving',
+    onToggle: (next) => save({ outlook: { add_category: next } }),
+  });
+  $('archiveCategorySlot').appendChild(categorySwitch);
   traySwitch = switchEl(true, {
     label: 'Tray click opens Quick search',
     onToggle: async (next) => {

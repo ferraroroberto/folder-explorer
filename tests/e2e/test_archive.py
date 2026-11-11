@@ -36,7 +36,7 @@ def _suggestion(rel: str, label: str, tone: str, note: str, seq: str, score: flo
 
 
 PREPARED = {
-    "ok": True, "token": "invented-token", "mail": MAIL, "already_archived": None, "category": "Archived", "roots": [ROOT],
+    "ok": True, "token": "invented-token", "mail": MAIL, "already_archived": None, "add_category": True, "category": "Archived", "roots": [ROOT],
     "suggestions": [
         _suggestion("Clients/Project Alpha/2026", "Same subject", "accent", "This conversation is filed here", "004", 0.81, 21),
         _suggestion("Clients/Project Alpha/2025", "Sender", "", "12 emails from leo@example.org", "031", 0.52, 22),
@@ -95,6 +95,19 @@ def _file_the_archived_mail_again_through_the_copy_switch(page: Page, sheet: Loc
     expect(sheet).to_be_hidden()
     assert filed[1:] == [{"token": "invented-token", "folder": ROOT + "/Clients/Project Alpha/2026", "category": "Archived",
                           "date_prefix": "auto", "duplicate": True}]
+
+
+def _with_the_category_switch_off_the_sheet_shows_no_category_row(page: Page, sheet: Locator, filed: list[dict[str, Any]]) -> None:
+    page.route("**/api/archive/current", lambda r: _json(r, dict(PREPARED, add_category=False, category="")))
+    page.locator("#openArchive").click()
+    expect(sheet).to_be_visible()
+    expect(sheet.locator(".arch-opt")).to_have_count(3)
+    expect(sheet.locator("#archCat")).to_have_count(0)
+    expect(sheet.get_by_text("Outlook category")).to_have_count(0)
+    _lint_both_themes(page, allow=BELOW_FOLD)
+    sheet.locator("#archiveGo").click()
+    expect(sheet).to_be_hidden()
+    assert filed[-1]["category"] == ""
 
 
 def _the_macro_sheet_lists_its_steps_and_copies_the_macro(page: Page, browser_name: str) -> None:
@@ -193,6 +206,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     expect(page.locator("#outlookMeta")).to_have_text("Last filed to Northwind\\2026")
 
     _file_the_archived_mail_again_through_the_copy_switch(page, sheet, filed)
+    _with_the_category_switch_off_the_sheet_shows_no_category_row(page, sheet, filed)
 
     _the_macro_sheet_lists_its_steps_and_copies_the_macro(page, browser_name)
     assert errors == []

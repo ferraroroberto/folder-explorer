@@ -39,6 +39,7 @@
     "archive_folder": "Archive",
     "category": "Archived by task-os",
     "dismiss_category": "Dismissed by task-os",
-    "self_address": null
+    "self_address": null,
+    "add_category": false
   }
 }

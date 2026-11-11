@@ -33,7 +33,7 @@ SAVED = {"auto": "001 - Plan.msg", "on": "2026-11-05 - 001 - Plan.msg", "off": "
 def _doc(root: Path, **over: Any) -> dict[str, Any]:
     for name in ("Clients/Northwind", "Internal"):
         (root / name).mkdir(parents=True, exist_ok=True)
-    doc = {"ok": True, "category": "Filed", "roots": [str(root)], "already_archived": None,
+    doc = {"ok": True, "add_category": True, "category": "Filed", "roots": [str(root)], "already_archived": None,
            "mail": {"message_id": "m1", "subject": "Plan", "sender": "leo@example.invalid", "date_sent": "2026-11-05T09:12:00",
                     "attachment_count": 2, "where": "Inbox", "preview": "Hello team"},
            "suggestions": [
@@ -91,6 +91,15 @@ def test_the_request_carries_folder_category_and_date_prefix(root: Path) -> None
     assert (req.folder, req.category, req.duplicate, req.date_prefix) == (str(root / "Internal"), "Filed", False, "off")  # type: ignore[union-attr]
     view.category = ""
     assert view.request().category is None  # type: ignore[union-attr]
+
+
+def test_with_the_switch_off_the_window_offers_no_category_and_files_with_none(root: Path) -> None:
+    view = ModelView(_doc(root, add_category=False, category=""))
+    assert view.show_category is False and view.category_choices == []
+    assert view.request().category is None  # type: ignore[union-attr]
+    # A document from an older server carries a category but no switch: the row stays hidden and nothing is sent.
+    older = ModelView(_doc(root, add_category=None))
+    assert older.show_category is False and older.request().category is None  # type: ignore[union-attr]
 
 
 def test_no_suggestion_leaves_nothing_to_archive(root: Path) -> None:
@@ -233,6 +242,16 @@ def test_the_window_shows_what_the_sheet_shows(window: dict[str, Any]) -> None:
                      "Browse…", "Outlook category", "Filed", "No category", "Date prefix", "Saved as", "001 - Plan.msg",
                      "Archive to Clients\\Northwind", "Cancel"):
         assert expected in shown, expected
+
+
+def test_the_window_has_no_category_row_with_the_switch_off(root: Path, tk_root: tk.Tk) -> None:
+    source = _Folders(root, root.parent / "Elsewhere")
+    view = _build(ArchiveView(_doc(root, add_category=False, category=""), lambda *_a: {"ok": True}, source, theme.palette(False), tk_root))
+    try:
+        shown = chr(10).join(_texts(view.root))
+        assert "Outlook category" not in shown and "No category" not in shown and "Date prefix" in shown
+    finally:
+        view.frame.destroy()
 
 
 def test_choosing_a_folder_and_a_date_prefix_files_with_both(window: dict[str, Any], root: Path) -> None:

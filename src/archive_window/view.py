@@ -334,10 +334,11 @@ class ArchiveView:
 
     def _build_settings(self) -> None:
         assert self.model is not None
-        row = self._row("Outlook category")
-        items = [(c, c) for c in self.model.category_choices] + [("", NO_CATEGORY)]
-        self.category = Segmented(row, self.pal, items, self.model.category, self._set_category)
-        self.category.pack(side="right")
+        if self.model.show_category:
+            row = self._row("Outlook category")
+            items = [(c, c) for c in self.model.category_choices] + [("", NO_CATEGORY)]
+            self.category = Segmented(row, self.pal, items, self.model.category, self._set_category)
+            self.category.pack(side="right")
         row = self._row("Date prefix")
         self.date = Segmented(row, self.pal, list(DATE_CHOICES), self.model.date_prefix, self._set_date)
         self.date.pack(side="right")

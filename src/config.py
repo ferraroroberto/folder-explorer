@@ -72,9 +72,12 @@ DEFAULTS: dict[str, Any] = {
     "archive": {"date_prefix": False, "max_path_length": 255, "max_suggestions": 3, "min_score": 0.05},
     # The Outlook side of the archive verbs: the folder a filed mail moves to,
     # the categories they stamp, and the address a draft blind-copies (null:
-    # the default account's, read from Outlook). Set by editing config.json.
+    # the default account's, read from Outlook). Set by editing config.json,
+    # except add_category: the Settings switch for the category the Archive
+    # window and sheet stamp (off: neither offers one and filing stamps none).
     "outlook": {"archive_folder": "Archive", "category": "Archived by task-os",
-                "dismiss_category": "Dismissed by task-os", "self_address": None},
+                "dismiss_category": "Dismissed by task-os", "self_address": None,
+                "add_category": False},
 }
 
 # The most leading components folder search may hide.
@@ -85,7 +88,7 @@ _EMAIL_KEYS = {"index_path", "roots", "exclude", "download_budget_mb"}
 # The longest path the archiver may be told to write; Windows' own limit is 260.
 MAX_PATH_LENGTH = 260
 # Settings only config.json sets: no Settings control writes them.
-READ_ONLY = ("port", "server", "archive", "outlook")
+READ_ONLY = ("port", "server", "archive")
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -152,6 +155,8 @@ def _clean_outlook(raw: Any) -> dict[str, Any]:
         value = raw.get(key)
         if isinstance(value, str) and value.strip():
             out[key] = value.strip()
+    if isinstance(raw.get("add_category"), bool):
+        out["add_category"] = raw["add_category"]
     return out
 
 
@@ -271,6 +276,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "tray":
             if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
+        if key == "outlook":
+            if not (isinstance(value, dict) and set(value) == {"add_category"} and isinstance(value["add_category"], bool)):
+                raise ValueError("outlook takes add_category, true or false")
         out[key] = value
     return out
 
@@ -315,7 +323,12 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
             current = {}
     except (OSError, ValueError):
         current = {}
-    current.update(clean)
+    for key, value in clean.items():
+        # Settings sets one outlook key; the folder and category names the file holds stay as they are.
+        if key == "outlook":
+            held = current.get("outlook")
+            value = {**(held if isinstance(held, dict) else {}), **value}
+        current[key] = value
     atomic_write_text(path, json.dumps(current, indent=2) + "\n")
     logger.info("ℹ️ settings saved: %s", ", ".join(sorted(clean)))
     return load()

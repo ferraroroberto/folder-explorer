@@ -64,7 +64,8 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     root = tmp_path / "archive"
     root.mkdir()
     # The setting is off here so the hand-off tests reach the page; the tests of the default turn it on.
-    write_config(tmp_path, roots=[str(tmp_path)], email={"roots": [str(root)]}, macro={"prefer_window": False})
+    write_config(tmp_path, roots=[str(tmp_path)], email={"roots": [str(root)]}, macro={"prefer_window": False},
+                 outlook={"add_category": True})
     cfg = config.load()
     _seed_index(cfg, root, {"Project Alpha": ["Kickoff agenda"]})
     item = _mail("kick@example.invalid", "Kickoff agenda")
@@ -118,6 +119,35 @@ def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNam
         assert fake.spawned == [("archive", str(Path(dest).resolve()))]
         again = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest})
         assert again.status_code == 404
+
+
+def test_with_the_switch_off_the_sheet_offers_no_category_and_the_server_stamps_none(fake: SimpleNamespace,
+                                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = config.save({"outlook": {"add_category": False}})
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        handed = c.get("/api/archive/pending").json()["mail"]
+        assert handed["add_category"] is False and handed["category"] == ""
+        dest = handed["suggestions"][0]["folder_path"]
+        filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest, "category": "Filed"}).json()
+        assert filed["ok"] and not filed["categorized"] and filed["category"] == "" and fake.item.Categories == ""
+
+
+def test_the_setting_saves_alone_and_keeps_the_other_outlook_keys(fake: SimpleNamespace, tmp_path: Path) -> None:
+    config.save({"outlook": {"add_category": False}})
+    path = tmp_path / "config.json"
+    path.write_text(path.read_text(encoding="utf-8").replace('"add_category": false', '"add_category": false, "category": "Mine"'), encoding="utf-8")
+    with TestClient(app, client=LOCAL) as c:
+        for bad in ("yes", None, 1):
+            assert c.post("/api/config", json={"outlook": {"add_category": bad}}).status_code == 400
+        for bad in ({}, {"add_category": True, "category": "Other"}, {"archive_folder": "X"}):
+            assert c.post("/api/config", json={"outlook": bad}).status_code == 400
+        saved = c.post("/api/config", json={"outlook": {"add_category": True}})
+        assert saved.status_code == 200 and saved.json()["config"]["outlook"]["add_category"] is True
+    assert config.load()["outlook"]["add_category"] is True and config.load()["outlook"]["category"] == "Mine"
+    assert config.DEFAULTS["outlook"]["add_category"] is False
 
 
 def test_an_archived_mail_is_refused_until_the_page_asks_for_a_copy(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:

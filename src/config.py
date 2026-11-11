@@ -73,12 +73,16 @@ DEFAULTS: dict[str, Any] = {
     # The Outlook side of the archive verbs: the folder a filed mail moves to,
     # the categories they stamp, and the address a draft blind-copies (null:
     # the default account's, read from Outlook). Set by editing config.json,
-    # except add_category: the Settings switch for the category the Archive
-    # window and sheet stamp (off: neither offers one and filing stamps none).
+    # except the two Settings switches: add_category (the category the Archive
+    # window and sheet stamp; off: neither offers one and filing stamps none)
+    # and move_to_archive (off: filing leaves the mail where it is in Outlook).
     "outlook": {"archive_folder": "Archive", "category": "Archived by task-os",
                 "dismiss_category": "Dismissed by task-os", "self_address": None,
-                "add_category": False},
+                "add_category": False, "move_to_archive": False},
 }
+
+# The outlook keys the Settings screen switches; the rest of the block is edited in config.json.
+OUTLOOK_SWITCHES = ("add_category", "move_to_archive")
 
 # The most leading components folder search may hide.
 MAX_SKIP_LEVELS = 8
@@ -176,8 +180,9 @@ def _clean_outlook(raw: Any) -> dict[str, Any]:
         value = raw.get(key)
         if isinstance(value, str) and value.strip():
             out[key] = value.strip()
-    if isinstance(raw.get("add_category"), bool):
-        out["add_category"] = raw["add_category"]
+    for key in OUTLOOK_SWITCHES:
+        if isinstance(raw.get(key), bool):
+            out[key] = raw[key]
     return out
 
 
@@ -298,8 +303,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
         if key == "outlook":
-            if not (isinstance(value, dict) and set(value) == {"add_category"} and isinstance(value["add_category"], bool)):
-                raise ValueError("outlook takes add_category, true or false")
+            if not (isinstance(value, dict) and value and set(value) <= set(OUTLOOK_SWITCHES)
+                    and all(isinstance(v, bool) for v in value.values())):
+                raise ValueError("outlook takes " + " and ".join(OUTLOOK_SWITCHES) + ", true or false")
         out[key] = value
     return out
 

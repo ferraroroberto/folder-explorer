@@ -241,6 +241,14 @@ class FakeOutlookClient:
         finally:
             self.view_away = False
 
+    # The fake keeps Sent Items as a folder named "Sent Items"; `sent_check_unknown` is Outlook not saying.
+    sent_check_unknown = False
+
+    def is_in_sent_items(self, item: _FakeMailItem) -> bool | None:
+        if self.sent_check_unknown:
+            return None
+        return item in self.folders.get("Sent Items", [])
+
     def is_open_in_inspector(self, entry_id: str) -> bool | None:
         if self.inspector_check_raises:
             raise RuntimeError("Outlook would not list its windows")

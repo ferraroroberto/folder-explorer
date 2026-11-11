@@ -274,7 +274,7 @@ async function doArchive() {
 
 // Rounds of the server's longest wait (20 s each) that outlast its own limit on what follows a save.
 const FOLLOW_UP_ROUNDS = 4;
-const NOT_CONFIRMED = "The mail was filed, but its category and indexing couldn't be confirmed";
+const NOT_CONFIRMED = "The mail was filed, but its category, move and indexing couldn't be confirmed";
 
 /** What followed a filing: nothing to say when it went well, an error toast when it failed or can't be confirmed. */
 async function followUp(token) {

@@ -91,6 +91,11 @@ def get_outlook_add_category(cfg: dict[str, Any]) -> bool:
     return _section(cfg, "outlook").get("add_category") is True
 
 
+def get_outlook_move_to_archive(cfg: dict[str, Any]) -> bool:
+    """Whether filing a mail also moves it to the Outlook archive folder once it is saved (off unless set)."""
+    return _section(cfg, "outlook").get("move_to_archive") is True
+
+
 def get_outlook_dismiss_category(cfg: dict[str, Any]) -> str:
     """The category ``dismiss`` stamps on a mail it moved without keeping a file."""
     return _text(cfg, "outlook", "dismiss_category") or DEFAULT_DISMISSED_CATEGORY

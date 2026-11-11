@@ -21,7 +21,7 @@ export const DEFAULTS = {
   archive: { date_prefix: false, max_path_length: 255, max_suggestions: 3, min_score: 0.05 },
   outlook: {
     archive_folder: 'Archive', category: 'Archived by task-os', dismiss_category: 'Dismissed by task-os',
-    self_address: null, add_category: false,
+    self_address: null, add_category: false, move_to_archive: false,
   },
 };
 

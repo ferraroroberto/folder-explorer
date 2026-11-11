@@ -122,6 +122,28 @@ class EmailIndex:
         return {"hits": [self._hit(r, bool(q.match)) for r in rows], "total": total, "facets": chips,
                 "notes": q.notes, "words": q.words}
 
+    def flagged(self, offset: int = 0, limit: int = PAGE) -> dict[str, Any]:
+        """One page of the flagged mails, oldest first, with the count of all of them.
+
+        Oldest first so a caller draining a backlog sees mail in arrival order, whatever is added meanwhile.
+        Raises ``ValueError`` on an index without ``flag_status``: that is "can't tell", never "none flagged".
+        """
+        if "flag_status" not in self.columns:
+            raise ValueError("the email index has no flag_status column")
+        limit = max(1, min(limit, MAX_PAGE))
+        where = " FROM emails e WHERE e.flag_status = ?"
+        rows = self.conn.execute("SELECT " + self._select + where + " ORDER BY e.date_sent, e.id LIMIT ? OFFSET ?",
+                                 (FLAG_FLAGGED, limit, max(0, offset))).fetchall()
+        total = int(self.conn.execute("SELECT COUNT(*)" + where, (FLAG_FLAGGED,)).fetchone()[0])
+        return {"mails": [self._flagged_mail(r) for r in rows], "total": total}
+
+    @staticmethod
+    def _flagged_mail(r: sqlite3.Row) -> dict[str, Any]:
+        name, addr = split_address(r["sender"] or "")
+        return {"id": r["id"], "path": r["file_path"], "filename": r["filename"] or "", "folder": r["folder_path"] or "",
+                "subject": r["subject"] or "", "sender": r["sender"] or "", "from_name": name, "from_addr": addr,
+                "date": r["date_sent"] or "", "preview": r["body_preview"] or ""}
+
     def _hit(self, r: sqlite3.Row, matched: bool) -> dict[str, Any]:
         keys = r.keys()
         name, addr = split_address(r["sender"] or "")

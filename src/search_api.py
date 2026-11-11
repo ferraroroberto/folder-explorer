@@ -105,3 +105,6 @@ def email_hit(hit: dict[str, Any]) -> dict[str, Any]:
 
 
 MARKS = {"start": MARK_START, "end": MARK_END}
+
+# The flagged-mail fields of the contract, in the order docs/service-api.md lists them.
+FLAGGED_FIELDS = ("id", "path", "filename", "folder", "subject", "sender", "from_name", "from_addr", "date", "preview")

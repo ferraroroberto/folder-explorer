@@ -25,7 +25,7 @@ folder-explorer/
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
-│       │                       #   versioned search API other apps call, docs/service-api.md), archive_v1 (the archive
+│       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md)

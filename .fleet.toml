@@ -177,7 +177,7 @@ history_phrases = true
 [conventions_ratchet]
 enabled        = true
 baseline       = ".conventions-ratchet-baseline.json"
-rules          = ["no-window", "logging-not-print", "no-drive-path", "secret-compare", "git-wrapper", "password-input-vendored", "login-lockout", "state-literal", "state-set-repeat", "state-write"]
+rules          = ["no-window", "logging-not-print", "no-drive-path", "secret-compare", "git-wrapper", "password-input-vendored", "login-lockout", "state-literal", "state-set-repeat", "state-write", "subprocess-timeout"]
 secret_helpers = ["src/secret_compare.py"]
 git_wrappers   = ["src/build_info.py"]
 

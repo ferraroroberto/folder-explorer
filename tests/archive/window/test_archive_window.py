@@ -167,18 +167,6 @@ def test_an_unreadable_windows_theme_opens_light(monkeypatch: pytest.MonkeyPatch
 
 # ------------------------------------------------------------------ the window
 
-@pytest.fixture(scope="module")
-def tk_root() -> Iterator[tk.Tk]:
-    """The one Tk root the window tests share: Tk can't reliably be started again after each test, and the app opens one."""
-    try:
-        shared = tk.Tk()
-    except tk.TclError as exc:
-        pytest.skip("Tk can't open a window here: %s" % exc)
-    shared.withdraw()
-    yield shared
-    shared.destroy()
-
-
 def _build(view: ArchiveView) -> ArchiveView:
     """Build ``view`` on the shared root with closing disabled, so a pending close can't take the root down."""
     view.close = lambda: None  # type: ignore[method-assign]

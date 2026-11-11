@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import tkinter as tk
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
@@ -56,3 +58,44 @@ def fresh_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(auth, "_lockout", auth.make_lockout())
     monkeypatch.setattr(auth, "alert_notifier", lambda: None)
+
+
+# ------------------------------------------------------------------ Tk windows
+
+_MAPPED: list[str] = []
+
+
+@pytest.fixture(scope="session")
+def tk_root() -> Iterator[tk.Tk]:
+    """The one Tk root every window test shares, kept withdrawn: Tk can't reliably be started twice in a process.
+
+    A top-level the tests map is a real window on the owner's desktop, so every map is recorded
+    and :func:`no_window_mapped` fails the test that caused it.
+    """
+    try:
+        shared = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip("Tk can't open a window here: %s" % exc)
+    shared.withdraw()
+
+    def record(event: tk.Event) -> None:
+        if isinstance(event.widget, (tk.Tk, tk.Toplevel)):
+            _MAPPED.append(str(event.widget))
+
+    shared.bind_all("<Map>", record)
+    yield shared
+    shared.destroy()
+
+
+@pytest.fixture()
+def mapped_windows() -> list[str]:
+    """The top-level windows mapped since the test began; a test that expects one clears it."""
+    return _MAPPED
+
+
+@pytest.fixture(autouse=True)
+def no_window_mapped() -> Iterator[None]:
+    """A gate run opens no window on the desktop: a test that maps one fails here, whatever it asserts."""
+    _MAPPED.clear()
+    yield
+    assert not _MAPPED, "the test mapped a window on the desktop: %s" % ", ".join(_MAPPED)

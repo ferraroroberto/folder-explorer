@@ -286,7 +286,7 @@ async function followUp(token) {
       showToast(NOT_CONFIRMED + ': ' + e.message, 'error');
       return;
     }
-    if (r.state === 'done') {
+    if (r.done) {
       if (!r.result.ok) showToast((r.result.error && r.result.error.message) || NOT_CONFIRMED + '.', 'error');
       return;
     }

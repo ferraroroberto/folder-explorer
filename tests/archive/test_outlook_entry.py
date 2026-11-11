@@ -135,7 +135,7 @@ def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNam
         assert Path(filed["files"][0]).name == "001 - Kickoff agenda.msg" and Path(filed["files"][0]).is_file()
         assert fake.spawned == [("archive", str(Path(dest).resolve()))]
         after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()
-        assert after == {"state": "done", "result": {"ok": True, "error": None, "categorized": True, "indexing": True}}
+        assert after == {"done": True, "result": {"ok": True, "error": None, "categorized": True, "indexing": True}}
         assert c.get("/api/archive/followup", params={"token": handed["token"]}).status_code == 404
         again = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest})
         assert again.status_code == 404
@@ -285,7 +285,7 @@ def test_the_follow_up_route_says_running_then_gives_the_result_once(fake: Simpl
     with TestClient(app, client=LOCAL) as c:
         assert c.get("/api/archive/followup", params={"token": "t1"}).status_code == 404
         follow.start("t1")
-        assert c.get("/api/archive/followup", params={"token": "t1"}).json() == {"state": "running"}
+        assert c.get("/api/archive/followup", params={"token": "t1"}).json() == {"done": False}
         follow.finish("t1", {"ok": False, "error": {"code": "category_failed", "message": "no tag"}})
         assert c.get("/api/archive/followup", params={"token": "t1", "wait": 1}).json()["result"]["error"]["message"] == "no tag"
         assert c.get("/api/archive/followup", params={"token": "t1"}).status_code == 404

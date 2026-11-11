@@ -151,16 +151,15 @@ class _FollowUps:
         with self.lock:
             self.items.pop(token, None)
 
-    def take(self, token: str) -> tuple[str, Optional[dict[str, Any]]]:
-        """``("done", doc)`` once (the entry goes), ``("running", None)``, or ``("unknown", None)``."""
+    def take(self, token: str) -> tuple[bool, Optional[dict[str, Any]]]:
+        """Whether the token is known, and its document once it ended (given once: the entry goes with it)."""
         with self.lock:
             item = self.items.get(token)
             if item is None:
-                return "unknown", None
-            if item[1] is None:
-                return "running", None
-            del self.items[token]
-            return "done", item[1]
+                return False, None
+            if item[1] is not None:
+                del self.items[token]
+            return True, item[1]
 
 
 FOLLOW_UPS = _FollowUps()
@@ -423,23 +422,23 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
 @router.get("/archive/followup")
 async def followup(request: Request, token: str = Query(..., max_length=64),
                    wait: float = Query(0.0, ge=0.0, le=PENDING_WAIT_MAX_S)) -> dict[str, Any]:
-    """What followed a filing (the category, the indexing): ``{"state": "running"}`` or ``{"state": "done", "result"}``.
+    """What followed a filing (the category, the indexing): ``{"done": false}`` while it runs, then ``{"done": true, "result"}``.
 
     ``wait`` holds the poll open until it ends; the result is given once, and 404 says no filing under that token is known.
     """
     _pc_only(request)
     deadline = time.monotonic() + wait
     while True:
-        state, doc = FOLLOW_UPS.take(token)
-        if state == "unknown":
+        known, doc = FOLLOW_UPS.take(token)
+        if not known:
             raise HTTPException(status_code=404, detail="no filing is following up under this token")
-        if state == "done":
-            return {"state": "done", "result": doc}
+        if doc is not None:
+            return {"done": True, "result": doc}
         if time.monotonic() >= deadline:
-            return {"state": "running"}
+            return {"done": False}
         await asyncio.sleep(PENDING_TICK_S)
         if await request.is_disconnected():
-            return {"state": "running"}
+            return {"done": False}
 
 
 @router.post("/archive/explorer")

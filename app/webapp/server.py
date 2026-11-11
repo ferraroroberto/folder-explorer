@@ -108,6 +108,7 @@ def create_app() -> FastAPI:
     app.include_router(scans.router)
     app.include_router(search.router)
     app.include_router(search_v1.router)
+    app.include_router(search_v1.mail_router)
     app.include_router(archive_v1.router)
     app.include_router(emails.router)
     app.include_router(archive.router)

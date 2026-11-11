@@ -1,4 +1,4 @@
-"""The versioned search API for other apps: ``/api/v1/search/{status,folders,emails}``, shapes in ``docs/service-api.md``.
+"""The versioned read API for other apps: ``/api/v1/search/{status,folders,emails}`` and ``/api/v1/mail/flagged``, shapes in ``docs/service-api.md``.
 
 Thin over the same searches the Search tab runs; ``src.search_api`` owns the
 states and the hit shapes. A caller on this PC needs no sign-in (the
@@ -27,6 +27,7 @@ from src.search_api import DEFAULT_LIMIT, MAX_LIMIT, OK, doc
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/search")
+mail_router = APIRouter(prefix="/api/v1/mail")
 
 _SORT_PATTERN = "^(" + "|".join(SORTS) + ")$"
 
@@ -122,3 +123,27 @@ def emails(q: str = "", sort: str = Query("relevance", pattern=_SORT_PATTERN), o
         return _answer(doc(search_api.ERROR, "the email index could not be read: " + str(exc), **empty))
     return _answer(doc(OK, **{**empty, "hits": [search_api.email_hit(h) for h in found["hits"]],
                               "total": found["total"], "notes": found["notes"], "facets": found["facets"]}))
+
+
+@mail_router.get("/flagged")
+def flagged(offset: int = Query(0, ge=0), limit: int = Query(MAX_LIMIT, ge=1, le=MAX_LIMIT)) -> JSONResponse:
+    """One page of the mails flagged in Outlook, oldest first, with how many are flagged in all.
+
+    An index that cannot say which mails are flagged answers ``not-configured``, never an empty list.
+    """
+    empty: dict[str, Any] = {"mails": [], "total": 0}
+    cfg = config.load()
+    part, (state, reason) = _emails(cfg, resolve_roots(cfg["roots"]))
+    if state != OK or part.index_path is None:  # a ready part always names its index file
+        return _answer(doc(state, reason, **empty))
+    try:
+        index = EMAILS.get(part.index_path)
+        with index.lock:
+            if "flag_status" not in index.columns:
+                return _answer(doc(search_api.NOT_CONFIGURED, "the email index has no flag_status column, so flagged "
+                                   "mail can't be told apart; re-index the email folders", **empty))
+            found = index.flagged(offset, limit)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        logger.warning("⚠️ v1 flagged mail failed: %s", exc)
+        return _answer(doc(search_api.ERROR, "the email index could not be read: " + str(exc), **empty))
+    return _answer(doc(OK, **found))

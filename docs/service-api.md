@@ -1,6 +1,6 @@
 # Service API (v1)
 
-folder-explorer is the fleet's one folder and email search and its one archive. Another app on this PC calls it over HTTP instead of keeping its own index or spawning its CLI. Search comes first; the archive verbs follow it, under [Archive](#archive). The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them.
+folder-explorer is the fleet's one folder and email search and its one archive. Another app on this PC calls it over HTTP instead of keeping its own index or spawning its CLI. Search comes first, then the flagged-mail list; the archive verbs follow, under [Archive](#archive). The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them, flagged mail included.
 
 ## Calling it
 
@@ -114,6 +114,36 @@ Relevance is `bm25(emails_fts, 10, 3, 3, 1)` (subject, sender, recipients, previ
 
 `notes` lists operators the index has no field for (left out, never faked) and a query the index refused. A caller wanting a mail's full text or an Outlook action uses this app's page, through `page`.
 
+
+## `GET /api/v1/mail/flagged`
+
+The mails flagged in Outlook (`flag_status` 2, the "follow up" flag; a mail marked done is not in the list), for an app that turns them into tasks. It reads the same email index as the search and writes nothing. It answers in the [search envelope](#the-search-envelope) with the same states; a caller tells "nothing is flagged" (`ok`, `total` 0) from "can't tell" by `state`.
+
+| Parameter | Default | |
+| --- | --- | --- |
+| `offset` | 0 | for the next page |
+| `limit` | 200 | 1 to 200 |
+
+Mails come oldest first (`date_sent`, then `id`), so a backlog drains in arrival order and a new flag lands at the end. Offset paging can shift if a mail is unflagged between two calls; a caller that repeats its pass picks up what moved. `total` counts every flagged mail, before paging.
+
+```json
+{"schema_version": 1, "state": "ok", "reason": null, "total": 1,
+ "mails": [{"id": 17, "path": "D:\Mail\Clients\Northwind\001 - Q4 budget draft.msg", "filename": "001 - Q4 budget draft.msg",
+            "folder": "D:\Mail\Clients\Northwind", "subject": "Q4 budget draft",
+            "sender": "Ana Lopez <ana@example.com>", "from_name": "Ana Lopez", "from_addr": "ana@example.com",
+            "date": "2025-10-14T09:12:00+02:00", "preview": "Here is the revised budget for the fourth quarter."}]}
+```
+
+| Mail field | |
+| --- | --- |
+| `id` | the mail's row in the email index |
+| `path`, `filename`, `folder` | where the `.msg` sits on disk |
+| `subject` | as indexed, not trimmed |
+| `sender` | the raw sender as indexed; `from_name` and `from_addr` are its two halves |
+| `date` | as indexed, ISO 8601 |
+| `preview` | the full indexed text preview, not the 200-character snippet the search hits carry |
+
+An index with no `flag_status` column (one built before flags were read) answers `not-configured` with that in `reason`, never an empty list; re-indexing the email folders adds the column.
 
 ## Archive
 

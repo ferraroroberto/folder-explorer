@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import time
 from pathlib import Path
 
@@ -129,3 +130,109 @@ def test_a_single_letter_matches_only_itself() -> None:
 
     assert compile_query("a", set(), date(2026, 1, 1)).match == '"a"'
     assert compile_query("ab", set(), date(2026, 1, 1)).match == '"ab"*'
+
+
+def _flagged(c: TestClient, **params: object) -> dict:
+    return c.get("/api/v1/mail/flagged", params=params).json()
+
+
+def test_flagged_mail_answers_in_the_documented_shape(drive: Path) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        res = c.get("/api/v1/mail/flagged")
+        body = res.json()
+        assert res.status_code == 200 and set(body) == STATE_KEYS | {"mails", "total"}
+        # Only flag_status 2 counts: the mail marked done (1) and the unflagged ones stay out.
+        assert body["state"] == "ok" and body["reason"] is None and body["total"] == 1
+        assert [m["subject"] for m in body["mails"]] == ["Q4 budget draft"]
+        first = body["mails"][0]
+        assert tuple(first) == search_api.FLAGGED_FIELDS
+        assert first["sender"] == "Ana Lopez <ana@example.com>" and first["from_name"] == "Ana Lopez"
+        assert first["from_addr"] == "ana@example.com" and first["date"] == "2025-10-14T09:12:00+02:00"
+        assert first["preview"] == "Here is the revised budget for the fourth quarter."
+        assert first["filename"].endswith(".msg") and first["path"].endswith(first["filename"])
+
+
+def test_flagged_mail_pages_oldest_first_with_the_total_of_all(isolated: Path) -> None:
+    mail = isolated / "Mail"
+    index = build_email_index(isolated / "emails.db", mail)
+    conn = sqlite3.connect(str(index))
+    conn.execute("UPDATE emails SET flag_status = 2")
+    conn.commit()
+    conn.close()
+    write_config(isolated, roots=[], email={"index_path": str(index), "roots": [str(mail)]})
+    EMAILS.close()
+    with TestClient(app, client=LOCAL) as c:
+        pages = [_flagged(c, limit=2, offset=n) for n in (0, 2, 4, 6)]
+        assert [p["total"] for p in pages] == [5, 5, 5, 5]
+        assert [len(p["mails"]) for p in pages] == [2, 2, 1, 0]
+        assert [m["subject"] for p in pages for m in p["mails"]] == [
+            "Invoice 0042", "Re: budget notes", "Q4 budget draft", "Kickoff agenda", "Site visit photos"]
+        assert pages[3]["state"] == "ok"
+        assert c.get("/api/v1/mail/flagged", params={"limit": 0}).status_code == 422
+        assert c.get("/api/v1/mail/flagged", params={"limit": 201}).status_code == 422
+        assert c.get("/api/v1/mail/flagged", params={"offset": -1}).status_code == 422
+
+
+def test_no_flagged_mail_is_ok_with_an_empty_list(isolated: Path) -> None:
+    mail = isolated / "Mail"
+    index = build_email_index(isolated / "emails.db", mail)
+    conn = sqlite3.connect(str(index))
+    conn.execute("UPDATE emails SET flag_status = 0")
+    conn.commit()
+    conn.close()
+    write_config(isolated, roots=[], email={"index_path": str(index), "roots": [str(mail)]})
+    EMAILS.close()
+    with TestClient(app, client=LOCAL) as c:
+        res = c.get("/api/v1/mail/flagged")
+        assert res.status_code == 200 and res.json()["state"] == "ok" and res.json()["total"] == 0
+    EMAILS.close()
+
+
+def test_flagged_mail_without_an_email_setup_is_not_configured(isolated: Path) -> None:
+    write_config(isolated, roots=[])
+    EMAILS.close()
+    with TestClient(app, client=LOCAL) as c:
+        res = c.get("/api/v1/mail/flagged")
+        assert res.status_code == 503 and res.json()["state"] == "not-configured"
+        assert res.json()["reason"] and res.json()["mails"] == [] and res.json()["total"] == 0
+
+
+def test_flagged_mail_while_the_first_index_builds_is_indexing(isolated: Path) -> None:
+    root = build_tree(isolated / "Invented drive")
+    write_config(isolated, roots=[str(root)], email={"index_path": str(isolated / "missing.db"), "roots": [str(root)]})
+    EMAILS.close()
+    with TestClient(app, client=LOCAL) as c, indexer.lock():
+        res = c.get("/api/v1/mail/flagged")
+        assert res.status_code == 503 and res.json()["state"] == "indexing" and res.json()["mails"] == []
+
+
+def test_an_index_without_flag_status_is_not_configured_never_empty(isolated: Path) -> None:
+    mail = isolated / "Mail"
+    index = build_email_index(isolated / "emails.db", mail)
+    conn = sqlite3.connect(str(index))
+    conn.execute("ALTER TABLE emails DROP COLUMN flag_status")
+    conn.commit()
+    conn.close()
+    write_config(isolated, roots=[], email={"index_path": str(index), "roots": [str(mail)]})
+    EMAILS.close()
+    with TestClient(app, client=LOCAL) as c:
+        res = c.get("/api/v1/mail/flagged")
+        assert res.status_code == 503 and res.json()["state"] == "not-configured"
+        assert "flag_status" in res.json()["reason"] and res.json()["mails"] == []
+    EMAILS.close()
+
+
+def test_an_unreadable_index_is_an_error_for_flagged_mail(drive: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(path: Path) -> None:
+        raise OSError("invented read failure")
+
+    monkeypatch.setattr(search_v1.EMAILS, "get", broken)
+    with TestClient(app, client=LOCAL) as c:
+        res = c.get("/api/v1/mail/flagged")
+        assert res.status_code == 500 and res.json()["state"] == "error" and "invented" in res.json()["reason"]
+        assert res.json()["mails"] == []
+
+
+def test_flagged_mail_needs_the_token_off_this_pc(drive: Path) -> None:
+    with TestClient(app, client=REMOTE) as c:
+        assert c.get("/api/v1/mail/flagged").status_code == 401

@@ -71,6 +71,10 @@ def test_a_dead_process_cannot_stay_running_and_an_unreadable_lock_is_never_idle
     assert derive_run_state("running", None, U).state is RunState.UNKNOWN
 
 
+def test_attention_is_exactly_the_states_that_ended_badly_or_cannot_be_told() -> None:
+    assert {s for s in RunState if Derived(s).attention} == {RunState.FAILED, RunState.INTERRUPTED, RunState.UNKNOWN}
+
+
 def test_failed_interrupted_and_unknown_always_carry_a_reason() -> None:
     for row in (None, "running", "ok", "failed", "interrupted"):
         for lock in (T, F, U):

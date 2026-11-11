@@ -43,6 +43,9 @@ _RECORDED = {RunState.RUNNING.value: RunState.RUNNING, RunState.OK.value: RunSta
              RunState.FAILED.value: RunState.FAILED, RunState.INTERRUPTED.value: RunState.INTERRUPTED}
 
 
+_ATTENTION = frozenset({RunState.FAILED, RunState.INTERRUPTED, RunState.UNKNOWN})
+
+
 @dataclass(frozen=True)
 class Derived:
     """One answer: the state, and why when it is ``failed``, ``interrupted`` or ``unknown``."""
@@ -53,6 +56,11 @@ class Derived:
     @property
     def running(self) -> bool:
         return self.state is RunState.RUNNING
+
+    @property
+    def attention(self) -> bool:
+        """Whether the run ended badly or cannot be told: ``failed``, ``interrupted`` or ``unknown``."""
+        return self.state in _ATTENTION
 
     def as_dict(self) -> dict[str, Optional[str]]:
         return {"state": self.state.value, "reason": self.reason}

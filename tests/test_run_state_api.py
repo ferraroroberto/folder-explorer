@@ -81,6 +81,7 @@ def test_a_dead_running_email_run_is_interrupted_on_the_status_route(drive: Path
         body = c.get("/api/email/status").json()
     assert body["running"] is False and body["state"] == "interrupted" and body["reason"]
     assert body["runs"][0]["status"] == "running" and body["runs"][0]["state"] == "interrupted"
+    assert body["runs"][0]["live"] is False and body["runs"][0]["attention"] is True
 
 
 def test_a_live_email_run_is_running_on_the_status_route(drive: Path) -> None:
@@ -88,6 +89,7 @@ def test_a_live_email_run_is_running_on_the_status_route(drive: Path) -> None:
     with indexer.lock(), TestClient(app, client=LOCAL) as c:
         body = c.get("/api/email/status").json()
     assert body["running"] is True and body["state"] == "running" and body["runs"][0]["state"] == "running"
+    assert body["runs"][0]["live"] is True and body["runs"][0]["attention"] is False
 
 
 def test_an_unreadable_email_lock_is_unknown(drive: Path, monkeypatch: pytest.MonkeyPatch) -> None:

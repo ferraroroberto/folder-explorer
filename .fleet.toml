@@ -49,6 +49,13 @@ module = "src/run_state.py"
 type   = "RunState"
 derive = "derive_run_state"
 
+# The Search preview's "Show all" load of one mail: idle, loading, ok or error, one step function
+# that refuses an illegal move (docs/body-state.md). tests/js/body_state.test.mjs carries the proof.
+[[state_machines]]
+name   = "body-state"
+module = "app/webapp/static/body-state.js"
+type   = "BodyState"
+
 # [vendored] -- components copied byte-for-byte from project-scaffolding, with the
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]

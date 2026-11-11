@@ -98,6 +98,27 @@ def config_path() -> Path:
     return Path(override) if override else PROJECT_ROOT / "config.json"
 
 
+def example_path() -> Path:
+    return PROJECT_ROOT / "config.example.json"
+
+
+def create_from_example() -> bool:
+    """Write config.json from config.example.json; False, and nothing touched, when the file already exists."""
+    text = example_path().read_text(encoding="utf-8")
+    path = config_path()
+    # runtime-write-exempt: the user's own config.json (or its FOLDER_EXPLORER_CONFIG override), not runtime output
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        # Mode "x" fails on an existing file, so a config the user has can never be overwritten.
+        # runtime-write-exempt: the user's own config.json, created once and never over an existing file
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+    except FileExistsError:
+        return False
+    logger.info("ℹ️ config.json created from config.example.json")
+    return True
+
+
 def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg = dict(DEFAULTS)
     if isinstance(raw.get("remote_access"), bool):

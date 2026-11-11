@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -14,6 +15,8 @@ from app.webapp.build import BUILD_INFO
 from app.webapp.routers.archive import archive_status
 from src import config, folder_lists, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -52,6 +55,7 @@ def settings_body(pc: bool) -> dict[str, Any]:
         },
         "index_bytes": _index_bytes(),
         "archive": archive_status(cfg, pc),
+        "config_file": {"exists": config.config_path().is_file()},
     }
 
 
@@ -79,3 +83,13 @@ def post_config(request: Request, updates: dict[str, Any] = Body(...)) -> JSONRe
     return JSONResponse(settings_body(is_pc_itself(request)))
 
 
+@router.post("/api/config/create")
+def create_config(request: Request) -> JSONResponse:
+    """First run: config.json from config.example.json. A file that exists is left as it is (``created`` false)."""
+    try:
+        created = config.create_from_example()
+    except OSError as exc:
+        logger.warning("⚠️ config.json not created: %s", exc)
+        return JSONResponse({"detail": "config.json could not be created: " + (exc.strerror or "the file system refused")},
+                            status_code=500)
+    return JSONResponse({**settings_body(is_pc_itself(request)), "created": created})

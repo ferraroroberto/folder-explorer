@@ -6,6 +6,7 @@ import { fmtBytes } from './fmt.js';
 import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { folderList } from './folder-list.js';
+import { loadFailureText, serverSentence, settingsBody } from './config-defaults.js';
 
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
@@ -27,6 +28,7 @@ const REMOTE_TEXT = {
 function render(body) {
   const cfg = body.config;
   const remote = body.remote;
+  $('setupCard').hidden = body.config_file.exists;
   setSwitch(reuseSwitch, cfg.desktop.reuse_explorer_window);
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
@@ -88,9 +90,9 @@ function renderBudget(mb) {
 /** Save one setting from a folder list: null when saved, else the server's sentence. */
 async function saveList(update, okText, after) {
   try {
-    render(await postJSON('/api/config', update));
+    render(await postConfig(update));
   } catch (e) {
-    return e.message;
+    return serverSentence(e);
   }
   showToast(okText);
   if (after) after();
@@ -103,14 +105,32 @@ function setBasis(value) {
   $('defaultBasisSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === value)));
 }
 
+/** POST a change (or the first-run create) and read the answer as a settings body, or throw. */
+async function postConfig(update, path = '/api/config') {
+  const body = settingsBody(await postJSON(path, update));
+  if (!body) throw new Error('not a settings body');
+  return body;
+}
+
 async function save(update) {
   try {
-    const body = await postJSON('/api/config', update);
+    const body = await postConfig(update);
     render(body);
     return body;
   } catch (e) {
-    showToast('Could not save: ' + e.message, 'error');
+    showToast('Could not save: ' + serverSentence(e), 'error');
     return null;
+  }
+}
+
+/** The first-run card: create config.json from config.example.json; the server never overwrites a file that exists. */
+async function createConfig() {
+  try {
+    const body = await postConfig({}, '/api/config/create');
+    render(body);
+    showToast(body.created ? 'config.json created' : 'config.json already exists, left as it is');
+  } catch (e) {
+    showToast('Could not create config.json: ' + serverSentence(e), 'error');
   }
 }
 
@@ -135,6 +155,7 @@ export function initSettings(opts) {
     },
   });
   $('trayClickSlot').appendChild(traySwitch);
+  $('createConfig').addEventListener('click', createConfig);
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);
   autoSwitch = switchEl(true, {
@@ -180,12 +201,24 @@ export function initSettings(opts) {
   });
 }
 
+/** The server's build for the load-failure sentence, '' when it can't say. */
+async function serverBuild() {
+  try {
+    return (await getJSON('/api/version')).git_sha || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 export async function openSettings() {
   const d = $('settingsDialog');
   try {
-    render(await getJSON('/api/config'));
+    const body = settingsBody(await getJSON('/api/config'));
+    if (!body) throw new Error('not a settings body');
+    render(body);
   } catch (e) {
-    showToast('Could not load settings: ' + e.message, 'error');
+    console.warn('Settings could not be loaded', e);
+    showToast(loadFailureText(await serverBuild()), 'error');
     return;
   }
   if (!d.open) d.showModal();

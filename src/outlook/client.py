@@ -563,6 +563,17 @@ class OutlookClient(DraftSurface):
                 logger.warning("Skipping unreadable item %d during lookup: %s", i, exc)
         return None
 
+    def is_in_sent_items(self, item: Any) -> bool | None:
+        """Whether the mail sits in the mailbox's Sent Items; ``None`` when Outlook would not say.
+
+        Compared by the folders' EntryIDs, never by name: a folder's name is localised.
+        """
+        parent_id = safe_com(lambda: str(item.Parent.EntryID), "")
+        sent_id = safe_com(lambda: str(self._sent_items().EntryID), "")
+        if not parent_id or not sent_id:
+            return None
+        return parent_id == sent_id
+
     def archive_ref(self, item: Any) -> str:
         """The mail's ``X-Archive-Ref`` header value, or ``""`` when absent.
 

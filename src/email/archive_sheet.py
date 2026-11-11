@@ -5,8 +5,9 @@ Pure orchestration over the Outlook client's surface (``read_mail``,
 drives both steps in a test. The sheet replaces the old archive dialog, so
 filing writes the ``.msg`` and its attachments into an email folder
 (``save_mail``, all the user waits on), then tags the mail and queues its
-folder for indexing (``follow_up``, after the window closes); it never moves
-it, which stays the batch ``apply`` verb's job.
+folder for indexing (``follow_up``, after the window closes). When the
+``outlook.move_to_archive`` setting is on, ``follow_up`` also moves the mail to
+the Outlook archive folder; a failed move never undoes the saved file.
 Every failure is a ``SheetError`` with its own code and words, never a bare
 exception the page cannot tell apart.
 """
@@ -22,7 +23,13 @@ from typing import Any, Callable, Optional
 
 from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
-from src.email.archive_settings import get_outlook_add_category, get_outlook_category
+from src.email.archive_settings import (
+    get_outlook_add_category,
+    get_outlook_archive_folder,
+    get_outlook_category,
+    get_outlook_move_to_archive,
+)
+from src.email.batch.move import move_failure_error, move_out_of_inbox
 from src.email.repository import EmailRepository, open_index, record_filed_mail
 from src.email.suggester import EmailData, RankedSuggestion, SuggestionEngine
 from src.explorer_window import ExplorerUnavailableError, get_current_explorer_folder
@@ -42,6 +49,7 @@ ERR_ALREADY = "already_archived"
 ERR_ARCHIVE = "archive_failed"
 ERR_CATEGORY = "category_failed"
 ERR_INDEX = "index_failed"
+ERR_MOVE = "move_failed"
 ERR_NOT_IN_MAILBOX = "not_in_mailbox"
 ERR_TIMEOUT = "timeout"
 ERR_FAILED = "failed"
@@ -63,6 +71,7 @@ MESSAGES = {
     ERR_ARCHIVE: "The mail couldn't be saved to the folder.",
     ERR_CATEGORY: "The mail was filed, but Outlook wouldn't take the category.",
     ERR_INDEX: "The mail was filed, but its folder wasn't queued for indexing: search finds it after the next scan.",
+    ERR_MOVE: "The mail was filed, but Outlook wouldn't move it to its archive folder: it is still where it was.",
     ERR_NOT_IN_MAILBOX: "The live copy isn't in the Inbox, the archive folder or Sent Items any more.",
     ERR_TIMEOUT: "Outlook didn't answer in time. A dialog may be waiting in Outlook.",
     ERR_FAILED: "Something went wrong talking to Outlook.",
@@ -251,6 +260,9 @@ class Saved:
     folder_path: str
     email_path: str
     category: Optional[str]
+    message_id: str = ""
+    # The Outlook folder to move the mail to after the save; None leaves it where it is.
+    move_to: Optional[str] = None
 
 
 def save_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, category: Optional[str],
@@ -309,13 +321,37 @@ def save_mail(client: Any, cfg: dict[str, Any], item: Any, folder_path: str, cat
                 len(archived.attachment_paths), ", a copy of " + os.path.basename(filed) if filed else "")
     doc: dict[str, Any] = {"ok": True, "folder_path": str(folder), "files": [archived.email_path, *archived.attachment_paths],
                            "category": category or "", "error": None}
-    return doc, Saved(item, str(folder), archived.email_path, category)
+    move_to = get_outlook_archive_folder(cfg) if get_outlook_move_to_archive(cfg) else None
+    return doc, Saved(item, str(folder), archived.email_path, category, mail.message_id, move_to)
 
 
 def _stamp_category(client: Any, saved: Saved) -> bool:
     if not saved.category:
         return False
     client.set_category(saved.item, saved.category)
+    return True
+
+
+def _move_to_archive(client: Any, saved: Saved) -> bool:
+    """Move the saved mail to the Outlook archive folder through the batch verbs' own move; the file stays whatever happens."""
+    if saved.move_to is None:
+        return False
+    # Like the ``apply`` verb, a filed Sent item stays in Sent Items: only received mail moves.
+    in_sent = client.is_in_sent_items(saved.item)
+    if in_sent is None:
+        logger.warning("⚠️ archive sheet: Outlook would not say whether the filed mail is in Sent Items, so it was not moved")
+        raise SheetError(ERR_MOVE, MESSAGES[ERR_MOVE] + " Outlook wouldn't say which folder it is in.")
+    if in_sent:
+        logger.info("ℹ️ archive sheet: the filed mail is in Sent Items, so it stays there")
+        return False
+    # The move takes over the only reference: ``Saved`` is frozen and goes out of use after the follow-up.
+    held = [saved.item]
+    try:
+        _, via = move_out_of_inbox(client, held, saved.move_to, saved.message_id)
+    except Exception as exc:
+        problem = move_failure_error(client, exc, saved.message_id)["message"]
+        raise SheetError(ERR_MOVE, MESSAGES[ERR_MOVE] + " " + problem) from exc
+    logger.info("✅ archive sheet: moved the filed mail to %r (move_via %s)", saved.move_to, via)
     return True
 
 
@@ -336,9 +372,10 @@ class FollowUpStep:
     run: Callable[[Any, Saved], bool]
 
 
-# What runs after the save, in order, off the user's wait. Another step (moving the mail in Outlook) joins this tuple.
+# What runs after the save, in order, off the user's wait. The category goes on before the move, so the moved mail carries it.
 FOLLOW_UP_STEPS = (
     FollowUpStep("category", "categorized", ERR_CATEGORY, _stamp_category),
+    FollowUpStep("move", "moved", ERR_MOVE, _move_to_archive),
     FollowUpStep("index", "indexing", ERR_INDEX, _queue_index),
 )
 
@@ -358,7 +395,7 @@ def follow_up(client: Any, saved: Saved, steps: tuple[FollowUpStep, ...] = FOLLO
         except Exception as exc:
             logger.exception("⚠️ archive sheet: the %s step after the save failed", step.name)
             doc[step.key] = False
-            failed.append((step.code, MESSAGES[step.code] + " " + type(exc).__name__))
+            failed.append((step.code, str(exc) if isinstance(exc, SheetError) else MESSAGES[step.code] + " " + type(exc).__name__))
         if timer:
             timer.mark(step.name)
     if failed:

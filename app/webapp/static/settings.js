@@ -12,6 +12,7 @@ const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
 let categorySwitch = null;
+let moveSwitch = null;
 let traySwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
@@ -37,6 +38,10 @@ function render(body) {
   $('archiveCategoryNote').textContent = cfg.outlook.add_category
     ? 'On: the Archive window and sheet offer the category "' + cfg.outlook.category + '" and stamp it on the mail they file.'
     : 'Off: the Archive window and sheet show no category row, and filing stamps none on the mail.';
+  setSwitch(moveSwitch, cfg.outlook.move_to_archive);
+  $('archiveMoveNote').textContent = cfg.outlook.move_to_archive
+    ? 'On: once the mail is saved, the Archive window and sheet also move it to the Outlook folder "' + cfg.outlook.archive_folder + '". A move Outlook refuses is reported and the saved file stays.'
+    : 'Off: filing saves the mail to disk and leaves it where it is in Outlook.';
   const quick = cfg.tray.left_click === 'quick_search';
   setSwitch(traySwitch, quick);
   $('trayClickNote').textContent = quick
@@ -146,6 +151,11 @@ export function initSettings(opts) {
     onToggle: (next) => save({ outlook: { add_category: next } }),
   });
   $('archiveCategorySlot').appendChild(categorySwitch);
+  moveSwitch = switchEl(false, {
+    label: 'Move to the Outlook archive folder when archiving',
+    onToggle: (next) => save({ outlook: { move_to_archive: next } }),
+  });
+  $('archiveMoveSlot').appendChild(moveSwitch);
   traySwitch = switchEl(true, {
     label: 'Tray click opens Quick search',
     onToggle: async (next) => {

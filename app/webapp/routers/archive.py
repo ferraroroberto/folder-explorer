@@ -246,10 +246,10 @@ def bridge_file(args: list[str], timeout: float, follow_up_timeout: float,
         if kind == "timeout":
             proc.kill()
             after = error_document(ERR_TIMEOUT, "The mail was filed, but Outlook didn't answer while tagging it, "
-                                                "so the category and the indexing aren't confirmed.")
+                                                "so the category, the move and the indexing aren't confirmed.")
         elif after is None:
             after = error_document(ERR_FAILED, "The mail was filed, but what follows the save stopped without an answer, "
-                                               "so the category and the indexing aren't confirmed.")
+                                               "so the category, the move and the indexing aren't confirmed.")
         proc.wait()
         logger.info("ℹ️ outlook file: the follow-up ended %s", "ok" if after.get("ok") else (after.get("error") or {}).get("code"))
         on_follow_up(after)

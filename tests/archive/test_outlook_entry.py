@@ -135,7 +135,7 @@ def test_the_macro_hands_the_mail_to_an_open_page_which_files_it(fake: SimpleNam
         assert Path(filed["files"][0]).name == "001 - Kickoff agenda.msg" and Path(filed["files"][0]).is_file()
         assert fake.spawned == [("archive", str(Path(dest).resolve()))]
         after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()
-        assert after == {"done": True, "result": {"ok": True, "error": None, "categorized": True, "indexing": True}}
+        assert after == {"done": True, "result": {"ok": True, "error": None, "categorized": True, "moved": False, "indexing": True}}
         assert c.get("/api/archive/followup", params={"token": handed["token"]}).status_code == 404
         again = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest})
         assert again.status_code == 404
@@ -155,6 +155,64 @@ def test_with_the_switch_off_the_sheet_offers_no_category_and_the_server_stamps_
         assert filed["ok"] and filed["category"] == "" and fake.item.Categories == ""
         after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()["result"]
         assert after["ok"] and not after["categorized"]
+
+
+def test_the_page_hears_the_move_to_the_archive_folder_after_the_save(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = config.save({"outlook": {"move_to_archive": True}})
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        handed = c.get("/api/archive/pending").json()["mail"]
+        dest = handed["suggestions"][0]["folder_path"]
+        filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest}).json()
+        assert filed["ok"] and Path(filed["files"][0]).is_file()
+        after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()["result"]
+        assert after["ok"] and after["moved"] is True
+    assert fake.client.moves == [(fake.item.message_id, "Archive")] and fake.client.folders[None] == []
+
+
+def test_a_move_the_page_cannot_get_is_a_failed_follow_up_and_the_file_stays(
+        fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = config.save({"outlook": {"move_to_archive": True}})
+    fake.client.move_should_fail = True
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        c.get("/api/archive/pending")
+        assert outlook.archive(cfg, fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+        handed = c.get("/api/archive/pending").json()["mail"]
+        dest = handed["suggestions"][0]["folder_path"]
+        filed = c.post("/api/archive/file", json={"token": handed["token"], "folder": dest}).json()
+        assert filed["ok"] and Path(filed["files"][0]).is_file()
+        after = c.get("/api/archive/followup", params={"token": handed["token"]}).json()["result"]
+        assert not after["ok"] and after["moved"] is False and after["error"]["code"] == "move_failed"
+    assert fake.client.folders[None] == [fake.item]
+
+
+def test_the_window_shows_a_move_that_failed_after_it_closed(fake: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    config.save({"outlook": {"move_to_archive": True}})
+    fake.client.move_should_fail = True
+
+    def window(doc: dict, on_file, find_folders, current_explorer=None, rank=None, progress=None) -> None:  # type: ignore[no-untyped-def]
+        on_file(str(fake.root / "Project Alpha"), None, False, "auto")
+
+    monkeypatch.setattr("src.archive_window.show_window", window)
+    with TestClient(app, client=LOCAL) as c:
+        _route_handoff(monkeypatch, c)
+        assert outlook.archive(config.load(), fake.item.EntryID, FAKE_STORE_ID) == outlook.EXIT_OK
+    assert len(fake.notices) == 1 and "wouldn't move it" in fake.notices[0][1] and "Project Alpha" in fake.notices[0][1]
+    assert list((fake.root / "Project Alpha").glob("*.msg")) and fake.client.folders[None] == [fake.item]
+
+
+def test_the_move_setting_saves_with_the_category_one_and_defaults_off(fake: SimpleNamespace) -> None:
+    assert config.DEFAULTS["outlook"]["move_to_archive"] is False
+    with TestClient(app, client=LOCAL) as c:
+        for bad in ("yes", None, 1):
+            assert c.post("/api/config", json={"outlook": {"move_to_archive": bad}}).status_code == 400
+        saved = c.post("/api/config", json={"outlook": {"move_to_archive": True}})
+        assert saved.status_code == 200 and saved.json()["config"]["outlook"]["move_to_archive"] is True
+        assert c.post("/api/config", json={"outlook": {"add_category": False, "move_to_archive": False}}).status_code == 200
+    assert config.load()["outlook"]["move_to_archive"] is False and config.load()["outlook"]["add_category"] is False
 
 
 def test_the_setting_saves_alone_and_keeps_the_other_outlook_keys(fake: SimpleNamespace, tmp_path: Path) -> None:

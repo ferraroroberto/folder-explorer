@@ -46,7 +46,7 @@ def test_the_save_writes_the_mail_and_leaves_tagging_and_indexing_to_the_follow_
     assert doc["ok"] and Path(doc["files"][0]).is_file()
     assert item.Categories == "" and spawned == [], "nothing after the save runs while the user waits"
     after = archive_sheet.follow_up(client, saved)
-    assert after == {"ok": True, "error": None, "categorized": True, "indexing": True}
+    assert after == {"ok": True, "error": None, "categorized": True, "moved": False, "indexing": True}
     assert item.Categories == "Filed" and spawned == [("archive", saved.folder_path)]
 
 
@@ -124,6 +124,60 @@ def test_filing_saves_the_mail_and_tags_it_without_moving_it(cfg: dict, archive_
     assert doc["ok"] and doc["categorized"] and item.Categories == "Filed"
     assert Path(doc["files"][0]).name == "001 - Kickoff agenda.msg" and Path(doc["files"][0]).is_file()
     assert client.moves == [] and client.folders[None] == [item]
+
+
+def test_with_the_move_setting_on_the_follow_up_moves_the_mail_to_the_archive_folder_after_tagging_it(
+        cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"].update(add_category=True, move_to_archive=True, archive_folder="Filed away")
+    client, item = _client_with("Kickoff agenda")
+    doc, saved = archive_sheet.save_mail(client, cfg, item, str(archive_root / "Project Alpha"), "Filed")
+    assert client.moves == [] and client.folders[None] == [item], "nothing moves while the user waits"
+    after = archive_sheet.follow_up(client, saved, steps=_NO_INDEX)
+    assert after == {"ok": True, "error": None, "categorized": True, "moved": True}
+    assert client.moves == [(item.message_id, "Filed away")] and client.folders[None] == []
+    assert item.Categories == "Filed" and Path(doc["files"][0]).is_file()
+
+
+def test_a_filed_sent_item_stays_in_sent_items_like_the_apply_verb_leaves_it(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["move_to_archive"] = True
+    client, item = _client_with("Kickoff agenda")
+    client.folders = {"Sent Items": [item]}
+    doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), None)
+    assert doc["ok"] and doc["moved"] is False and Path(doc["files"][0]).is_file()
+    assert client.moves == [] and client.folders["Sent Items"] == [item]
+
+
+def test_a_mail_whose_folder_outlook_will_not_name_is_not_moved_and_says_so(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["move_to_archive"] = True
+    client, item = _client_with("Kickoff agenda")
+    client.sent_check_unknown = True
+    doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), None)
+    assert not doc["ok"] and doc["moved"] is False and doc["error"]["code"] == "move_failed"
+    assert "which folder" in doc["error"]["message"] and Path(doc["files"][0]).is_file()
+    assert client.moves == [] and client.folders[None] == [item]
+
+
+def test_with_the_move_setting_off_the_mail_stays_where_it_is(cfg: dict, archive_root: Path) -> None:
+    client, item = _client_with("Kickoff agenda")
+    doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), None)
+    assert doc["ok"] and doc["moved"] is False
+    assert client.moves == [] and client.folders[None] == [item]
+
+
+def test_a_move_outlook_refuses_is_reported_and_the_file_and_the_other_steps_stay(
+        cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg["outlook"].update(add_category=True, move_to_archive=True)
+    spawned: list[tuple[str, str]] = []
+    monkeypatch.setattr("src.email.indexer.spawn", lambda trigger, scope: spawned.append((trigger, scope)))
+    client, item = _client_with("Kickoff agenda")
+    client.move_should_fail = True
+    doc, saved = archive_sheet.save_mail(client, cfg, item, str(archive_root / "Project Alpha"), "Filed")
+    after = archive_sheet.follow_up(client, saved)
+    assert not after["ok"] and after["moved"] is False
+    assert after["categorized"] and after["indexing"] and spawned, "a failed move does not stop the steps after it"
+    assert after["error"]["code"] == "move_failed" and "still where it was" in after["error"]["message"]
+    assert "the store refused the move" in after["error"]["message"]
+    assert Path(doc["files"][0]).is_file() and client.folders[None] == [item]
 
 
 def test_with_the_switch_off_the_document_offers_no_category_and_filing_stamps_none(cfg: dict, archive_root: Path) -> None:

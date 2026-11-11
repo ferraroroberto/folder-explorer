@@ -135,3 +135,23 @@ def test_the_archive_category_switch_is_off_by_default_and_saves(page: Page, app
         assert page.request.get(app_url + "/api/config").json()["config"]["outlook"]["add_category"] is True
     finally:
         page.request.post(app_url + "/api/config", data={"outlook": {"add_category": False}})
+
+
+def test_the_move_to_archive_switch_is_off_by_default_and_saves(page: Page, app_url: str) -> None:
+    if app_url.endswith(":%d" % LIVE_PORT):
+        pytest.skip("the switch writes the settings: never on the live app")
+    page.goto(app_url + "/")
+    page.locator("#paneSearch .home-settings").click()
+    sheet = page.locator("#settingsDialog")
+    expect(sheet).to_be_visible()
+    move = sheet.locator("#archiveMoveSlot [role=switch]")
+    expect(move).to_have_attribute("aria-label", "Move to the Outlook archive folder when archiving")
+    expect(move).to_have_attribute("aria-checked", "false")
+    expect(sheet.locator("#archiveMoveNote")).to_contain_text("leaves it where it is in Outlook")
+    try:
+        move.click()
+        expect(move).to_have_attribute("aria-checked", "true")
+        expect(sheet.locator("#archiveMoveNote")).to_contain_text("also move it to the Outlook folder")
+        assert page.request.get(app_url + "/api/config").json()["config"]["outlook"]["move_to_archive"] is True
+    finally:
+        page.request.post(app_url + "/api/config", data={"outlook": {"move_to_archive": False}})

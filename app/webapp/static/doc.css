@@ -149,3 +149,140 @@
   .doc-layout { grid-template-columns: 260px minmax(0, var(--layout-measure)); justify-content: center; }
   .doc-side { position: sticky; top: var(--gap); max-height: calc(100vh - 2 * var(--gap)); overflow: auto; }
 }
+
+/* ------------------------------------------------------------- the editor */
+.doc-modebar { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.doc-modebar[hidden] { display: none; }
+.doc-modebar .doc-mode { flex: none; width: 176px; }
+.doc-modebar .doc-where { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-dialog .doc-modebar { margin: 0 0 var(--space-sm); }
+.doc-save { flex: none; }
+.doc-save[hidden] { display: none; }
+
+.doc-editor { display: flex; flex-direction: column; gap: var(--space-sm); height: 100%; min-height: 0; }
+.doc-edit-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); min-width: 0; }
+.doc-edit-panes { flex: none; width: 200px; }
+.doc-format { --icon-btn-box: 28px; flex: none; }
+/* The status takes its own line on a phone, so a long one never squeezes the buttons. */
+.doc-edit-status { order: 3; flex: 1 1 100%; min-width: 0; color: var(--muted); font-size: var(--font-body-sm); }
+.doc-edit-status:empty { display: none; }
+.doc-discard { margin-left: auto; }
+.doc-discard[hidden] { display: none; }
+.doc-conflict-slot[hidden] { display: none; }
+
+.doc-edit-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); }
+.doc-src, .doc-edit-preview { position: relative; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.doc-edit-preview { padding: 0 var(--space-xs) var(--space-lg); }
+.doc-src { border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--input-bg); }
+
+/* The coloured copy sits under a transparent text field in one grid cell: same font, padding and wrapping, so every character lines up
+   and the copy's height (with its trailing newline) sizes the field. */
+.doc-src-stack { display: grid; min-height: 100%; }
+.doc-src-hl, .doc-src-input {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: var(--space-md);
+  border: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: var(--font-body-sm);
+  line-height: 1.6;
+  letter-spacing: normal;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.doc-src-hl { color: var(--ink); pointer-events: none; }
+.doc-src-input {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
+}
+.doc-src-input:focus-visible { outline: none; }
+.doc-src:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.doc-src-hl .md-heading { color: var(--accent-text); }
+.doc-src-hl .md-strong { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line); }
+.doc-src-hl .md-link { color: var(--accent-text); }
+.doc-src-hl :is(.md-code, .md-fence) { color: var(--success); }
+.doc-src-hl :is(.md-mark, .md-quote) { color: var(--attention-text); }
+
+/* Phone and narrow windows: one pane at a time, the Markdown keys above the keyboard while typing. */
+.doc-editor[data-pane="write"] .doc-edit-preview,
+.doc-editor[data-pane="preview"] .doc-src { display: none; }
+.doc-format { display: none; }
+.doc-keyrow {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--kb, 0px);
+  /* Above the fleet nav pill, which the keyboard covers while typing anyway. */
+  z-index: 130;
+  display: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.doc-editor.is-typing .doc-keyrow { display: grid; }
+.doc-key {
+  min-height: var(--hit-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: var(--font-body);
+  cursor: pointer;
+}
+.doc-key:active { background: var(--neutral-soft); }
+.doc-editor.is-typing .doc-src { margin-bottom: var(--hit-min); }
+
+/* Wide with a mouse: the source beside its preview, the format bar instead of the key row. */
+@media (min-width: 900px) and (pointer: fine) {
+  .doc-edit-panes { display: none; }
+  .doc-format { display: inline-flex; }
+  .doc-edit-status { order: 0; flex: 1 1 auto; }
+  .doc-discard { margin-left: 0; }
+  .doc-edit-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .doc-editor[data-pane] .doc-edit-preview, .doc-editor[data-pane] .doc-src { display: block; }
+  .doc-editor.is-typing .doc-keyrow { display: none; }
+  .doc-editor.is-typing .doc-src { margin-bottom: 0; }
+  .detail-dialog.doc-dialog.is-editing { width: min(1400px, 96vw); }
+}
+
+/* The sheet: the editor fills the scroll area, and each pane scrolls on its own. */
+.doc-dialog.is-editing .doc-scroll { overflow: hidden; padding-bottom: var(--space-md); }
+
+/* The /doc window: the editor spans the window and takes its height, so each pane scrolls on its own. */
+.doc-window.is-editing .doc-app { max-width: none; }
+.doc-window.is-editing .doc-side { display: none; }
+.doc-window.is-editing .doc-layout { grid-template-columns: minmax(0, 1fr); }
+.doc-window.is-editing .doc-main { height: calc(100vh - 200px); height: calc(100dvh - 200px); min-height: 320px; }
+
+/* ------------------------------------------------------------ the conflict */
+.doc-conflict { display: grid; gap: var(--space-sm); padding: var(--space-md); border: 1px solid var(--attention); border-radius: var(--radius-md); }
+.doc-conflict-title { display: flex; align-items: center; gap: var(--space-sm); margin: 0; font-weight: 600; color: var(--attention-text); }
+.doc-conflict-text { margin: 0; color: var(--muted); font-size: var(--font-body-sm); }
+.doc-conflict-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.doc-conflict-diff[hidden] { display: none; }
+.doc-diff-key { display: flex; gap: var(--space-md); margin: 0 0 var(--space-xs); font-size: var(--font-body-sm); }
+.doc-diff {
+  max-height: 40vh;
+  margin: 0;
+  padding: var(--space-sm);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: var(--font-body-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.doc-diff-del { color: var(--danger-text); }
+.doc-diff-add { color: var(--success); }
+.doc-diff-same { color: var(--muted); }
+.doc-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }

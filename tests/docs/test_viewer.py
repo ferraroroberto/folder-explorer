@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import ast
 import os
-import time
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +19,7 @@ from app.webapp.server import app
 from src import winfs
 from src.docs import reader
 from src.docs.locate import resolve_href
-from tests.conftest import write_config
-from tests.fixture_tree import BIG_MD_BYTES, DOCS_FOLDER, TINY_PNG, add_docs, build_tree
+from tests.fixture_tree import BIG_MD_BYTES, DOCS_FOLDER, TINY_PNG
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.7", 50000)
@@ -80,27 +78,6 @@ def test_a_relative_link_resolves_inside_the_root(tmp_path: Path) -> None:
     assert resolve_href(str(root), doc, "sub/watering.md#schedule") == str(root / "Notes" / "sub" / "watering.md")
     assert resolve_href(str(root), doc, "../README%20copy.md") == str(root / "README copy.md")
     assert resolve_href(str(root), doc, "./diagram.png?raw=1") == str(root / "Notes" / "diagram.png")
-
-
-@pytest.fixture()
-def docs(isolated: Path) -> dict[str, Any]:
-    tree = add_docs(build_tree(isolated / "Invented root"))
-    write_config(isolated, roots=[str(tree)])
-    with TestClient(app, client=LOCAL) as c:
-        assert c.post("/api/scan", json={}).status_code == 202
-        for _ in range(200):
-            if not c.get("/api/scan").json()["scanning"]:
-                break
-            time.sleep(0.05)
-        root = c.get("/api/roots").json()["roots"][0]
-        top = c.get("/api/folder", params={"root": root["key"]}).json()
-        notes = next(it["id"] for it in top["items"] if it["name"] == DOCS_FOLDER)
-        body = c.get("/api/folder", params={"root": root["key"], "folder": notes}).json()
-        sub = next(it["id"] for it in body["items"] if it["name"] == "sub")
-        deeper = c.get("/api/folder", params={"root": root["key"], "folder": sub}).json()
-    ids = {it["name"]: it["id"] for it in body["items"] + deeper["items"] if it["kind"] == "file"}
-    ids["notes.txt"] = next(it["id"] for it in top["items"] if it["name"] == "notes.txt")
-    return {"root": root["key"], "path": root["path"], "scan": body["scan_id"], "ids": ids}
 
 
 def _get(c: TestClient, d: dict[str, Any], name: str, route: str = "/api/doc", **over: Any) -> Any:

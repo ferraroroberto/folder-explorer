@@ -23,9 +23,13 @@ const STATES = {
   gone: { text: 'It was moved or deleted since the last scan.' },
   not_document: { text: 'Only Markdown files and the images beside them open here.' },
   unreadable: { text: 'Windows could not read it. Try again in a moment.' },
+  not_utf8: { text: 'This file is not saved as UTF-8 text, so it opens read-only here.' },
+  edit_too_large: { text: 'Markdown files up to 1 MB can be edited here.' },
 };
 
 const blobs = new WeakMap();
+// Each container's loaded images by id, so the editor's preview reuses them on every render instead of fetching again.
+const loaded = new WeakMap();
 
 const params = (loc) => new URLSearchParams({ root: loc.root, scan: String(loc.scan_id), id: String(loc.id) });
 
@@ -89,6 +93,11 @@ function imageOff(img, text, act) {
 
 async function showImage(container, img, loc, download) {
   const id = Number(img.dataset.docImg);
+  const known = !download && loaded.get(container) && loaded.get(container).get(id);
+  if (known) {
+    img.src = known;
+    return;
+  }
   const res = download
     ? await api('/api/doc/image/download', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ root: loc.root, scan_id: loc.scan_id, id }) })
@@ -99,7 +108,9 @@ async function showImage(container, img, loc, download) {
     return;
   }
   const url = URL.createObjectURL(await res.blob());
+  if (!blobs.has(container)) releaseDoc(container);
   blobs.get(container).push(url);
+  loaded.get(container).set(id, url);
   img.src = url;
 }
 
@@ -114,11 +125,12 @@ function loadImages(container, loc) {
 export function releaseDoc(container) {
   (blobs.get(container) || []).forEach((u) => URL.revokeObjectURL(u));
   blobs.set(container, []);
+  loaded.set(container, new Map());
 }
 
-/** Draw a rendered document into ``container``; ``loc`` names it for its images. */
-export function drawDoc(container, doc) {
-  releaseDoc(container);
+/** Draw a rendered document into ``container``; ``keep`` holds on to the images it already loaded (the editor's preview). */
+export function drawDoc(container, doc, keep) {
+  if (!keep || !blobs.has(container)) releaseDoc(container);
   container.innerHTML = '<article class="doc-prose">' + doc.html + '</article>';
   loadImages(container, { root: doc.root, scan_id: doc.scan_id });
 }
@@ -143,7 +155,7 @@ async function copyListing(btn) {
 
 /** Handle taps inside a document host: ``hooks`` are onDocLink(loc), onDownload(), onExplore(), and getLoc() for images. */
 export function wireDocHost(host, scroller, hooks) {
-  blobs.set(scroller, []);
+  releaseDoc(scroller);
   host.addEventListener('click', (e) => {
     const a = e.target.closest('a[href]');
     if (a && a.dataset.docId && hooks.onDocLink && !e.ctrlKey && !e.metaKey && !e.shiftKey) {

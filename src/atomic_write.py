@@ -1,4 +1,4 @@
-"""Atomic text writes: a reader sees the old file or the new one, never half of either.
+"""Atomic writes: a reader sees the old file or the new one, never half of either.
 
 The one place this repo calls ``os.replace`` for a write. Each write goes to a
 unique ``mkstemp`` sibling of the target (two writers of one file never share a
@@ -29,9 +29,22 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Replace ``path`` with ``data`` exactly, with no newline translation (a Markdown file keeps its own line ends)."""
+    fd, temporary = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+        os.replace(temporary, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+
+
 def swap_in(built: Path, dest: Path) -> None:
     """Rename a file that was built and closed beside ``dest`` onto it; there is no text to write."""
     os.replace(built, dest)
 
 
-__all__ = ["atomic_write_text", "swap_in"]
+__all__ = ["atomic_write_bytes", "atomic_write_text", "swap_in"]

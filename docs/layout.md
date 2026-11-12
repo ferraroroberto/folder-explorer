@@ -30,6 +30,7 @@ folder-explorer/
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
+│                           #   parts/icon-sprite.html is the inline icon sprite, spliced into index.html where its include line stands;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
@@ -82,7 +83,7 @@ folder-explorer/
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison
 │   ├── login_alert.py          # the guessing alert's text and Telegram notifier
-│   ├── static_versioning.py    # the fleet hash stamped on every asset URL
+│   ├── static_versioning.py    # the fleet hash stamped on every asset URL; splices a page's `<!--include x.html-->` fragments
 │   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),

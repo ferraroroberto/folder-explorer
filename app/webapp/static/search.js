@@ -9,7 +9,7 @@ import { getJSON, postJSON, api } from './api.js';
 import { writePref } from './state.js';
 import { withOp } from './query.js';
 import {
-  S, $, WIDE, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, setOpen, setRecentOpen, shortFolder,
+  S, $, WIDE, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, readyModes, setOpen, setRecentOpen, shortFolder,
 } from './search-state.js';
 import {
   FIELD_OPS, renderChips, renderFacets, renderFilters, renderRecent, renderSaved, resetFilters, toggled, withDate,
@@ -19,7 +19,7 @@ import { initPreview, openPreviewSheet, previewAction, renderPreview } from './s
 import { renderOutlookCard, scoreChip } from './archive.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { showToast } from './_vendored/toast/toast.js';
-import { esc, fmtBytes, glyph, plural, winPath } from './fmt.js';
+import { cloudMark, esc, fmtBytes, fmtDate, glyph, plural, winPath } from './fmt.js';
 
 // How long typing pauses before the box searches.
 const DEBOUNCE_MS = 200;
@@ -30,6 +30,13 @@ let booted = false;
 
 const box = () => $('q');
 
+// Per mode: the results card's glyph and title, the box's placeholder, and what one result and the total are called.
+const MODE_UI = {
+  folders: { glyph: 'folder', title: 'Folders', placeholder: 'Folder names, e.g. alpha budget', noun: 'folder' },
+  docs: { glyph: 'file-text', title: 'Markdown files', placeholder: 'File names, e.g. journal', noun: 'file' },
+  emails: { glyph: 'mail', title: 'Emails', placeholder: 'Words, or from: to: subject: has:attachment after:', noun: 'result' },
+};
+
 function head(exceptions, fallback) {
   renderHeadStatus($('paneSearch').querySelector('.head-status'), exceptions, fallback);
 }
@@ -39,11 +46,15 @@ function head(exceptions, fallback) {
 function renderChrome() {
   const mode = effectiveMode();
   const st = S.status;
-  const both = st.emails.ready && st.folders.ready;
-  $('modeSeg').hidden = !both;
-  $('modeSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === mode)));
-  box().placeholder = mode === 'folders' ? 'Folder names, e.g. alpha budget' : 'Words, or from: to: subject: has:attachment after:';
-  $('resultsTitle').innerHTML = glyph(mode === 'folders' ? 'folder' : 'mail') + (mode === 'folders' ? 'Folders' : 'Emails');
+  $('modeSeg').hidden = readyModes().length < 2;
+  $('modeSeg').querySelectorAll('.segmented-item').forEach((b) => {
+    b.hidden = !st[b.dataset.value].ready;
+    b.setAttribute('aria-pressed', String(b.dataset.value === mode));
+  });
+  const ui = MODE_UI[mode] || MODE_UI.emails;
+  $('searchOn').dataset.mode = mode || '';
+  box().placeholder = ui.placeholder;
+  $('resultsTitle').innerHTML = glyph(ui.glyph) + ui.title;
   if (WIDE.matches) { setOpen('filtersCard', true); setOpen('facetsCard', true); }
   renderOutlookCard(st, mode);
   $('searchOff').hidden = !!mode;
@@ -81,6 +92,15 @@ function folderRow(f, i, terms) {
     (f.kind === 'synced' ? ' · ' + glyph('cloud') + 'OneDrive' : '') + '</span></button></li>';
 }
 
+function docRow(h, i, terms) {
+  const where = [h.root_name].concat(h.folder).join(' › ');
+  return '<li><button type="button" class="result-row is-doc" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(winPath(h.path)) + '" data-track="doc-result">' +
+    '<span class="rr-who">' + glyph('file-text') + '<span>' + hl(h.name, terms) + '</span>' + cloudMark(h.online) + '</span>' +
+    '<span class="rr-when">' + esc(fmtDate(h.mtime)) + '</span>' +
+    '<span class="rr-snip">' + esc(where) + '</span>' +
+    '<span class="rr-meta"><span>' + fmtBytes(h.size) + '</span>' + (h.online ? '<span class="chip">Online-only</span>' : '') + '</span></button></li>';
+}
+
 function emptyRow(icon, text, clear) {
   return '<li><div class="empty-state">' + glyph(icon, 'empty-state-icon') + '<p class="empty-state-message">' + esc(text) + '</p>' +
     (clear ? '<button type="button" class="empty-state-action" id="clearQuery" data-track="search-clear">Clear search</button>' : '') + '</div></li>';
@@ -88,6 +108,9 @@ function emptyRow(icon, text, clear) {
 
 function keysLine(mode) {
   const k = (keys, label) => '<span>' + keys.map((x) => '<kbd>' + x + '</kbd>').join('') + ' ' + label + '</span>';
+  if (mode === 'docs') {
+    return k(['/'], 'search') + k(['j', 'k'], 'move') + k(['Enter'], 'view') + (S.status.pc ? k(['e'], 'open in default app') : '') + k(['f'], 'show in Explore') + k(['c'], 'copy path') + k(['Esc'], 'back');
+  }
   return mode === 'folders'
     ? k(['/'], 'search') + k(['j', 'k'], 'move') + (S.status.pc ? k(['e'], 'open in File Explorer') : '') + k(['f'], 'show in Explore') + k(['c'], 'copy path') + k(['Esc'], 'back')
     : k(['/'], 'search') + k(['j', 'k'], 'move') + k(['a'], 'show all') + (S.status.outlook.ready ? k(['o'], 'Outlook') : '') + (S.status.pc ? k(['e'], 'open folder') : '') + k(['f'], 'show folder') + k(['c'], 'copy path') + k(['Esc'], 'back');
@@ -97,8 +120,8 @@ function renderResults() {
   const mode = effectiveMode();
   const q = box().value.trim();
   const tools = $('resultsTools');
-  const more = S.results.length < S.total && mode === 'emails';
-  $('resultsMeta').textContent = plural(S.total, mode === 'folders' ? 'folder' : 'result');
+  const more = S.results.length < S.total && mode !== 'folders';
+  $('resultsMeta').textContent = plural(S.total, MODE_UI[mode].noun);
   if (mode === 'emails') {
     tools.innerHTML = '<span class="segmented" role="group" aria-label="Sort" id="sortSeg">' +
       '<button type="button" class="segmented-item" aria-pressed="' + (S.sort === 'relevance') + '" data-value="relevance" data-track="sort-relevance">Best match</button>' +
@@ -107,16 +130,18 @@ function renderResults() {
   const notes = S.notes.map((n) => '<li class="search-note">' + glyph('info') + '<span>' + esc(n) + '</span></li>').join('');
   let rows;
   if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Every word must match.', false);
+  else if (mode === 'docs' && !S.results.length) rows = emptyRow('file-text', q ? 'No Markdown file name matches every word.' : 'No Markdown files in the scanned roots.', !!q);
   else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches every word.' : 'No emails match. Remove a filter or use fewer words.', !!q);
   else {
     const terms = q.split(/[\s;]+/).filter(Boolean);
-    rows = S.results.map((r, i) => (mode === 'folders' ? folderRow(r, i, terms) : emailRow(r, i))).join('');
+    const draw = { folders: folderRow, docs: docRow, emails: emailRow }[mode];
+    rows = S.results.map((r, i) => draw(r, i, terms)).join('');
   }
   $('results').innerHTML = notes + rows +
     (more ? '<li class="results-more"><button type="button" class="button-ghost" id="moreResults" data-track="more-results">Show more</button></li>' : '');
   $('keysLine').innerHTML = keysLine(mode);
   head(S.notes.length ? [{ text: 'Some filters left out', tone: 'attention' }] : [],
-    mode === 'folders' ? plural(S.total, 'folder') : plural(S.total, 'email'));
+    mode === 'folders' ? plural(S.total, 'folder') : mode === 'docs' ? plural(S.total, 'Markdown file') : plural(S.total, 'email'));
 }
 
 // ------------------------------------------------------------------- search
@@ -125,6 +150,7 @@ async function fetchResults(offset) {
   const mode = effectiveMode();
   const q = box().value;
   if (mode === 'folders') return getJSON('/api/search/folders?q=' + encodeURIComponent(q));
+  if (mode === 'docs') return getJSON('/api/search/docs?q=' + encodeURIComponent(q) + '&offset=' + offset);
   return getJSON('/api/search/emails?q=' + encodeURIComponent(q) + '&sort=' + S.sort + '&offset=' + offset);
 }
 
@@ -299,6 +325,7 @@ function wire() {
 const RESULT_KEYS = {
   emails: { a: 'showall', o: 'outlook', e: 'openfolder', c: 'copy', f: 'folder' },
   folders: { e: 'explorer', c: 'copy', f: 'folder' },
+  docs: { e: 'default', c: 'copy', f: 'folder' },
 };
 
 function onKey(ev) {
@@ -317,7 +344,7 @@ function onKey(ev) {
 }
 
 function readHash() {
-  const m = /^#search\?mode=(emails|folders)&q=(.*)$/.exec(location.hash);
+  const m = /^#search\?mode=(emails|folders|docs)&q=(.*)$/.exec(location.hash);
   if (!m) return;
   S.mode = m[1];
   try { S.q[m[1]] = decodeURIComponent(m[2]); } catch (e) { S.q[m[1]] = ''; }

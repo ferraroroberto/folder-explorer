@@ -39,7 +39,7 @@ export function renderSaved() {
     '" data-track="saved-search">' + glyph('bookmark') + esc(s.name) + '</button>' +
     '<button type="button" class="icon-button saved-remove" data-unsave="' + s.id + '" aria-label="Forget ' + esc(s.name) +
     '" data-track="saved-remove">' + glyph('x') + '</button></span>').join('') +
-    (mode ? '<button type="button" class="button-ghost" id="saveSearch" data-track="save-search">Save search</button>' : '');
+    (mode && mode !== 'docs' ? '<button type="button" class="button-ghost" id="saveSearch" data-track="save-search">Save search</button>' : '');
 }
 
 export function renderRecent() {
@@ -122,6 +122,7 @@ function dateMode(toks) {
 
 export function renderFilters() {
   const mode = effectiveMode();
+  $('filtersCard').hidden = mode === 'docs';
   if (builtFor !== mode) {
     builtFor = mode;
     $('filtersBody').innerHTML = mode === 'folders' ? folderOptionsHtml() : mode === 'emails' ? emailFiltersHtml() : '';

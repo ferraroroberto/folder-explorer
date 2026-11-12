@@ -54,7 +54,8 @@ folder-explorer/
 │   │                           #   link and cloud-only checks), locate (a relative link fenced to its root, then its
 │   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
 │   │                           #   and writer (the editor's only writer: the opened file only, after its version check);
-│   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index)
+│   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index);
+│   │                           #   listing (Search's Markdown mode: every indexed Markdown file across the roots, from the index; no disk)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

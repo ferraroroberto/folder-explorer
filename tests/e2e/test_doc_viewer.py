@@ -160,3 +160,70 @@ def test_the_doc_window_lists_recent_documents_and_opens_one(page: Page, app_url
     expect(page.locator("#docTitle")).to_have_text("guide.md")
     assert "/doc?" in page.url
     assert errors == []
+
+
+def test_search_lists_every_markdown_file_and_a_row_opens_the_viewer(page: Page, app_url: str, browser_name: str) -> None:
+    errors = _errors(page)
+    flagged: list[str] = []
+
+    def mark_cloud_only(route: Route) -> None:
+        body = route.fetch().json()
+        for hit in body["hits"]:
+            if hit["name"] == "journal.md":
+                hit["online"] = True
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+        flagged.append(route.request.url)
+
+    page.route("**/api/search/docs?*", mark_cloud_only)
+    page.goto(app_url + "/#search?mode=docs&q=")
+    rows = page.locator("#results .result-row")
+    expect(page.locator("#modeSeg .segmented-item[aria-pressed=true]")).to_have_text("Markdown")
+    expect(page.locator("#resultsTitle")).to_contain_text("Markdown files")
+    expect(page.locator("#resultsMeta")).to_have_text("4 files")
+    names = [r.locator(".rr-who").inner_text().strip() for r in rows.all()]
+    assert sorted(names) == ["big.md", "guide.md", "journal.md", "watering.md"]
+    expect(rows.filter(has_text="watering.md").locator(".rr-snip")).to_contain_text(DOCS_FOLDER + " › sub")
+    expect(rows.filter(has_text="journal.md").locator(".chip")).to_have_text("Online-only")
+    expect(rows.filter(has_text="guide.md").locator(".chip")).to_have_count(0)
+    expect(page.locator("#facetsCard")).to_be_hidden()
+    expect(page.locator("#filtersCard")).to_be_hidden()
+    assert page.evaluate("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+
+    def clean() -> None:
+        page.evaluate("document.querySelectorAll('.search-side, .results-card, .preview-card').forEach(e => { e.scrollTop = 0; })")
+
+    _themes(page, clean)
+
+    page.locator("#q").fill("gui")
+    expect(rows).to_have_count(1)
+    expect(rows.first).to_contain_text("guide.md")
+    expect(page.locator("#resultsMeta")).to_have_text("1 file")
+    assert "q=gui" in page.url
+    page.locator("#q").fill("gui jour")
+    expect(page.locator("#results .empty-state-message")).to_contain_text("No Markdown file name matches")
+    page.locator("#clearQuery").click()
+    expect(rows).to_have_count(4)
+
+    rows.filter(has_text="guide.md").click()
+    sheet = page.locator("#docDialog")
+    expect(sheet.locator("#docDialogTitle")).to_have_text("guide.md")
+    expect(sheet.locator("#docSheetBody .doc-prose h1")).to_have_text("Garden guide")
+    sheet.locator("[data-close]").click()
+    expect(sheet).to_be_hidden()
+    if browser_name != "webkit":
+        dock = page.locator("#previewDock")
+        expect(dock.locator(".pv-subject")).to_have_text("guide.md")
+        expect(dock.locator("[data-act=view]")).to_be_visible()
+        expect(dock.locator("[data-act=default]")).to_have_count(1)
+        dock.locator("[data-act=edit]").click()
+        expect(sheet.locator("#docSave")).to_be_visible()
+        sheet.locator("[data-close]").click()
+
+    # A cloud-only file opens to the viewer's own refusal, and the list never read it.
+    page.route("**/api/doc?*", lambda route: route.fulfill(
+        status=423, content_type="application/json", body=json.dumps({"detail": "Only in OneDrive", "reason": "cloud_only"})))
+    rows.filter(has_text="journal.md").click()
+    expect(sheet.locator(".doc-state")).to_contain_text("Only in OneDrive")
+    expect(sheet.locator('[data-doc-act="download"]')).to_be_visible()
+    assert_layout_clean(page, allow=SHEET_SCROLLER)
+    assert flagged and errors == []

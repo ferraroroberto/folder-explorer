@@ -1,4 +1,4 @@
-"""Search: folders over every root's index, emails over the email index, and one mail's preview.
+"""Search: folders over every root's index, Markdown files over the same indexes, emails over the email index, and one mail's preview.
 
 Reads only, with narrow exceptions behind their own checks: "Show all"
 reads a mail's ``.msg`` (looked up by row id, never a client path, and only
@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from app.webapp.auth import is_pc_itself
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.routers.browse import scanned_path_or_http
-from app.webapp.state import EMAILS, POOL, folder_hits
+from app.webapp.state import EMAILS, POOL, doc_hits, folder_hits
 from src import config, store
 from src.desktop import (
     GoneError,
@@ -28,6 +28,8 @@ from src.desktop import (
     open_in_outlook,
     outlook_exe,
 )
+from src.docs.listing import MAX_PAGE
+from src.docs.listing import PAGE as DOC_PAGE
 from src.email.body import ERR_NOT_SET_UP, ERR_OUTSIDE, failed, fetch_body
 from src.email.search import PAGE, SORTS, EmailIndex
 from src.email.settings import EmailPart, email_part, is_under, under_any
@@ -88,6 +90,7 @@ def status(request: Request) -> dict[str, Any]:
     return {
         "pc": pc,
         "folders": {"ready": bool(scanned), "reason": None if scanned else "no root has a finished scan yet"},
+        "docs": {"ready": bool(scanned), "reason": None if scanned else "no root has a finished scan yet"},
         "emails": emails,
         "outlook": {"ready": pc and outlook, "reason": None if outlook else "Outlook (classic) isn't installed on this PC"},
         "archive": archive_status(cfg, pc),
@@ -99,6 +102,12 @@ def status(request: Request) -> dict[str, Any]:
 def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int] = Query(None, ge=0, le=config.MAX_SKIP_LEVELS),
                    onedrive: Optional[bool] = None) -> dict[str, Any]:
     return folder_hits(config.load(), q, prune, skip, onedrive)
+
+
+@router.get("/search/docs")
+def search_docs(q: str = "", offset: int = Query(0, ge=0), limit: int = Query(DOC_PAGE, ge=1, le=MAX_PAGE)) -> dict[str, Any]:
+    """The Markdown files of every scanned root, newest first, whose name holds every word of ``q``; metadata only."""
+    return doc_hits(config.load(), q, offset, limit)
 
 
 @router.get("/search/emails")

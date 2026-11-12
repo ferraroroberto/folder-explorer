@@ -26,7 +26,7 @@ kbd {
   line-height: 1;
 }
 @media (pointer: coarse), (max-width: 699px) { .kbd-only { display: none !important; } }
-.search-layout[hidden], .search-off[hidden], .recent-list[hidden], .ff-pair[hidden], .side-card[hidden], #modeSeg[hidden] { display: none; }
+.search-layout[hidden], .search-off[hidden], .recent-list[hidden], .ff-pair[hidden], .side-card[hidden], #modeSeg[hidden], #modeSeg .segmented-item[hidden] { display: none; }
 .wide-dialog { width: min(640px, 92vw); }
 .chip.tone-attention { background: color-mix(in srgb, var(--attention) 16%, transparent); color: var(--attention-text); }
 .chip.tone-danger { background: color-mix(in srgb, var(--deficit) 16%, transparent); color: var(--danger-text); }
@@ -222,10 +222,11 @@ kbd {
 .rr-meta .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 .rr-meta .is-flag { color: var(--attention-text); }
 .result-row[aria-selected="true"] .rr-when, .result-row[aria-selected="true"] .rr-snip, .result-row[aria-selected="true"] .rr-meta { color: var(--ink); }
-/* Folder results: name, then the trimmed path, then size. */
-.result-row.is-folder { grid-template-areas: "who when" "snip snip" "meta meta"; }
-.result-row.is-folder .rr-who { display: flex; align-items: center; gap: var(--space-sm); }
-.result-row.is-folder .rr-who .icon { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); flex: none; }
+/* Folder results: name, then the trimmed path, then size. A Markdown result has the same shape: name and date, then its folder, then size. */
+.result-row.is-folder, .result-row.is-doc { grid-template-areas: "who when" "snip snip" "meta meta"; }
+.result-row.is-folder .rr-who, .result-row.is-doc .rr-who { display: flex; align-items: center; gap: var(--space-sm); }
+.result-row.is-folder .rr-who .icon, .result-row.is-doc .rr-who .icon { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); flex: none; }
+.result-row.is-doc .rr-who > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rr-meta .rr-score .chip { font-variant-numeric: tabular-nums; min-width: 4ch; text-align: center; overflow: visible; }
 .result-row.is-folder .rr-snip { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; }
 .keys-line { margin: var(--space-sm) 0 0; padding-top: var(--space-sm); border-top: 1px solid var(--line-muted); font-size: var(--font-body-sm); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
@@ -305,10 +306,13 @@ kbd {
   }
   .search-card { grid-area: box; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--gap); }
   .search-card > .search-modes { grid-column: 1; }
-  .search-card > .search-modes .segmented { width: 240px; }
+  .search-card > .search-modes .segmented { width: 300px; }
   .search-card > .search-field { grid-column: 2; }
   .search-card > .query-chips, .search-card > .saved-row, .search-card > .recent-list { grid-column: 1 / -1; }
   .search-side { grid-area: side; min-height: 0; overflow: auto; display: grid; align-content: start; gap: var(--gap); }
+  /* The Markdown list has no filters or facets, so its side column would be empty: results and preview take the width. */
+  .search-layout[data-mode="docs"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); grid-template-areas: "box box" "results preview"; }
+  .search-layout[data-mode="docs"] .search-side { display: none; }
   .results-card { grid-area: results; min-height: 0; overflow: auto; }
   .preview-card { grid-area: preview; display: block; min-height: 0; overflow: auto; }
   .search-side .side-toggle { min-height: var(--row-sm); }

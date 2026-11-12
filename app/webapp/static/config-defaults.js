@@ -15,6 +15,7 @@ export const DEFAULTS = {
   email: { index_path: null, roots: [], exclude: [], download_budget_mb: null },
   folder_search: { skip_levels: 0, prune_people: true, onedrive_prevails: true },
   explore: { show_hidden: false },
+  search: { markdown: true },
   desktop: { reuse_explorer_window: false },
   macro: { prefer_window: true },
   tray: { left_click: 'quick_search' },

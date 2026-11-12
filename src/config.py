@@ -57,6 +57,9 @@ DEFAULTS: dict[str, Any] = {
     # Explore: whether hidden and system items are listed. Off by default, as
     # in File Explorer; the totals count them either way.
     "explore": {"show_hidden": False},
+    # Search: whether the Markdown mode is offered next to Folders and Emails. On by default; off hides the
+    # mode, so only folders and emails are searched.
+    "search": {"markdown": True},
     # Opening a folder on this PC: whether it shows in the foremost open File Explorer window
     # (faster, but that window loses what it showed) instead of a new one. Off by default.
     "desktop": {"reuse_explorer_window": False},
@@ -143,6 +146,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
     cfg["explore"] = _clean_explore(raw.get("explore"))
+    cfg["search"] = _clean_search(raw.get("search"))
     cfg["desktop"] = _clean_desktop(raw.get("desktop"))
     cfg["macro"] = _clean_macro(raw.get("macro"))
     cfg["tray"] = _clean_tray(raw.get("tray"))
@@ -231,6 +235,13 @@ def _clean_explore(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_search(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["search"])
+    if isinstance(raw, dict) and isinstance(raw.get("markdown"), bool):
+        out["markdown"] = raw["markdown"]
+    return out
+
+
 def _clean_desktop(raw: Any) -> dict[str, Any]:
     out: dict[str, Any] = dict(DEFAULTS["desktop"])
     if isinstance(raw, dict) and isinstance(raw.get("reuse_explorer_window"), bool):
@@ -292,6 +303,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "explore":
             if not (isinstance(value, dict) and set(value) == {"show_hidden"} and isinstance(value["show_hidden"], bool)):
                 raise ValueError("explore takes show_hidden, true or false")
+        if key == "search":
+            if not (isinstance(value, dict) and set(value) == {"markdown"} and isinstance(value["markdown"], bool)):
+                raise ValueError("search takes markdown, true or false")
         if key == "desktop":
             if not (isinstance(value, dict) and set(value) == {"reuse_explorer_window"}
                     and isinstance(value["reuse_explorer_window"], bool)):

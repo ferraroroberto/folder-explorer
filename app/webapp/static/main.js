@@ -312,7 +312,7 @@ async function boot() {
   initExplore({ onSelect: onFolderSelected });
   initEmailScans();
   initArchive();
-  initDrop({ open: openIndexed, show: openDropped });
+  initDrop({ open: openIndexed, show: openDropped, ownWindow: true });
   initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
   bindTextSize($('textSizeControl'), APP);
   wireTheme();

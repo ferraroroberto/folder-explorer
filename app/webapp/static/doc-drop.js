@@ -1,4 +1,4 @@
-/* Open a Markdown file dropped on the window, in Explore or in the /doc window.
+/* Open a Markdown file dropped on the window: in its own /doc window from the app, in place in the /doc window.
  *
  * A drop gives the page the file's bytes and name, never its path, so the
  * file is looked up by what the page knows: name, size and modified time
@@ -6,12 +6,17 @@
  * document, with Edit; otherwise the page reads the text and has it rendered
  * read-only (``POST /api/doc/dropped/render``). A drop of anything else says
  * so in a toast. The host decides how each opens: ``host.open(loc)`` for an
- * indexed document, ``host.show(doc)`` for a rendered one.
+ * indexed document, ``host.show(doc)`` for a rendered one. A host with
+ * ``ownWindow`` opens each in a new /doc window, like Explore's "Open in new
+ * window"; if the browser blocks that window, the same two calls show it in
+ * place and a toast says why.
  */
 
 import { api } from './api.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
 import { dragHasFiles, matchBody, pickDrop, renderBody } from './drop-files.js';
+import { docUrl } from './doc-view.js';
+import { handOff } from './doc-handoff.js';
 import { glyph } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 
@@ -56,7 +61,17 @@ function overlay() {
   return el;
 }
 
-/** Wire the whole window as a drop target for Markdown files; ``host`` is ``{open(loc), show(doc)}``. */
+const BLOCKED = 'The browser blocked the new window, so the file opened here. Allow pop-ups for this app to open it in its own window.';
+
+/** Show a resolved drop in the window ``popup`` that was opened for it; false when it can't (the caller closes the window). */
+function showInWindow(popup, r) {
+  if (r.kind === 'indexed') popup.location.href = docUrl(r.loc);
+  else if (r.kind === 'dropped') handOff(popup, r.doc);
+  else return false;
+  return true;
+}
+
+/** Wire the whole window as a drop target for Markdown files; ``host`` is ``{open(loc), show(doc), ownWindow?}``. */
 export function initDrop(host) {
   const el = overlay();
   const popover = el.hasAttribute('popover');
@@ -96,11 +111,18 @@ export function initDrop(host) {
     if (!picked.file) { showToast(picked.message, 'error'); return; }
     if (busy) return;
     busy = true;
+    // Opened now, while the drop still counts as the reader's own act, and pointed at the file once it is resolved.
+    const popup = host.ownWindow ? window.open('', '_blank') : null;
     try {
       const r = await resolveDrop(picked.file);
-      if (r.kind === 'indexed') host.open(r.loc);
-      else if (r.kind === 'dropped') host.show(r.doc);
-      else showToast(r.message, 'error');
+      if (popup && showInWindow(popup, r)) return;
+      if (popup) popup.close();
+      if (r.kind === 'refused') showToast(r.message, 'error');
+      else {
+        if (host.ownWindow) showToast(BLOCKED, undefined, { ms: 6000 });
+        if (r.kind === 'indexed') host.open(r.loc);
+        else host.show(r.doc);
+      }
     } finally {
       busy = false;
     }

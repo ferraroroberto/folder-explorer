@@ -5,7 +5,8 @@
  * says so and offers Explore. The outline is a sidebar on a wide window and a
  * popover below it. View | Edit switches to the editor; Esc goes back to View.
  * The fleet nav leads back into the app: a tab opens the app on that tab,
- * after asking when there are unsaved changes.
+ * after asking when there are unsaved changes. A file dropped on the app that the
+ * scan doesn't have opens here too, as ``/doc?dropped=<token>`` (doc-handoff.js).
  */
 
 import { authHeaders, getJSON } from './api.js';
@@ -14,6 +15,7 @@ import { APP } from './state.js';
 import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
 import { openEditor } from './doc-edit.js';
 import { initDrop } from './doc-drop.js';
+import { droppedToken, fetchDropped } from './doc-handoff.js';
 import { wireThemeToggle } from './theme.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
@@ -149,6 +151,19 @@ async function showDropped(doc) {
   drawSide(doc.outline, await fetchRecent());
 }
 
+/** The window a drop opened for a file the scan doesn't have: its document comes from the app page that opened it. */
+async function loadDropped(token) {
+  $('docBody').innerHTML = '<p class="doc-loading" role="status">Loading…</p>';
+  const doc = await fetchDropped(token);
+  if (doc) {
+    await showDropped(doc);
+    return;
+  }
+  renderHeadStatus($('docStatus'), [], '');
+  $('docBody').innerHTML = stateHtml({ reason: 'dropped_gone', message: 'This dropped file is no longer here' });
+  drawSide([], await fetchRecent());
+}
+
 function boot() {
   const usage = initUsageLog({ headers: authHeaders });
   usage.trackView('doc-window');
@@ -189,7 +204,9 @@ function boot() {
     e.returnValue = '';  // older Safari asks only when this is set
   });
   if (!loc) document.querySelector('.doc-modebar').hidden = true;
-  load(false);
+  const token = droppedToken(location.href);
+  if (token) loadDropped(token);
+  else load(false);
 }
 
 boot();

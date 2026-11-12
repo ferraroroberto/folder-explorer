@@ -8,6 +8,7 @@ from contextlib import ExitStack
 from typing import Any, Optional
 
 from src import folder_search, store
+from src.docs import listing
 from src.email.search import EmailIndexHolder
 from src.email.settings import is_under, under_any
 from src.folder_search import item_path
@@ -93,6 +94,12 @@ def folder_hits(cfg: dict[str, Any], q: str, prune: Optional[bool] = None, skip:
     scan_ids = {root.key: scan["id"] for root, scan, _ in entries}
     found["results"] = [{**hit, "scan_id": scan_ids[hit["root"]]} for hit in found["results"]]
     return found
+
+
+def doc_hits(cfg: dict[str, Any], q: str, offset: int, limit: int) -> dict[str, Any]:
+    """One page of the Markdown list: ``GET /api/search/docs``. Reads each root's current index and nothing on disk."""
+    sources = [(root, scan, index, lock) for root, scan, (index, lock) in _open_scans(cfg)]
+    return listing.search(sources, q, cfg["explore"]["show_hidden"], offset, limit)
 
 
 def _subfolders(cfg: dict[str, Any], root: Root, scan: dict[str, Any], path: str, fid: int) -> list[dict[str, Any]]:

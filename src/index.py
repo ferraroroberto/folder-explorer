@@ -229,6 +229,20 @@ class Index:
             raise KeyError("no such file")
         return {**self._file(row), "folder_id": int(row["folder_id"])}
 
+    def files_by_ext(self, exts: Sequence[str], show_hidden: bool = True) -> list[dict[str, Any]]:
+        """Every file whose extension is one of ``exts``, newest first, each with its ``folder_id``.
+
+        ``folder_ext`` names the folders that hold such a file, so the walk over ``files`` skips the rest.
+        """
+        marks = ",".join("?" * len(exts))
+        rows = self.conn.execute(
+            "SELECT rowid id, * FROM files WHERE ext IN (" + marks + ") AND folder_id IN "
+            "(SELECT folder_id FROM folder_ext WHERE ext IN (" + marks + "))" + self._visible(show_hidden)
+            + " ORDER BY mtime DESC, name",
+            (*exts, *exts),
+        ).fetchall()
+        return [{**self._file(r), "folder_id": int(r["folder_id"])} for r in rows]
+
     def percentile(self, fid: int, p: float, basis: str, ext: Optional[str]) -> dict[str, Any]:
         """How much of the folder sits in its largest ``p`` percent of files, and where those files are."""
         f = self.folder(fid)

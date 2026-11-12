@@ -6,10 +6,13 @@ import { readPref, writePref } from './state.js';
 // Recent searches kept per mode, on this device only.
 const RECENT_MAX = 10;
 
+// The three things Search looks in, in the order a chosen-but-off mode falls back through.
+export const MODES = ['emails', 'folders', 'docs'];
+
 export const S = {
   status: null, // /api/search/status
-  mode: readPref('search.mode', 'emails') === 'folders' ? 'folders' : 'emails',
-  q: { emails: '', folders: '' },
+  mode: MODES.includes(readPref('search.mode', 'emails')) ? readPref('search.mode', 'emails') : 'emails',
+  q: { emails: '', folders: '', docs: '' },
   sort: 'relevance',
   results: [],
   total: 0,
@@ -42,14 +45,14 @@ export function setOpen(card, open) {
 /** Text without the server's match markers, for a title attribute. */
 export const plain = (text) => (text || '').split(MARK_START).join('').split(MARK_END).join('');
 
-/** Which mode actually runs: the chosen one, or the other when the chosen one is off here. */
+/** The modes that can run here, in :data:`MODES` order. */
+export const readyModes = () => (S.status ? MODES.filter((m) => S.status[m].ready) : MODES);
+
+/** Which mode actually runs: the chosen one, or the first that is on when the chosen one is off here. */
 export function effectiveMode() {
-  const st = S.status;
-  if (!st) return S.mode;
-  const on = { emails: st.emails.ready, folders: st.folders.ready };
-  if (on[S.mode]) return S.mode;
-  const other = S.mode === 'emails' ? 'folders' : 'emails';
-  return on[other] ? other : null;
+  const on = readyModes();
+  if (!S.status || on.includes(S.mode)) return S.mode;
+  return on[0] || null;
 }
 
 

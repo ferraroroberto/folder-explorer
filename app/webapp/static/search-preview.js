@@ -1,4 +1,4 @@
-/* The Search tab's preview: one mail's indexed fields and "Show all", or one folder's totals, plus their actions.
+/* The Search tab's preview: one mail's indexed fields and "Show all", one folder's totals or one Markdown file's facts, plus their actions.
  *
  * On a wide desktop it fills the right-hand pane; on a phone it opens as a sheet.
  */
@@ -6,7 +6,9 @@
 import { getJSON, postJSON, api } from './api.js';
 import { BodyState, bodyOf, bodyStep, canLoad } from './body-state.js';
 import { S, $, WIDE, copyText, effectiveMode, hl, mailDate, marked, shortFolder } from './search-state.js';
-import { esc, fmtBytes, fmtNum, glyph, plural, winPath } from './fmt.js';
+import { docUrl } from './doc-view.js';
+import { openDoc } from './doc-sheet.js';
+import { esc, fmtBytes, fmtDate, fmtNum, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { switchEl } from './_vendored/switch/switch.js';
 
@@ -19,10 +21,12 @@ export function initPreview(opts) {
     const item = current();
     if (item && effectiveMode() === 'emails' && !S.frame.get(item.id)?.look) refreshFrame(item.id);
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  $('previewDialog').addEventListener('close', () => {
-    const row = document.querySelector('#results .result-row[aria-selected="true"]');
+  const refocus = () => {
+    const row = S.tab === 'search' && document.querySelector('#results .result-row[aria-selected="true"]');
     if (row) row.focus({ preventScroll: true });
-  });
+  };
+  $('previewDialog').addEventListener('close', refocus);
+  $('docDialog').addEventListener('close', refocus);
 }
 
 const current = () => S.results[S.selected] || null;
@@ -152,10 +156,37 @@ function folderHtml(f) {
     '</div></div>';
 }
 
+// -------------------------------------------------------------- Markdown
+
+const docLoc = (h) => ({ root: h.root, scan_id: h.scan_id, id: h.id, name: h.name });
+
+function docHtml(h) {
+  const pc = S.status.pc;
+  return '<div class="pv">' +
+    '<h2 class="pv-subject">' + esc(h.name) + '</h2>' +
+    (h.online ? '<div class="pv-flags"><span class="chip">Online-only</span></div>' : '') +
+    '<dl class="pv-fields"><dt>Folder</dt><dd><button type="button" class="reference-pill" data-act="folder" data-track="folder-pill">' + glyph('folder') +
+    '<span>' + esc([h.root_name].concat(h.folder).join(' › ')) + '</span></button></dd>' +
+    '<dt>Size</dt><dd>' + fmtBytes(h.size) + '</dd><dt>Modified</dt><dd>' + esc(fmtDate(h.mtime)) + '</dd></dl>' +
+    '<div class="pv-actions">' +
+    '<button type="button" class="button-primary" data-act="view" data-track="doc-view">' + glyph('file-text') + 'View</button>' +
+    '<div class="pv-utils">' +
+    '<button type="button" class="button-surface" data-act="edit" data-track="doc-edit">' + glyph('pencil') + 'Edit here</button>' +
+    '<button type="button" class="button-surface" data-act="window" data-track="doc-window">' + glyph('external-link') + 'Open in new window</button>' +
+    '<button type="button" class="button-surface" data-act="folder" data-track="show-in-explore">' + glyph('folder-open') + 'Show in Explore</button>' +
+    '<button type="button" class="button-surface" data-act="copy" data-track="copy-path">' + glyph('copy') + 'Copy path</button>' +
+    (pc ? '<button type="button" class="button-surface" data-act="default" data-track="open-default-app">' + glyph('external-link') + 'Open in default app</button>' : '') +
+    '</div>' +
+    (!pc ? '<p class="pv-note">Opening in a Windows app works on the PC.</p>' : '') +
+    '</div></div>';
+}
+
 // ---------------------------------------------------------------- render
 
+const EMPTY_GLYPH = { folders: 'folder', docs: 'file-text', emails: 'mail' };
+
 function emptyHtml() {
-  return '<div class="empty-state">' + glyph(effectiveMode() === 'folders' ? 'folder' : 'mail', 'empty-state-icon') +
+  return '<div class="empty-state">' + glyph(EMPTY_GLYPH[effectiveMode()] || 'mail', 'empty-state-icon') +
     '<p class="empty-state-message">Pick a result to preview it.</p></div>';
 }
 
@@ -163,6 +194,7 @@ async function previewHtml() {
   const item = current();
   if (!item) return emptyHtml();
   if (effectiveMode() === 'folders') return folderHtml(item);
+  if (effectiveMode() === 'docs') return docHtml(item);
   return emailHtml(await detail(item));
 }
 
@@ -182,6 +214,7 @@ export async function renderPreview() {
 }
 
 export async function openPreviewSheet() {
+  if (current() && effectiveMode() === 'docs') { openDoc(docLoc(current())); return; }
   if (!current() || WIDE.matches) return;
   $('previewDialogTitle').textContent = effectiveMode() === 'folders' ? 'Folder' : 'Email';
   if (!$('previewDialog').open) $('previewDialog').showModal();
@@ -249,6 +282,14 @@ export async function previewAction(act) {
     if (act === 'copy') showToast((await copyText(item.path)) ? 'Path copied' : 'Copy isn\'t allowed here');
     else if (act === 'explorer' && S.status.pc) post('/api/folders/open', { root: item.root, scan_id: item.scan_id, id: item.id }, 'Opened in File Explorer');
     else if (act === 'folder') showInExplore(item.root, item.id);
+    return;
+  }
+  if (effectiveMode() === 'docs') {
+    if (act === 'view' || act === 'edit') openDoc(docLoc(item), act === 'edit');
+    else if (act === 'window') window.open(docUrl(docLoc(item)), '_blank', 'noopener');
+    else if (act === 'copy') showToast((await copyText(winPath(item.path))) ? 'Path copied' : 'Copy isn\'t allowed here');
+    else if (act === 'default' && S.status.pc) post('/api/open', { root: item.root, scan_id: item.scan_id, kind: 'file', id: item.id, verb: 'open' }, 'Opening');
+    else if (act === 'folder') showInExplore(item.root, item.folder_id);
     return;
   }
   const d = await detail(item);

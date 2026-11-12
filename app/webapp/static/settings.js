@@ -1,4 +1,4 @@
-/* Settings: text size, default basis, how File Explorer opens, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -11,6 +11,7 @@ import { loadFailureText, serverSentence, settingsBody } from './config-defaults
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
+let assocSwitch = null;
 let categorySwitch = null;
 let moveSwitch = null;
 let traySwitch = null;
@@ -34,6 +35,7 @@ function render(body) {
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
     : 'Off: each Open starts a new File Explorer window. Turn on for a faster open that reuses the window you used last.';
+  renderAssoc(body.md_assoc.state);
   setSwitch(categorySwitch, cfg.outlook.add_category);
   $('archiveCategoryNote').textContent = cfg.outlook.add_category
     ? 'On: the Archive window and sheet offer the category "' + cfg.outlook.category + '" and stamp it on the mail they file.'
@@ -77,6 +79,31 @@ function render(body) {
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
   setBasis(readPref('basis', 'size'));
+}
+
+const ASSOC_TEXT = {
+  on: 'On: Markdown files list folder-explorer under Open with, and File Explorer\'s menu has Open in Folder Explorer. Windows may ask once which app opens them by default.',
+  off: 'Off: Markdown files open in the app Windows uses for them. Turning it on changes only your user account; nothing needs an administrator.',
+  partial: 'Partly set, or set for another copy of this app. Turn it on to set it for this one, or off to remove it.',
+  unknown: 'The association could not be read on this PC, so its state is unknown.',
+};
+
+/** The Markdown association row: shown on this PC only, with the state the registry gave back. */
+function renderAssoc(assocState) {
+  $('mdAssocRow').hidden = assocState === 'pc_only';
+  setSwitch(assocSwitch, assocState === 'on');
+  assocSwitch.disabled = assocState === 'unknown';
+  $('mdAssocNote').textContent = ASSOC_TEXT[assocState] || ASSOC_TEXT.unknown;
+}
+
+async function saveAssoc(on) {
+  try {
+    const body = await postJSON('/api/md-assoc', { on });
+    renderAssoc(typeof body.state === 'string' ? body.state : 'unknown');
+    showToast(on ? 'Markdown files associated with this app' : 'Markdown association removed');
+  } catch (e) {
+    showToast('Could not change it: ' + serverSentence(e), 'error');
+  }
 }
 
 // The menu value for a budget: '' is no limit (null in config.json), else the MB as text.
@@ -146,6 +173,16 @@ export function initSettings(opts) {
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
+  // Built here, not in index.html: the row exists only for a server that reports this PC's association.
+  const assocRow = document.createElement('div');
+  assocRow.className = 'row row-stack';
+  assocRow.id = 'mdAssocRow';
+  assocRow.hidden = true;
+  assocRow.innerHTML = '<div class="row-line"><span>Associate Markdown files with this app</span>' +
+    '<span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span></div><p class="row-note" id="mdAssocNote"></p>';
+  $('reuseExplorerSlot').closest('.row').after(assocRow);
+  assocSwitch = switchEl(false, { label: 'Associate Markdown files with this app', onToggle: saveAssoc });
+  $('mdAssocSlot').appendChild(assocSwitch);
   categorySwitch = switchEl(false, {
     label: 'Add an Outlook category when archiving',
     onToggle: (next) => save({ outlook: { add_category: next } }),

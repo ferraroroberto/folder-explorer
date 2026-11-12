@@ -12,13 +12,15 @@ answers with its own status and a ``reason`` the page keys on.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+import os
+from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 
+from app.webapp.auth import is_pc_itself
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
-from src import config, store
+from src import config, store, winfs
 from src.docs import reader, writer
 from src.docs.locate import find_item, resolve_href
 from src.docs.render import render
@@ -29,9 +31,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/doc")
 
 _STATUS = {"not_found": 404, "scan_changed": 409, "gone": 410, "too_large": 413, "not_document": 415,
-           "unreadable": 422, "cloud_only": 423, "edit_too_large": 413, "not_utf8": 415, "not_writable": 423}
+           "unreadable": 422, "cloud_only": 423, "edit_too_large": 413, "not_utf8": 415, "not_writable": 423,
+           "pc_only": 403}
 _MESSAGES = {**reader.REASON_MESSAGES, "not_found": "No such file in this scan",
-             "scan_changed": "A newer scan renumbered this file: find it again in Explore"}
+             "scan_changed": "A newer scan renumbered this file: find it again in Explore",
+             "pc_only": "Only the launcher on this PC can ask this"}
+# Recent documents the sidebar lists.
+RECENT_SHOWN = 8
 
 
 class _Refusal(Exception):
@@ -52,9 +58,14 @@ def _text(body: dict[str, Any], key: str) -> str:
 
 
 def _item(root_key: str, scan_id: object, item_id: object) -> tuple[Root, dict[str, Any], str, dict[str, Any]]:
-    """The file a request names: its root, the root's current scan, its path rebuilt from the scan, and its index record."""
+    """The file a request names: its root, the root's current scan, its path rebuilt from the scan, and its index record.
+
+    A negative id is a file the scan missed that the launcher found in its scanned folder (``POST /api/doc/find``).
+    """
     if not isinstance(item_id, int) or isinstance(item_id, bool):
         raise _Refusal("not_found")
+    if item_id < 0:
+        return _found_item(root_key, scan_id, item_id)
     try:
         root, scan, path = scanned_item_path(resolve_roots(config.load()["roots"]), root_key, scan_id, "file", item_id)
         index, lock = POOL.get(store.index_dir() / scan["index_file"])
@@ -66,6 +77,34 @@ def _item(root_key: str, scan_id: object, item_id: object) -> tuple[Root, dict[s
     except KeyError as exc:
         raise _Refusal("not_found") from exc
     return root, scan, path, record
+
+
+def _folder(root_key: str, scan_id: object, folder_id: int) -> tuple[Root, dict[str, Any], str, list[str]]:
+    """A scanned folder by id: its root, the current scan, its path and its names from the root down."""
+    try:
+        root, scan, path = scanned_item_path(resolve_roots(config.load()["roots"]), root_key, scan_id, "folder", folder_id)
+        index, lock = POOL.get(store.index_dir() / scan["index_file"])
+        with lock:
+            names = [p["name"] for p in index.path(folder_id)]
+    except ScanChanged as exc:
+        raise _Refusal("scan_changed") from exc
+    except KeyError as exc:
+        raise _Refusal("not_found") from exc
+    return root, scan, path, names
+
+
+def _found_item(root_key: str, scan_id: object, item_id: int) -> tuple[Root, dict[str, Any], str, dict[str, Any]]:
+    """A found file's root, scan, path and a record like an indexed one, from a fresh listing of its scanned folder."""
+    found = store.found_doc(root_key, scan_id, -item_id) if isinstance(scan_id, int) else None
+    if found is None:
+        raise _Refusal("not_found")
+    root, scan, folder_path, names = _folder(root_key, scan_id, found[0])
+    entry = reader.find_document(folder_path, found[1])
+    if entry is None:
+        raise _Refusal("gone")
+    record = {"id": item_id, "name": entry.name, "ext": os.path.splitext(entry.name)[1].lower().lstrip("."),
+              "size": entry.size, "mtime": entry.mtime, "online": winfs.is_online_only(entry.attrs), "folder": names}
+    return root, scan, os.path.join(folder_path, entry.name), record
 
 
 def _lookup(root: Root, scan: dict[str, Any], doc_path: str, wanted: Callable[[str], bool], kind: str
@@ -96,6 +135,7 @@ def _document(root_key: str, scan_id: object, item_id: object, download: bool) -
         return _refuse(exc.reason)
     except reader.Refused as exc:
         return _refuse(exc.reason)
+    store.touch_recent(root.key, record["folder"][1:] + [record["name"]])
     text = data.decode("utf-8-sig", errors="replace")
     body = render(text, _lookup(root, scan, path, reader.is_document, "link"), _lookup(root, scan, path, reader.is_image, "image"))
     return {"name": record["name"], "root": root.key, "scan_id": scan["id"], "id": record["id"], "size": len(data),
@@ -179,3 +219,76 @@ def save(body: dict[str, Any] = Body(...)) -> Any:
         return JSONResponse({"detail": writer.CONFLICT_MESSAGE, "reason": "conflict", "text": exc.text, "version": exc.version},
                             status_code=409)
     return {"version": new_version}
+
+
+def _name(value: object) -> Optional[str]:
+    """A bare file name from a request: one path part, never a path, a drive or ``..``."""
+    if not isinstance(value, str) or not value or value in (".", ".."):
+        return None
+    return value if not any(c in value for c in "\\/:") else None
+
+
+@router.post("/find")
+def find(request: Request, body: dict[str, Any] = Body(...)) -> Any:
+    """The "Open with" launcher's question: the id of a Markdown file named by root, scan id, scanned folder id and name.
+
+    Only for a caller on this PC. A file the scan has is answered from the index; one it missed is
+    found in a fresh listing of that one folder and given a lasting negative id. No path is taken.
+    """
+    if not is_pc_itself(request):
+        return _refuse("pc_only")
+    name, folder_id = _name(body.get("name")), body.get("folder")
+    if name is None or not isinstance(folder_id, int) or isinstance(folder_id, bool):
+        return _refuse("not_found")
+    if not reader.is_document(name):
+        return _refuse("not_document")
+    try:
+        root, scan, folder_path, _names = _folder(str(body.get("root")), body.get("scan_id"), folder_id)
+    except _Refusal as exc:
+        return _refuse(exc.reason)
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        hit = index.find_file(folder_id, name)
+    if hit is not None:
+        logger.info("ℹ️ launcher: an indexed %s file", os.path.splitext(name)[1].lower())
+        return {"root": root.key, "scan_id": scan["id"], "id": hit["id"]}
+    entry = reader.find_document(folder_path, name)
+    if entry is None:
+        return _refuse("gone")
+    number = store.remember_found(root.key, scan["id"], folder_id, entry.name)
+    logger.info("ℹ️ launcher: a %s file newer than the scan, found in its folder's listing", os.path.splitext(name)[1].lower())
+    return {"root": root.key, "scan_id": scan["id"], "id": -number}
+
+
+def _recent_item(roots: dict[str, Root], root_key: str, rel: list[str]) -> Optional[dict[str, Any]]:
+    """A recent document by its names below its root, as the root's current scan numbers it; None when that scan has no such file."""
+    root, scan = roots.get(root_key), store.current_index(root_key)
+    if root is None or scan is None or not rel:
+        return None
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        folder = index.find_folder(rel[:-1])
+        hit = index.find_file(folder, rel[-1]) if folder is not None else None
+        names = [p["name"] for p in index.path(folder)] if folder is not None else []
+    if hit is not None:
+        item_id = hit["id"]
+    else:
+        number = store.found_number(root_key, scan["id"], folder, rel[-1]) if folder is not None else None
+        if number is None:
+            return None
+        item_id = -number
+    return {"root": root_key, "scan_id": scan["id"], "id": item_id, "name": rel[-1], "folder": names}
+
+
+@router.get("/recent")
+def recent() -> dict[str, Any]:
+    """The documents opened last, newest first, each by its id in its root's current scan."""
+    roots = {r.key: r for r in resolve_roots(config.load()["roots"])}
+    items = []
+    for root_key, rel in store.recent_docs():
+        item = _recent_item(roots, root_key, rel)
+        if item is not None:
+            items.append(item)
+        if len(items) == RECENT_SHOWN:
+            break
+    return {"recent": items}

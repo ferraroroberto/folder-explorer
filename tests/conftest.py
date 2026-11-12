@@ -52,6 +52,14 @@ def no_window_watch(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test reads or writes this PC's file associations: the tests that need a registry pass a fake one."""
+    from src import file_assoc
+
+    monkeypatch.setattr(file_assoc, "_allowed", lambda: False)
+
+
+@pytest.fixture(autouse=True)
 def fresh_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
     """A new lock-out per test, and no real notifier, so no test sends a Telegram message."""
     from app.webapp import auth

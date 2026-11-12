@@ -108,7 +108,7 @@ def test_the_doc_window_renders_the_same_document_with_the_fleet_nav(page: Page,
         page.locator("#docOutlineBtn").click()
     else:
         expect(page.locator("#docOutlineBtn")).to_be_hidden()
-    expect(outline.locator("a")).to_have_text(HEADINGS)
+    expect(outline.locator(".doc-outline-list:not(.doc-recent-list) a")).to_have_text(HEADINGS)
     _themes(page, lambda: expect(body.locator("h1")).to_be_visible())
 
     body.locator("a", has_text="second page").click()
@@ -142,3 +142,21 @@ def test_the_doc_window_explains_a_renumbered_file_and_downloads_a_cloud_only_on
     page.locator('[data-doc-act="download"]').click()
     expect(page.locator("#docBody h1")).to_have_text("Garden guide")
     assert asked == [{"root": loc["root"], "scan_id": loc["scan"], "id": loc["id"]}]
+
+
+def test_the_doc_window_lists_recent_documents_and_opens_one(page: Page, app_url: str, browser_name: str) -> None:
+    errors = _errors(page)
+    page.goto(app_url + "/doc?" + urlencode(_guide(page, app_url)))
+    expect(page.locator("#docTitle")).to_have_text("guide.md")
+    page.locator("#docBody a", has_text="second page").click()
+    expect(page.locator("#docTitle")).to_have_text("watering.md")
+    if browser_name == "webkit":
+        page.locator("#docOutlineBtn").click()
+    recent = page.locator("#docOutline .doc-recent-list a")
+    expect(recent.first).to_have_text("guide.md")
+    expect(recent.filter(has_text="watering.md")).to_have_count(0)
+    _themes(page, lambda: expect(recent.first).to_be_visible())
+    recent.first.click()
+    expect(page.locator("#docTitle")).to_have_text("guide.md")
+    assert "/doc?" in page.url
+    assert errors == []

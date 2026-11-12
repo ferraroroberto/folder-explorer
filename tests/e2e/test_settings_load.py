@@ -150,3 +150,35 @@ def test_the_setup_card_fits_the_sheet_in_light_and_dark(page: Page, app_url: st
     _open_settings(page, app_url)
     expect(page.locator("#setupCard")).to_be_visible()
     assert_layout_clean(page, allow=BELOW_FOLD)
+
+
+def test_the_markdown_association_row_shows_its_state_on_this_pc(page: Page, app_url: str) -> None:
+    # The e2e instance never touches the registry, so it reports the state as unknown and offers no switch.
+    _open_settings(page, app_url)
+    sheet = page.locator("#settingsDialog")
+    expect(sheet.locator("#mdAssocRow")).to_be_visible()
+    expect(sheet.locator("#mdAssocNote")).to_contain_text("unknown")
+    expect(sheet.locator("#mdAssocSlot [role=switch]")).to_be_disabled()
+
+    asked: list[Any] = []
+    _serve_config(page, lambda body: body.update(md_assoc={"state": "off"}))
+
+    def assoc(route: Route) -> None:
+        asked.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({"state": "on"}))
+
+    page.route("**/api/md-assoc", assoc)
+    _open_settings(page, app_url)
+    switch = sheet.locator("#mdAssocSlot [role=switch]")
+    expect(switch).to_have_attribute("aria-checked", "false")
+    switch.click()
+    expect(switch).to_have_attribute("aria-checked", "true")
+    expect(sheet.locator("#mdAssocNote")).to_contain_text("Windows may ask once")
+    assert asked == [{"on": True}]
+
+
+def test_another_device_gets_no_markdown_association_row(page: Page, app_url: str) -> None:
+    _serve_config(page, lambda body: body.update(md_assoc={"state": "pc_only"}))
+    _open_settings(page, app_url)
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    expect(page.locator("#mdAssocRow")).to_be_hidden()

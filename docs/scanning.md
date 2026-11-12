@@ -67,14 +67,15 @@ Downloaded mail stays on the disk until OneDrive frees it. The app never sets a 
 
 ## What opens a file
 
-The disk walk never opens a file. Mail is the one exception, and only a `.msg` inside the email folders (`email.roots`). These are the only readers, all through `src/email/reader.py`:
+The disk walk never opens a file. Mail is the one exception: a `.msg` inside the email folders (`email.roots`), opened by five callers, all through `src/email/reader.py`:
 
-- the email stage, for new or changed mail (a child process, a per-run download budget, a failed file not retried until it changes);
-- Show all in the Search preview, for the one mail asked for by its row id, in a child process with a timeout;
-- `email batch renumber`, for a mail's date, or its attachment names when mails share a number, only when the index has none;
-- `email subjects` (a dry run that renames nothing) and `email batch fix-cut-names` (the rename from it, with an undo log), which read each mail's subject under the stage's download budget and lock.
+- the email stage, on every scan and on `email index`;
+- Show all in the Search preview, for the single mail you pick;
+- `email batch renumber`, when the index lacks a mail's date or attachment names;
+- `email subjects`, the dry run that lists names cut by an old rule;
+- `email batch fix-cut-names`, the rename that follows from it.
 
-Nothing else opens a scanned file. The Archive sheet, the Outlook macro and the archive verbs save, rename and delete mail only inside `email.roots` ([archive.md](archive.md)). Explore's open actions hand a path to Windows and read nothing.
+Nothing else opens a scanned file. Filing mail (the Archive sheet, the macro, the archive verbs) writes only inside `email.roots`: [archive.md](archive.md). Explore's open actions read nothing; they hand a path to Windows.
 
 ## One scan at a time
 

@@ -11,6 +11,8 @@ import { initEmailScans, loadEmailScans } from './email-scans.js';
 import { initSettings, openSettings } from './settings.js';
 import { initSearch, leaveSearch, loadSearch } from './search.js';
 import { initArchive, startArchivePoll } from './archive.js';
+import { initDrop } from './doc-drop.js';
+import { openDropped, openIndexed } from './doc-sheet.js';
 import { wireThemeToggle } from './theme.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
@@ -310,6 +312,7 @@ async function boot() {
   initExplore({ onSelect: onFolderSelected });
   initEmailScans();
   initArchive();
+  initDrop({ open: openIndexed, show: openDropped });
   initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
   bindTextSize($('textSizeControl'), APP);
   wireTheme();

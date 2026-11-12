@@ -102,6 +102,12 @@ def doc_hits(cfg: dict[str, Any], q: str, offset: int, limit: int) -> dict[str, 
     return listing.search(sources, q, cfg["explore"]["show_hidden"], offset, limit)
 
 
+def dropped_doc(cfg: dict[str, Any], name: str, size: int, modified_ms: int) -> Optional[dict[str, Any]]:
+    """The indexed Markdown file a dropped file is (``{root, scan_id, id}``), or None: ``POST /api/doc/dropped/match``. Reads no disk."""
+    sources = [(root, scan, index, lock) for root, scan, (index, lock) in _open_scans(cfg)]
+    return listing.match_dropped(sources, name, size, modified_ms)
+
+
 def _subfolders(cfg: dict[str, Any], root: Root, scan: dict[str, Any], path: str, fid: int) -> list[dict[str, Any]]:
     """The direct subfolders of folder ``fid`` of ``scan`` (at ``path``), heaviest first, shaped like a folder search hit."""
     skip = cfg["folder_search"]["skip_levels"]

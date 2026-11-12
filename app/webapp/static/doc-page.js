@@ -13,6 +13,7 @@ import { esc } from './fmt.js';
 import { APP } from './state.js';
 import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
 import { openEditor } from './doc-edit.js';
+import { initDrop } from './doc-drop.js';
 import { wireThemeToggle } from './theme.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
@@ -23,7 +24,8 @@ const $ = (id) => document.getElementById(id);
 // Wide windows show the outline beside the text; narrower ones open it from the header.
 const WIDE = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
 
-const loc = locFromUrl(location.href);
+// The address's document; null for an address that names none and for a dropped file the scan doesn't have.
+let loc = locFromUrl(location.href);
 let editor = null;
 // Set once the reader chose how to leave (the in-app question), so the browser's own prompt doesn't ask again.
 let leaving = false;
@@ -125,6 +127,28 @@ async function load(download) {
   if (loc.fragment) scrollToHeading($('docBody'), loc.fragment);
 }
 
+/** A dropped file the scan has opens as its document (a new address, so Edit and the bookmark work). */
+function openIndexed(next) {
+  go(docUrl(next));
+}
+
+/** A dropped file the scan doesn't have, already rendered: shown read-only here, with no address of its own. */
+async function showDropped(doc) {
+  if (editor) {
+    if (!(await editor.leave())) return;
+    editor.close();
+    editor = null;
+  }
+  loc = null;
+  markMode('view');
+  document.querySelector('.doc-modebar').hidden = true;
+  document.title = doc.name + ' · Folder explorer';
+  $('docTitle').textContent = doc.name;
+  renderHeadStatus($('docStatus'), [], 'Dropped file');
+  drawDoc($('docBody'), doc);
+  drawSide(doc.outline, await fetchRecent());
+}
+
 function boot() {
   const usage = initUsageLog({ headers: authHeaders });
   usage.trackView('doc-window');
@@ -134,6 +158,7 @@ function boot() {
   nav.setTab(null);
   ready = true;
   wireThemeToggle();
+  initDrop({ open: openIndexed, show: showDropped });
   wireDocHost(document.body, $('docBody'), {
     onDocLink: (next) => go(docUrl(next) + (next.fragment ? '#' + encodeURIComponent(next.fragment) : '')),
     onDownload: () => load(true),

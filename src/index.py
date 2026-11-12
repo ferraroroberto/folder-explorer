@@ -406,6 +406,13 @@ class Index:
         ).fetchone()
         return self._file(row) if row is not None else None
 
+    def files_named(self, name: str, size: int) -> list[dict[str, Any]]:
+        """Every file called ``name`` (any case) of exactly ``size`` bytes, each with its ``folder_id``."""
+        rows = self.conn.execute(
+            "SELECT rowid id, * FROM files WHERE size = ? AND name = ? COLLATE NOCASE", (size, name)
+        ).fetchall()
+        return [{**self._file(r), "folder_id": int(r["folder_id"])} for r in rows]
+
     def types(self, fid: int, basis: str) -> dict[str, Any]:
         """Bytes, file count and share per extension under the folder, heaviest first."""
         key = (fid, basis)

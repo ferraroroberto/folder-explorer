@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 import threading
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 from src.docs import reader
 from src.folder_match import fold
@@ -23,6 +23,8 @@ EXTS = tuple(sorted(e.lstrip(".") for e in reader.DOC_EXTS))
 PAGE = 100
 MAX_PAGE = 200
 _WORDS = re.compile(r"[\s;]+")
+# The index keeps a modified time as whole seconds (truncated), a browser's as milliseconds that Firefox may round: one second covers both.
+MTIME_SLACK_S = 1
 
 # One root with a finished scan: its root, scan row, open index and that index's lock.
 Source = tuple[Root, dict[str, Any], Index, threading.Lock]
@@ -31,6 +33,21 @@ Source = tuple[Root, dict[str, Any], Index, threading.Lock]
 def _matches(name: str, words: list[str]) -> bool:
     folded = fold(name)
     return all(w in folded for w in words)
+
+
+def match_dropped(sources: Sequence[Source], name: str, size: int, modified_ms: int) -> Optional[dict[str, Any]]:
+    """The one indexed file a dropped file is, by name, size and modified time, or None when none or several fit.
+
+    A browser reports the time in milliseconds and some round it, while the index keeps whole seconds:
+    the times match within ``MTIME_SLACK_S``. Reads the index only; nothing the page sent is a path.
+    """
+    wanted = modified_ms / 1000
+    found = []
+    for root, scan, index, lock in sources:
+        with lock:
+            hits = index.files_named(name, size)
+        found.extend({"root": root.key, "scan_id": scan["id"], "id": h["id"]} for h in hits if abs(h["mtime"] - wanted) <= MTIME_SLACK_S)
+    return found[0] if len(found) == 1 else None
 
 
 def search(sources: Sequence[Source], query: str, show_hidden: bool, offset: int = 0, limit: int = PAGE) -> dict[str, Any]:

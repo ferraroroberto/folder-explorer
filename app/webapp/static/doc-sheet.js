@@ -90,6 +90,7 @@ function wire() {
   dialog.addEventListener('close', () => {
     seq += 1;
     if (editor) { editor.close(); editor = null; }
+    dialog.classList.remove('is-dropped');
     markMode('view');
     releaseDoc($('docSheetBody'));
     back.length = 0;
@@ -100,6 +101,7 @@ function wire() {
 
 async function show(loc, download) {
   const mine = ++seq;
+  $('docDialog').classList.remove('is-dropped');
   current = { root: loc.root, scan_id: loc.scan_id, id: loc.id, name: loc.name };
   $('docBack').hidden = !back.length;
   $('docWindow').href = docUrl(current);
@@ -123,6 +125,41 @@ async function show(loc, download) {
   drawDoc($('docSheetBody'), r.doc);
   $('docSheetBody').scrollTop = 0;
   if (loc.fragment) scrollToHeading($('docSheetBody'), loc.fragment);
+}
+
+/** Leave the editor for another document: asks first when it holds unsaved changes; false when the reader chose to stay. */
+async function leaveEditor() {
+  if (!editor) return true;
+  if (!(await editor.leave())) return false;
+  editor.close();
+  editor = null;
+  markMode('view');
+  return true;
+}
+
+/** A dropped file that the scan has: opened like any indexed document, Edit included. */
+export async function openIndexed(loc) {
+  wire();
+  if (await leaveEditor()) openDoc(loc);
+}
+
+/** A dropped file the scan doesn't have, already rendered by the server: read-only, with no id to edit, link from or open in a window. */
+export async function openDropped(doc) {
+  wire();
+  if (!(await leaveEditor())) return;
+  seq += 1;
+  back.length = 0;
+  current = null;
+  $('docDialog').classList.add('is-dropped');
+  $('docBack').hidden = true;
+  $('docDialogTitle').textContent = doc.name;
+  $('docWhere').textContent = '';
+  $('docOutline').innerHTML = outlineHtml(doc.outline);
+  $('docOutlineBtn').hidden = !doc.outline.length;
+  toggleOutline(false);
+  if (!$('docDialog').open) $('docDialog').showModal();
+  drawDoc($('docSheetBody'), doc);
+  $('docSheetBody').scrollTop = 0;
 }
 
 /** Open the sheet on a document: ``loc`` is ``{root, scan_id, id}`` and, for the title while it loads, ``name``; ``edit`` opens the editor. */

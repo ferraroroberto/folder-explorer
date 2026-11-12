@@ -16,7 +16,7 @@ from src.no_window import NO_WINDOW
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("name", ["body_state.test.mjs", "md_source.test.mjs", "doc_answer.test.mjs"])
+@pytest.mark.parametrize("name", ["body_state.test.mjs", "md_source.test.mjs", "doc_answer.test.mjs", "drop_files.test.mjs"])
 def test_the_js_module_tests_pass_under_node(name: str) -> None:
     node = shutil.which("node")
     if node is None:

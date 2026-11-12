@@ -34,7 +34,8 @@ folder-explorer/
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
-│                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both
+│                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
+│                           #   doc-drop.js takes a Markdown file dropped on the window (drop-files.js its DOM-free request builders)
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
@@ -55,7 +56,7 @@ folder-explorer/
 │   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
 │   │                           #   and writer (the editor's only writer: the opened file only, after its version check);
 │   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index);
-│   │                           #   listing (Search's Markdown mode: every indexed Markdown file across the roots, from the index; no disk)
+│   │                           #   listing (Search's Markdown mode: every indexed Markdown file across the roots, and the match of a dropped file by name, size and time, from the index; no disk)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

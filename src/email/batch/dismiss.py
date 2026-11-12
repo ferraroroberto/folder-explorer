@@ -31,8 +31,8 @@ from src.email.archive_settings import (
     get_mailbox_archive_folder,
     get_outlook_dismiss_category,
 )
-from src.email.batch.common import ERROR_CATEGORY_FAILED, ERROR_NOT_IN_INBOX, envelope
-from src.email.batch.move import move_failure_error, move_out_of_inbox
+from src.email.batch.common import ERROR_NOT_IN_INBOX, envelope
+from src.email.batch.move import move_and_tag
 from src.email.mailboxes import Mailbox
 from src.email.naming import normalize_message_id
 
@@ -80,33 +80,14 @@ def _dismiss_one(
         }
         return result
 
-    try:
-        # The move takes over the only reference: nothing in this frame may
-        # keep the mail alive while Outlook is asked to let go of it.
-        held, item = [item], None
-        moved, via = move_out_of_inbox(client, held, archive_folder, message_id)
-        result["moved"] = True
-        result["move_via"] = via
-        result["entry_id"] = client.entry_id(moved)
-    except Exception as exc:
-        logger.exception("Moving %s to %r failed", message_id, archive_folder)
-        result["error"] = move_failure_error(client, exc, message_id)
-        return result
-
-    # Tagged in its own step: a tag that would not stick leaves the mail moved,
-    # which the caller recovers from differently than a move that did not happen.
-    try:
-        client.set_category(moved, category)
-        result["categorized"] = True
-    except Exception as exc:
-        logger.exception("Tagging %s with %r failed", message_id, category)
-        result["error"] = {
-            "code": ERROR_CATEGORY_FAILED,
-            "message": f"the mail was moved, but not tagged: {type(exc).__name__}: {exc}",
-        }
-        return result
-
-    result["ok"] = True
+    # The move takes over the only reference: nothing in this frame may keep
+    # the mail alive while Outlook is asked to let go of it.
+    held, item = [item], None
+    if move_and_tag(
+        client, held, archive_folder, category, message_id, result,
+        done="the mail was moved",
+    ):
+        result["ok"] = True
     return result
 
 

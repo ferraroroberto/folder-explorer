@@ -363,8 +363,12 @@ export async function loadSearch() {
   S.tab = 'search';
   try {
     const [status, saved] = await Promise.all([getJSON('/api/search/status'), getJSON('/api/searches')]);
+    const before = effectiveMode();
     S.status = status;
     S.saved = saved.searches;
+    // A mode that went off (Markdown switched off in Settings) hands the box to the one that runs instead.
+    const after = effectiveMode();
+    if (before && after && before !== after) { S.q[before] = box().value; box().value = S.q[after] || ''; }
   } catch (e) {
     showToast(e.message, 'error');
     return;

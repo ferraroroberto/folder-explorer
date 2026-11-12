@@ -185,6 +185,28 @@ def test_config_validates_the_search_settings(isolated: Path) -> None:
         assert c.post("/api/config", json={"email": {"bogus": 1}}).status_code == 400
 
 
+def test_the_markdown_search_switch_is_on_by_default_and_only_takes_true_or_false(isolated: Path) -> None:
+    assert config.load()["search"] == {"markdown": True}
+    with TestClient(app, client=LOCAL) as c:
+        assert c.post("/api/config", json={"search": {"markdown": "no"}}).status_code == 400
+        assert c.post("/api/config", json={"search": {"markdown": False, "other": 1}}).status_code == 400
+        off = c.post("/api/config", json={"search": {"markdown": False}})
+        assert off.status_code == 200 and off.json()["config"]["search"] == {"markdown": False}
+    assert config.load()["search"] == {"markdown": False}
+
+
+def test_status_reports_markdown_search_off_with_a_reason_and_leaves_the_other_parts(setup: Path) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        on = c.get("/api/search/status").json()
+        assert on["docs"]["ready"] is True and on["folders"]["ready"] is True and on["emails"]["ready"] is True
+        assert c.post("/api/config", json={"search": {"markdown": False}}).status_code == 200
+        off = c.get("/api/search/status").json()
+        assert off["docs"]["ready"] is False and "Settings" in off["docs"]["reason"]
+        assert off["folders"]["ready"] is True and off["emails"]["ready"] is True
+        assert c.post("/api/config", json={"search": {"markdown": True}}).status_code == 200
+        assert c.get("/api/search/status").json()["docs"]["ready"] is True
+
+
 def test_the_folders_cli_prints_one_document(setup: Path, capsys: pytest.CaptureFixture[str]) -> None:
     capsys.readouterr()
     assert cli(["folders", "search", "--query", "harbour", "--json"]) == 0

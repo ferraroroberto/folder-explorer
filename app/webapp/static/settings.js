@@ -1,4 +1,4 @@
-/* Settings: text size, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, the Markdown search switch, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -11,12 +11,14 @@ import { loadFailureText, serverSentence, settingsBody } from './config-defaults
 const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
+let markdownSwitch = null;
 let assocSwitch = null;
 let categorySwitch = null;
 let moveSwitch = null;
 let traySwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
+let onSearchChanged = () => {};
 // The four folder lists, built once in initSettings.
 const lists = {};
 let config = null;
@@ -31,6 +33,10 @@ function render(body) {
   const cfg = body.config;
   const remote = body.remote;
   $('setupCard').hidden = body.config_file.exists;
+  setSwitch(markdownSwitch, cfg.search.markdown);
+  $('markdownSearchNote').textContent = cfg.search.markdown
+    ? 'On: Search offers a Markdown mode that lists Markdown files by name.'
+    : 'Off: Search looks only in folders and emails, and the Markdown mode is hidden.';
   setSwitch(reuseSwitch, cfg.desktop.reuse_explorer_window);
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
@@ -168,6 +174,12 @@ async function createConfig() {
 
 export function initSettings(opts) {
   onRootsChanged = opts.onRootsChanged;
+  onSearchChanged = opts.onSearchChanged;
+  markdownSwitch = switchEl(true, {
+    label: 'Markdown search',
+    onToggle: async (next) => { if (await save({ search: { markdown: next } })) onSearchChanged(); },
+  });
+  $('markdownSearchSlot').appendChild(markdownSwitch);
   reuseSwitch = switchEl(false, {
     label: 'Reuse an open Explorer window',
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),

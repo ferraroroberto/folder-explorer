@@ -313,7 +313,10 @@ async function boot() {
   initEmailScans();
   initArchive();
   initDrop({ open: openIndexed, show: openDropped, ownWindow: true });
-  initSettings({ onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); } });
+  initSettings({
+    onRootsChanged: () => { state.root = null; refreshRoots().catch(fail); },
+    onSearchChanged: () => { if (state.tab === 'search') loadSearch().catch(fail); },
+  });
   bindTextSize($('textSizeControl'), APP);
   wireTheme();
   wireClicks(nav);

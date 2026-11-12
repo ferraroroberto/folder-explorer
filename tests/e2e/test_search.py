@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
 
+import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e.conftest import LIVE_PORT
+from tests.e2e.test_settings_folders import BELOW_FOLD
 
 
 def _errors(page: Page) -> list[str]:
@@ -268,4 +272,65 @@ def test_recent_searches_fold_remove_one_and_clear(page: Page, app_url: str) -> 
     page.locator("#recentList .recent-clear").click()
     expect(page.locator("#recentList")).to_be_hidden()
     assert _stored_recent(page, "emails") == []
+    assert errors == []
+
+
+@pytest.fixture()
+def markdown_search_restored(page: Page, app_url: str) -> Iterator[None]:
+    """Leave the session app's Markdown search switch on however the test ends."""
+    if app_url.endswith(":%d" % LIVE_PORT):
+        pytest.skip("the switch writes the settings: never on the live app")
+    yield
+    page.request.post(app_url + "/api/config", data={"search": {"markdown": True}})
+
+
+@pytest.mark.usefixtures("markdown_search_restored")
+def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    segments = page.locator("#modeSeg .segmented-item:visible")
+    markdown = page.locator('#modeSeg .segmented-item[data-value="docs"]')
+    switch = page.locator("#settingsDialog #markdownSearchSlot [role=switch]")
+
+    def settings(want: str) -> None:
+        page.locator("#paneSearch .home-settings").click()
+        expect(page.locator("#settingsDialog")).to_be_visible()
+        expect(switch).to_have_attribute("aria-checked", want)
+
+    page.goto(app_url + "/#search?mode=docs&q=")
+    expect(markdown).to_be_visible()
+    expect(markdown).to_have_attribute("aria-pressed", "true")
+    expect(segments).to_have_text(["Folders", "Markdown", "Emails"])
+
+    settings("true")
+    for theme in ("light", "dark"):
+        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        page.wait_for_timeout(100)
+        assert_layout_clean(page, allow=BELOW_FOLD)
+    switch.click()
+    expect(switch).to_have_attribute("aria-checked", "false")
+    expect(page.locator("#markdownSearchNote")).to_contain_text("Markdown mode is hidden")
+    page.locator("#settingsDialog [data-close]").click()
+
+    expect(segments).to_have_text(["Folders", "Emails"])
+    expect(page.locator('#modeSeg .segmented-item[aria-pressed=true]')).to_have_text("Folders")
+    expect(page.locator("#resultsTitle")).to_contain_text("Folders")
+    assert "mode=folders" in page.url
+    page.locator("#q").fill("harbour")
+    expect(page.locator("#results .result-row").first).to_contain_text("harbour")
+    page.locator('#modeSeg .segmented-item[data-value="emails"]').click()
+    expect(page.locator("#resultsTitle")).to_contain_text("Emails")
+
+    # It survives a reload, and a link to the Markdown mode lands on Folders.
+    page.goto(app_url + "/#search?mode=docs&q=")
+    page.reload()
+    expect(segments).to_have_text(["Folders", "Emails"])
+    expect(page.locator('#modeSeg .segmented-item[aria-pressed=true]')).to_have_text("Folders")
+
+    settings("false")
+    switch.click()
+    expect(switch).to_have_attribute("aria-checked", "true")
+    page.locator("#settingsDialog [data-close]").click()
+    expect(segments).to_have_text(["Folders", "Markdown", "Emails"])
+    page.locator("#modeSeg .segmented-item", has_text="Markdown").click()
+    expect(page.locator("#resultsTitle")).to_contain_text("Markdown files")
     assert errors == []

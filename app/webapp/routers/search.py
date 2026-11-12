@@ -68,6 +68,13 @@ def _scanned(roots: list[Root]) -> list[tuple[Root, dict[str, Any]]]:
     return out
 
 
+def _docs_part(cfg: dict[str, Any], scanned: bool) -> dict[str, Any]:
+    """The Markdown mode: off by the Settings switch, else ready once a root has a finished scan."""
+    if not cfg["search"]["markdown"]:
+        return {"ready": False, "reason": "turned off in Settings"}
+    return {"ready": scanned, "reason": None if scanned else "no root has a finished scan yet"}
+
+
 @router.get("/search/status")
 def status(request: Request) -> dict[str, Any]:
     """Which search parts run here, and why a part that doesn't is off."""
@@ -90,7 +97,7 @@ def status(request: Request) -> dict[str, Any]:
     return {
         "pc": pc,
         "folders": {"ready": bool(scanned), "reason": None if scanned else "no root has a finished scan yet"},
-        "docs": {"ready": bool(scanned), "reason": None if scanned else "no root has a finished scan yet"},
+        "docs": _docs_part(cfg, bool(scanned)),
         "emails": emails,
         "outlook": {"ready": pc and outlook, "reason": None if outlook else "Outlook (classic) isn't installed on this PC"},
         "archive": archive_status(cfg, pc),

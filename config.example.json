@@ -20,6 +20,9 @@
   "explore": {
     "show_hidden": false
   },
+  "search": {
+    "markdown": true
+  },
   "desktop": {
     "reuse_explorer_window": false
   },

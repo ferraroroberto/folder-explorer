@@ -70,6 +70,12 @@ _INDEX_ASSET_RE = re.compile(
 )
 
 
+# ``<!--include name.html-->`` on its own line in a shell page: replaced by the
+# fragment ``name.html`` from the static dir. Word characters and hyphens only, so a
+# path cannot leave the static dir.
+_INCLUDE_RE = re.compile(r"<!--include ((?:[\w\-]+/)*[\w\-]+\.html)-->")
+
+
 def _short_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()[:_HASH_LEN]
 
@@ -121,6 +127,22 @@ def fleet_hash_of(hashes: Dict[str, str]) -> str:
     if not hashes:
         return ""
     return next(iter(hashes.values()))
+
+
+def expand_includes(body: str, static_dir: Path) -> str:
+    """Splice every ``<!--include name.html-->`` with that fragment from ``static_dir``.
+
+    The page is served as one document, so a block the browser needs inline
+    (the icon sprite: iOS Safari does not resolve an external ``<use>``) can
+    live in its own file and keep ``index.html`` small. A missing fragment
+    raises, so a half-deployed page fails loudly instead of losing its icons.
+    """
+
+    def _sub(match: "re.Match[str]") -> str:
+        fragment = (static_dir / match.group(1)).read_text(encoding="utf-8")
+        return fragment.rstrip()
+
+    return _INCLUDE_RE.sub(_sub, body)
 
 
 def rewrite_index_html(body: str, hashes: Dict[str, str]) -> str:
@@ -196,8 +218,8 @@ class BuildInfo:
         self.built_at: str = identity["built_at"]
 
     def stamp_html(self, html: str) -> str:
-        """Stamp the asset URLs in index.html with the fleet hash."""
-        return rewrite_index_html(html, self.asset_hashes)
+        """Splice the page's include fragments, then stamp its asset URLs with the fleet hash."""
+        return rewrite_index_html(expand_includes(html, self._static_dir), self.asset_hashes)
 
     def stamp_js(self, body: str, source_path: Path) -> str:
         """Stamp the relative ``import`` URLs in a served JS module.

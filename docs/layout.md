@@ -55,7 +55,7 @@ folder-explorer/
 │   │   ├── subject_audit.py    # `email subjects`: the read-only dry run for names cut by the old reply-prefix rule (`fix-cut-names` renames from it)
 │   │   ├── batch/              # the archive verbs: verbs (plan, apply, mailboxes, renumber), fix_cut_names, revert,
 │   │   │                       #   dismiss, draft, send, find, sync, move, common (the envelope)
-│   │   └── reader.py           # the only module that opens a file (a .msg, for the stage, Show all, renumber)
+│   │   └── reader.py           # the only module that opens a file (a .msg; its callers: scanning.md, "What opens a file")
 │   ├── outlook/                # every COM call: client, drafts, sending (the one Send), syncing, stores, process,
 │   │                           #   bridge (attach, the mail at hand, a mail by its ids, Display)
 │   ├── scanner.py              # the walk and the index writer

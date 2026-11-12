@@ -53,6 +53,29 @@ Each scan ends with the email stage, `python -m app.cli email index` in its own 
 
 The disk walk holds `scan.lock`, the email stage `email.lock`, both OS byte-range locks the system drops when the holder exits. A run waiting on the email lock past its `--wait` exits 2 ("busy"), never a plain failure. Each run writes a row to `email_runs` in `state.sqlite3` with its counts.
 
+## Running the email index
+
+With `email.roots` set (the email folders, each inside a scan root) and `email.index_path` left empty, the app keeps its own email index, `emails.sqlite3` in the runtime-data folder, and is its only writer. Every scan ends with the email stage: it compares the scan's list of `.msg` files with the index by path, size and modified time, reads only new or changed mail through `src/email/reader.py`, and removes rows for mail that is gone only after a complete listing of its folder. It opens only a `.msg` inside `email.roots` (see What opens a file, below). Reading an online-only mail downloads it, so by default one run downloads everything it needs (`email.download_budget_mb` is `null`, "No limit"). A whole number caps one run at that many MB and leaves the rest for the next run ("waiting for budget"); 0 reads local files only. A budget saved in `config.json` is kept as it is, so a config that already holds a number stays capped until Settings → Email folders → OneDrive downloads per run is switched to "No limit (recommended)". A file that fails is not read again until it changes. `email.exclude` (Settings → Leave out of the email index) names folders inside the email folders that only the email index skips; the global skip list applies to it too. The Scans tab shows each run (new, downloaded, failed, and waiting for budget when a cap is set) and runs it now, or for one folder; a run of every folder started there lists the email folders afresh (`--fresh`), so mail filed since the last disk scan is read too. While a run is going its row shows a bar over the files that need a read, with the files done, the files and MB downloaded, the failed reads and the files left unchanged, refreshed every 2 seconds; the stage stores those counts on the running row of the run history, so the page reads them from `GET /api/email/status` (`runs[0].counts`, plus `budget_mb`):
+
+- `& .\.venv\Scripts\python.exe -m app.cli email index` (every email folder) or `... email index --root <folder>` (one folder below one, in seconds, under the email lock only, so it never waits behind a disk scan). Exit 0 indexed, 1 failed, 2 busy (another email run held the lock past `--wait S`), 3 not inside an email folder, 4 not set up here.
+- `... email import --from <emails.db>` copies another app's email index in once, keeping its rows; the next run reads each mail once more to fill To, Cc, attachments and size. `... email status` lists the last runs.
+- `... email subjects [--root <folder>] [--limit N]` is a dry run that lists archived mails whose file name lost its first letters to an old reply-prefix rule ("Recibo" filed as "cibo"): a count and N names, printed locally. It reads each mail's subject under the email stage's download budget and lock, and renames nothing. `email batch fix-cut-names` renames those files to the full subject: a dry run unless `--apply`, with the date and sequence kept, no file overwritten (a taken name is counted as a clash), the index rows following the rename and an undo log (`cut-names-undo-<time>.json`, written before the first rename) in the runtime-data folder; `--revert <log>` restores from it. The disk walk's tree shows the new names after the next scan.
+- `... email index --fresh` lists the email folders now instead of reading the last scan's index: a mail filed since that scan is only seen this way.
+- `... scan --no-email` scans the disks only.
+
+Downloaded mail stays on the disk until OneDrive frees it. The app never sets a file back to online-only, because that is a write.
+
+## What opens a file
+
+The disk walk never opens a file. Mail is the one exception, and only a `.msg` inside the email folders (`email.roots`). These are the only readers, all through `src/email/reader.py`:
+
+- the email stage, for new or changed mail (a child process, a per-run download budget, a failed file not retried until it changes);
+- Show all in the Search preview, for the one mail asked for by its row id, in a child process with a timeout;
+- `email batch renumber`, for a mail's date, or its attachment names when mails share a number, only when the index has none;
+- `email subjects` (a dry run that renames nothing) and `email batch fix-cut-names` (the rename from it, with an undo log), which read each mail's subject under the stage's download budget and lock.
+
+Nothing else opens a scanned file. The Archive sheet, the Outlook macro and the archive verbs save, rename and delete mail only inside `email.roots` ([archive.md](archive.md)). Explore's open actions hand a path to Windows and read nothing.
+
 ## One scan at a time
 
 `scan.lock` in the runtime-data folder is an OS byte-range lock taken without waiting, by the app's Rescan, the in-app schedule, the tray and the CLI alike. The operating system releases it when the holder exits, so a crashed scan never leaves it stuck; the next scan marks the crashed one `interrupted`.

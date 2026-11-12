@@ -288,3 +288,60 @@
 .doc-diff-add { color: var(--success); }
 .doc-diff-same { color: var(--muted); }
 .doc-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-sm); }
+
+/* --------------------------------------------------- a dropped Markdown file */
+.doc-drop-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--neutral-soft);
+  color: var(--ink);
+  font-size: var(--font-body-sm);
+}
+.doc-drop-note .icon { flex: none; margin-top: 2px; color: var(--muted); }
+/* A rendered drop has no id to edit, so the sheet's View | Edit switch and its own window link have nothing to act on. */
+.doc-dialog.is-dropped .doc-mode, .doc-dialog.is-dropped #docWindow { display: none; }
+
+/* The drop target: the whole window, above an open sheet (the popover top layer; a plain fixed layer where popovers are missing). */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--space-md);
+  border: 0;
+  background: transparent;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1000;
+}
+.drop-overlay:popover-open, .drop-overlay.is-open {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  outline: 2px dashed var(--accent);
+  outline-offset: calc(-1 * var(--space-sm));
+}
+.drop-card {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  max-width: 360px;
+  padding: var(--space-lg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.drop-card .icon { width: 32px; height: 32px; color: var(--accent); }
+.drop-title { margin: 0; font-weight: 600; }
+.drop-text { margin: 0; color: var(--muted); font-size: var(--font-body-sm); }
+.drop-overlay:not([popover]):not(.is-open) { display: none; }

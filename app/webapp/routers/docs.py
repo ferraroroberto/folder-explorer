@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 
+from app.webapp import state
 from app.webapp.auth import is_pc_itself
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, store, winfs
@@ -226,6 +227,61 @@ def _name(value: object) -> Optional[str]:
     if not isinstance(value, str) or not value or value in (".", ".."):
         return None
     return value if not any(c in value for c in "\\/:") else None
+
+
+def _count(body: dict[str, Any], key: str) -> int:
+    """A whole number from a request, never a bool and never negative."""
+    value = body.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise HTTPException(422, "%s must be a whole number" % key)
+    return value
+
+
+def _dropped_name(body: dict[str, Any]) -> str:
+    """The name of a file the page was handed by a drop: a bare name, never a path, and a Markdown one."""
+    name = _name(body.get("name"))
+    if name is None:
+        raise HTTPException(422, "name must be a file name, not a path")
+    if not reader.is_document(name):
+        raise _Refusal("not_document")
+    return name
+
+
+@router.post("/dropped/match")
+def dropped_match(body: dict[str, Any] = Body(...)) -> Any:
+    """Is a file dropped on the window one the scan has: ``{match: {root, scan_id, id} | null}``.
+
+    The page sends the file's name, size and modified time (milliseconds), never a path.
+    Exactly one indexed Markdown file of that name, size and time is a match; none or
+    several is ``null`` and the page renders the dropped text read-only instead.
+    """
+    try:
+        name = _dropped_name(body)
+        size, modified = _count(body, "size"), _count(body, "modified")
+    except _Refusal as exc:
+        return _refuse(exc.reason)
+    if size > reader.DOC_MAX_BYTES:
+        return _refuse("too_large")
+    return {"match": state.dropped_doc(config.load(), name, size, modified)}
+
+
+@router.post("/dropped/render")
+def dropped_render(body: dict[str, Any] = Body(...)) -> Any:
+    """A dropped file no scan has, rendered read-only from the text the page read: nothing is read from disk.
+
+    It has no folder here, so a relative link or image renders inert.
+    """
+    try:
+        name = _dropped_name(body)
+    except _Refusal as exc:
+        return _refuse(exc.reason)
+    text = _text(body, "text")
+    if len(text.encode("utf-8")) > reader.DOC_MAX_BYTES:
+        return _refuse("too_large")
+    rendered = render(text, lambda _href: (None, "Open the file from its folder to follow relative links"),
+                      lambda _src: (None, "Open the file from its folder to show its images"))
+    logger.info("ℹ️ a dropped %s file rendered read-only (no indexed copy)", os.path.splitext(name)[1].lower())
+    return {"name": name, "dropped": True, "folder": [], "size": len(text.encode("utf-8")), **rendered}
 
 
 @router.post("/find")

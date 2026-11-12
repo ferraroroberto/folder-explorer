@@ -1,6 +1,6 @@
 """The front end's pure modules are JavaScript, so their tests run under Node inside the suite.
 
-The Search preview's body-state table, and the Markdown editor's text helpers.
+The Search preview's body-state table, the Markdown editor's text helpers and the document API answer classifier.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from src.no_window import NO_WINDOW
 ROOT = Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize("name", ["body_state.test.mjs", "md_source.test.mjs"])
+@pytest.mark.parametrize("name", ["body_state.test.mjs", "md_source.test.mjs", "doc_answer.test.mjs"])
 def test_the_js_module_tests_pass_under_node(name: str) -> None:
     node = shutil.which("node")
     if node is None:

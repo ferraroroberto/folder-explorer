@@ -7,6 +7,7 @@ client's save through the same API, so nothing here writes a file directly.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from urllib.parse import urlencode
 
@@ -147,3 +148,23 @@ def test_a_file_changed_underneath_shows_the_conflict_screen(page: Page, app_url
     expect(page.locator(".doc-edit-status")).to_have_text("Saved")
     assert _source(page, app_url, loc)["text"] == "# Journal\n\nMy line.\n"
     assert errors == []
+
+
+def test_an_answer_with_no_reason_is_not_called_a_disk_read_failure(page: Page, app_url: str) -> None:
+    """A plain 404 (the page newer than the running app, as during a restart) and no answer at all each say what they are."""
+    loc = _journal(page, app_url)
+    not_found = json.dumps({"detail": "Not Found"})
+    page.route("**/api/doc/source?*", lambda route: route.fulfill(status=404, content_type="application/json", body=not_found))
+    page.goto(app_url + "/doc?" + urlencode(loc))
+    expect(page.locator("#docBody h1")).to_have_text("Journal")
+    page.locator('.doc-mode [data-mode="edit"]').click()
+    state = page.locator(".doc-state")
+    expect(state).to_contain_text("different versions")
+    expect(state).not_to_contain_text("Windows could not read it")
+    expect(state.locator('[data-doc-act="reload"]')).to_be_visible()
+
+    page.unroute("**/api/doc/source?*")
+    page.route("**/api/doc?*", lambda route: route.abort())
+    page.goto(app_url + "/doc?" + urlencode(loc))
+    expect(page.locator(".doc-state")).to_contain_text("did not answer")
+    expect(page.locator(".doc-state")).not_to_contain_text("Windows could not read it")

@@ -12,6 +12,7 @@
 import { api } from './api.js';
 import { esc, glyph } from './fmt.js';
 import { APP } from './state.js';
+import { NO_ANSWER, refusal } from './doc-answer.js';
 import { askLeave, confirmSheet } from './doc-confirm.js';
 import { hideConflict, showConflict } from './doc-conflict.js';
 import { drawDoc, releaseDoc, stateHtml } from './doc-view.js';
@@ -129,7 +130,7 @@ class Editor {
     const body = await json(res);
     if (mine !== this.seq || this.closed) return;
     if (!res.ok) {
-      this.el.preview.innerHTML = stateHtml({ reason: (body && body.reason) || 'unreadable', message: (body && body.detail) || 'No preview' });
+      this.el.preview.innerHTML = stateHtml(refusal(res.status, body));
       return;
     }
     drawDoc(this.el.preview, { ...body, root: this.loc.root, scan_id: this.loc.scan_id }, true);
@@ -200,7 +201,8 @@ class Editor {
     }
     if (body && body.reason === 'conflict') { this.conflict(body); return false; }
     this.status('');
-    showToast(res ? (body && body.detail) || 'Could not save' : 'The app did not answer. Your draft is kept on this device.', 'error');
+    // A refusal or failure never loses the text: say what happened and that the draft stays.
+    showToast((res ? refusal(res.status, body) : NO_ANSWER).message + '. Your draft is kept on this device.', 'error');
     return false;
   }
 
@@ -291,7 +293,7 @@ class Editor {
     const { res, body } = await this.fetchSource();
     if (this.closed) return;
     if (!res || !res.ok || !body || !body.editable) {
-      this.mount.innerHTML = stateHtml({ reason: (body && body.reason) || 'unreadable', message: (body && body.detail) || 'The app did not answer' });
+      this.mount.innerHTML = stateHtml(res ? refusal(res.status, body) : NO_ANSWER);
       this.hooks.onReady(false);
       return;
     }

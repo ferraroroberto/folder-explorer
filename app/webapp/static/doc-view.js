@@ -8,6 +8,7 @@
  */
 
 import { api } from './api.js';
+import { NO_ANSWER, refusal } from './doc-answer.js';
 import { esc, glyph } from './fmt.js';
 import { copyText } from './search-state.js';
 
@@ -23,6 +24,9 @@ const STATES = {
   gone: { text: 'It was moved or deleted since the last scan.' },
   not_document: { text: 'Only Markdown files and the images beside them open here.' },
   unreadable: { text: 'Windows could not read it. Try again in a moment.' },
+  app_mismatch: { text: 'This usually means the app was just updated or is restarting. Reload the page in a moment.', act: 'reload', label: 'Reload' },
+  app_error: { text: 'Something went wrong in the app. Try again in a moment.' },
+  no_answer: { text: 'Check the connection to the PC, then try again.' },
   not_utf8: { text: 'This file is not saved as UTF-8 text, so it opens read-only here.' },
   edit_too_large: { text: 'Markdown files up to 1 MB can be edited here.' },
 };
@@ -50,7 +54,7 @@ async function answer(res) {
   let body = null;
   try { body = await res.json(); } catch (e) { body = null; }
   if (res.ok) return { ok: true, doc: body };
-  return { ok: false, reason: (body && body.reason) || 'unreadable', message: (body && body.detail) || 'HTTP ' + res.status };
+  return { ok: false, ...refusal(res.status, body) };
 }
 
 /** Fetch a document rendered; ``download`` is the one tap that lets a cloud-only file come down to the PC. */
@@ -60,7 +64,7 @@ export async function fetchDoc(loc, download) {
   try {
     return await answer(await (download ? post('/api/doc/download') : api('/api/doc?' + params(loc))));
   } catch (e) {
-    return { ok: false, reason: 'unreadable', message: 'The app did not answer' };
+    return { ok: false, ...NO_ANSWER };
   }
 }
 
@@ -175,6 +179,7 @@ export function wireDocHost(host, scroller, hooks) {
     if (!act) return;
     if (act.dataset.docAct === 'download') hooks.onDownload();
     else if (act.dataset.docAct === 'explore') hooks.onExplore();
+    else if (act.dataset.docAct === 'reload') location.reload();
     else if (act.dataset.docAct === 'image-download') {
       const off = act.closest('.doc-img-off');
       const img = document.createElement('img');

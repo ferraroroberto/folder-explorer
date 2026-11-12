@@ -144,6 +144,8 @@
 .doc-side, .doc-main { min-width: 0; }
 .doc-main { padding: var(--space-md) 18px var(--space-lg); }
 .doc-side-title { margin: 0 0 var(--space-xs); padding: 0 var(--space-sm); color: var(--muted); font-size: var(--font-label); font-weight: 600; }
+.doc-outline-list + .doc-side-title { margin-top: var(--space-md); }
+.doc-recent-list a { overflow-wrap: anywhere; }
 @media (min-width: 1100px) and (pointer: fine) {
   .doc-app { max-width: calc(var(--layout-measure) + 260px + var(--gap)); }
   .doc-layout { grid-template-columns: 260px minmax(0, var(--layout-measure)); justify-content: center; }

@@ -8,6 +8,8 @@ folder-explorer/
 │   ├── cli/__main__.py         # `python -m app.cli scan|roots|email|folders`: scans and the email index with no app running
 │   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
 │   ├── cli/folders.py          # `folders search --json`: folder search for another app, one JSON document
+│   ├── launcher.py             # `pythonw -m app.launcher <file>`: the Markdown "Open with" handler (names the file by its
+│   │                           #   scanned folder, asks the app for its id, opens the /doc window)
 │   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
 │   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
@@ -50,8 +52,10 @@ folder-explorer/
 │   ├── docs/                   # the Markdown viewer: reader (the only reader of a document's bytes, with the size,
 │   │                           #   link and cloud-only checks), locate (a relative link fenced to its root, then its
 │   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
-│   │                           #   and writer (the editor's only writer: the opened file only, after its version check)
-│   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
+│   │                           #   and writer (the editor's only writer: the opened file only, after its version check);
+│   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index)
+│   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
+│   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
 │   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window (the Archive sheet and window offer it)
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,

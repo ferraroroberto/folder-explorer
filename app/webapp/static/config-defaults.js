@@ -49,6 +49,8 @@ export function settingsBody(raw) {
     index_bytes: typeof raw.index_bytes === 'number' ? raw.index_bytes : 0,
     // Only a server that says the file is missing gets the setup card; an older one says nothing.
     config_file: { exists: !(isObject(raw.config_file) && raw.config_file.exists === false) },
+    // Only this PC is told the Markdown association's state; any other device, or an older server, hides the row.
+    md_assoc: { state: isObject(raw.md_assoc) && typeof raw.md_assoc.state === 'string' ? raw.md_assoc.state : 'pc_only' },
     created: raw.created === true,
   };
 }

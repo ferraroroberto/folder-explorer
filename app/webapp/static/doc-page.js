@@ -8,7 +8,8 @@
  * after asking when there are unsaved changes.
  */
 
-import { authHeaders } from './api.js';
+import { authHeaders, getJSON } from './api.js';
+import { esc } from './fmt.js';
 import { APP } from './state.js';
 import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
 import { openEditor } from './doc-edit.js';
@@ -76,6 +77,32 @@ function placeOutline(hasOutline) {
   $('docOutlineBtn').setAttribute('aria-expanded', 'false');
 }
 
+/** The documents opened last, from the server (so every window and device shares them); empty when it can't say. */
+async function fetchRecent() {
+  try {
+    const body = await getJSON('/api/doc/recent');
+    return Array.isArray(body.recent) ? body.recent : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/** The recent list without the document on show, as links the page opens in this window. */
+function recentHtml(items) {
+  const others = items.filter((d) => !(loc && d.root === loc.root && d.scan_id === loc.scan_id && d.id === loc.id));
+  if (!others.length) return '';
+  return '<p class="doc-side-title">Recent</p><ul class="doc-outline-list doc-recent-list">' + others.map((d) =>
+    '<li><a href="' + esc(docUrl(d)) + '" data-doc-id="' + esc(String(d.id)) + '" title="' + esc(d.folder.join(' › ')) +
+    '" data-track="doc-recent-item">' + esc(d.name) + '</a></li>').join('') + '</ul>';
+}
+
+/** The sidebar: the outline when the document has headings, then the recent documents. */
+function drawSide(outline, recent) {
+  const html = (outline.length ? '<p class="doc-side-title">Outline</p>' + outlineHtml(outline) : '') + recentHtml(recent);
+  $('docOutline').innerHTML = html;
+  placeOutline(html !== '');
+}
+
 async function load(download) {
   if (!loc) {
     $('docBody').innerHTML = stateHtml({ reason: 'not_found', message: 'This address names no document' });
@@ -86,15 +113,15 @@ async function load(download) {
   if (!r.ok) {
     renderHeadStatus($('docStatus'), [], '');
     $('docBody').innerHTML = stateHtml(r);
-    placeOutline(false);
+    drawSide([], await fetchRecent());
     return;
   }
   document.title = r.doc.name + ' · Folder explorer';
   $('docTitle').textContent = r.doc.name;
   renderHeadStatus($('docStatus'), [], r.doc.folder.join(' › '));
-  $('docOutline').innerHTML = '<p class="doc-side-title">Outline</p>' + outlineHtml(r.doc.outline);
-  placeOutline(r.doc.outline.length > 0);
   drawDoc($('docBody'), r.doc);
+  // Asked after the document: the server counts this open first, then lists the others.
+  drawSide(r.doc.outline, await fetchRecent());
   if (loc.fragment) scrollToHeading($('docBody'), loc.fragment);
 }
 

@@ -13,7 +13,7 @@ from app.webapp.auth import is_pc_itself
 from app.webapp.bind import resolve_bind
 from app.webapp.build import BUILD_INFO
 from app.webapp.routers.archive import archive_status
-from src import config, folder_lists, store
+from src import config, file_assoc, folder_lists, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,7 @@ def settings_body(pc: bool) -> dict[str, Any]:
         "index_bytes": _index_bytes(),
         "archive": archive_status(cfg, pc),
         "config_file": {"exists": config.config_path().is_file()},
+        "md_assoc": {"state": file_assoc.state() if pc else "pc_only"},
     }
 
 
@@ -93,3 +94,21 @@ def create_config(request: Request) -> JSONResponse:
         return JSONResponse({"detail": "config.json could not be created: " + (exc.strerror or "the file system refused")},
                             status_code=500)
     return JSONResponse({**settings_body(is_pc_itself(request)), "created": created})
+
+
+@router.post("/api/md-assoc")
+def post_md_assoc(request: Request, body: dict[str, Any] = Body(...)) -> JSONResponse:
+    """Settings' "Associate Markdown files with this app": ``{"on": bool}``, for this PC only; answers the state read back."""
+    if not is_pc_itself(request):
+        return JSONResponse({"detail": "Only this PC can change its file associations"}, status_code=403)
+    on = body.get("on")
+    if not isinstance(on, bool):
+        return JSONResponse({"detail": "on must be true or false"}, status_code=400)
+    try:
+        return JSONResponse({"state": file_assoc.set_on(on)})
+    except file_assoc.NotAllowed as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=409)
+    except OSError as exc:
+        logger.warning("⚠️ file association not changed: %s", exc)
+        return JSONResponse({"detail": "Windows refused the change: " + (exc.strerror or str(exc)), "state": file_assoc.state()},
+                            status_code=500)

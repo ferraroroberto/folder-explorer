@@ -78,6 +78,17 @@ def _listed(path: str) -> Optional[winfs.Entry]:
         return None
 
 
+def find_document(folder: str, name: str) -> Optional[winfs.Entry]:
+    """A Markdown file called ``name`` in a fresh listing of ``folder``: what a scan missed, found without opening it.
+
+    None when the folder or the file is gone, or the entry is a folder, a link or not Markdown.
+    """
+    if not is_document(name) or name != os.path.basename(name):
+        return None
+    entry = _listed(os.path.join(folder, name))
+    return entry if entry is not None and not entry.is_dir and not winfs.is_link(entry) else None
+
+
 if sys.platform == "win32":
     import ctypes
     import msvcrt

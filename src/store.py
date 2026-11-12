@@ -71,7 +71,24 @@ CREATE TABLE IF NOT EXISTS saved_searches (
     created_at REAL NOT NULL,
     UNIQUE (mode, query)
 );
+CREATE TABLE IF NOT EXISTS found_docs (
+    id INTEGER PRIMARY KEY,
+    root_key TEXT NOT NULL,
+    scan_id INTEGER NOT NULL,
+    folder_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    UNIQUE (root_key, scan_id, folder_id, name)
+);
+CREATE TABLE IF NOT EXISTS recent_docs (
+    root_key TEXT NOT NULL,
+    rel TEXT NOT NULL,
+    opened_at REAL NOT NULL,
+    PRIMARY KEY (root_key, rel)
+);
 """
+
+# Recent documents kept; the sidebar shows fewer, so one that left the scan still leaves a full list.
+RECENT_KEEP = 20
 
 SEARCH_MODES = ("emails", "folders")
 
@@ -248,6 +265,50 @@ def save_search(mode: str, name: str, query: str) -> dict[str, Any]:
 def delete_search(search_id: int) -> bool:
     with connect() as conn:
         return conn.execute("DELETE FROM saved_searches WHERE id = ?", (search_id,)).rowcount > 0
+
+
+def remember_found(root_key: str, scan_id: int, folder_id: int, name: str) -> int:
+    """The lasting number of a Markdown file a scan missed, found in its scanned folder; the same file keeps its number."""
+    with connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO found_docs (root_key, scan_id, folder_id, name) VALUES (?, ?, ?, ?)",
+                     (root_key, scan_id, folder_id, name))
+    number = found_number(root_key, scan_id, folder_id, name)
+    if number is None:
+        raise RuntimeError("a found file was not recorded")
+    return number
+
+
+def found_doc(root_key: str, scan_id: int, number: int) -> Optional[tuple[int, str]]:
+    """The scanned folder and the name a found file's number stands for, or None."""
+    with connect() as conn:
+        row = conn.execute("SELECT folder_id, name FROM found_docs WHERE id = ? AND root_key = ? AND scan_id = ?",
+                           (number, root_key, scan_id)).fetchone()
+    return (int(row["folder_id"]), str(row["name"])) if row else None
+
+
+def found_number(root_key: str, scan_id: int, folder_id: int, name: str) -> Optional[int]:
+    """The number a file found in this scan already has, or None."""
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM found_docs WHERE root_key = ? AND scan_id = ? AND folder_id = ? AND name = ?",
+                           (root_key, scan_id, folder_id, name)).fetchone()
+    return int(row["id"]) if row else None
+
+
+def touch_recent(root_key: str, rel: list[str]) -> None:
+    """Mark the document at ``rel`` (names below its root) opened now, keeping the newest ``RECENT_KEEP``."""
+    with connect() as conn:
+        conn.execute("INSERT INTO recent_docs (root_key, rel, opened_at) VALUES (?, ?, ?) "
+                     "ON CONFLICT (root_key, rel) DO UPDATE SET opened_at = excluded.opened_at",
+                     (root_key, json.dumps(rel), time.time()))
+        conn.execute("DELETE FROM recent_docs WHERE rowid NOT IN "
+                     "(SELECT rowid FROM recent_docs ORDER BY opened_at DESC LIMIT ?)", (RECENT_KEEP,))
+
+
+def recent_docs() -> list[tuple[str, list[str]]]:
+    """``(root key, names below the root)`` of the documents opened last, newest first."""
+    with connect() as conn:
+        rows = conn.execute("SELECT root_key, rel FROM recent_docs ORDER BY opened_at DESC").fetchall()
+    return [(str(r["root_key"]), list(json.loads(r["rel"]))) for r in rows]
 
 
 def begin_email_run(trigger: str, scope: str) -> int:

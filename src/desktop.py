@@ -1,7 +1,8 @@
-"""Open a mail in Outlook, a folder in File Explorer or a file in its own app on this PC, without waiting.
+"""Open a mail in Outlook, a folder in File Explorer, a file in its own app or a document window on this PC, without waiting.
 
-Only the web routes that accept loopback callers use these: the phone gets
-Copy path and Show folder instead. Outlook opens the archived ``.msg`` itself
+Only the web routes that accept loopback callers and the "Open with" launcher
+(``app/launcher.py``, a document window) use these: the phone gets Copy path
+and Show folder instead. Outlook opens the archived ``.msg`` itself
 (``outlook.exe /f``), never the live mail, whose id changes when it moves.
 
 None of this reads a file: each call hands a path to Windows (File Explorer,
@@ -32,7 +33,7 @@ from src.no_window import NO_WINDOW
 
 logger = logging.getLogger(__name__)
 
-_OUTLOOK_APP_PATH = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.EXE"
+_APP_PATHS = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\"
 
 # ``off`` refuses every launch; the e2e suite's disposable instance sets it.
 DESKTOP_ENV = "FOLDER_EXPLORER_DESKTOP"
@@ -85,14 +86,19 @@ def _explorer() -> str:
 
 
 def outlook_exe() -> Optional[str]:
-    """Outlook (classic)'s executable from its App Paths registration, or None when it isn't installed."""
+    """Outlook (classic)'s executable, or None when it isn't installed."""
+    return _app_exe("OUTLOOK.EXE")
+
+
+def _app_exe(exe: str) -> Optional[str]:
+    """A program's executable from its App Paths registration, or None when it isn't installed."""
     if sys.platform != "win32":
         return None
     import winreg
 
     for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         try:
-            with winreg.OpenKey(hive, _OUTLOOK_APP_PATH) as key:
+            with winreg.OpenKey(hive, _APP_PATHS + exe) as key:
                 value, _ = winreg.QueryValueEx(key, "")
         except OSError:
             continue
@@ -208,3 +214,18 @@ def open_item(path: str, verb: str, started: Optional[float] = None) -> None:
         logger.info("ℹ️ asked Windows to %s a %s file", verb, os.path.splitext(path)[1].lower() or "typeless")
     else:
         raise ValueError("unknown action: " + verb)
+
+
+def open_app_window(url: str) -> None:
+    """Show ``url`` (the app's own /doc page) in an Edge app window, or in the default browser without Edge.
+
+    Raises ``FileNotFoundError`` when nothing can be opened here.
+    """
+    _check()
+    edge = _app_exe("msedge.exe")
+    if edge is not None:
+        _spawn([edge, "--app=" + url])
+        logger.info("ℹ️ opened a document window in Edge")
+    else:
+        _shell(url, "open")
+        logger.info("ℹ️ opened a document page in the default browser")

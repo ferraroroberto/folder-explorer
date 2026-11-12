@@ -78,12 +78,14 @@ from src.email.archive_settings import (
 )
 from src.email.batch.common import (
     ERROR_BAD_DECISION,
-    ERROR_CATEGORY_FAILED,
     ERROR_NOT_IN_INBOX,
     envelope,
     header,
     renumber_folders,
     unique_folders,
+)
+from src.email.batch.common import (
+    ERROR_CATEGORY_FAILED as ERROR_CATEGORY_FAILED,
 )
 from src.email.batch.mail_filter import mail_matches
 from src.email.batch.move import (
@@ -96,9 +98,7 @@ from src.email.batch.move import (
     MOVE_VIA_FOLDER_SWITCH as MOVE_VIA_FOLDER_SWITCH,
 )
 from src.email.batch.move import (
-    MOVE_VIA_KEPT_IN_SENT,
-    move_failure_error,
-    move_out_of_inbox,
+    MOVE_VIA_KEPT_IN_SENT as MOVE_VIA_KEPT_IN_SENT,
 )
 from src.email.batch.move import (
     MOVE_VIA_ORIGINAL as MOVE_VIA_ORIGINAL,
@@ -109,6 +109,7 @@ from src.email.batch.move import (
 from src.email.batch.move import (
     MOVE_VIA_RELEASED_RETRY as MOVE_VIA_RELEASED_RETRY,
 )
+from src.email.batch.move import move_and_tag
 from src.email.mailboxes import Mailbox, MailboxRegistry
 from src.email.naming import normalize_message_id
 from src.email.renumber import RenumberResult, renumber_folder
@@ -646,40 +647,15 @@ def _apply_one(
     if not _archive_decision(client, cfg, repo, raw, item, result):
         return result
 
-    try:
-        if from_sent:
-            # Filed from Sent Items: the files are written, the mail stays.
-            moved, via = item, MOVE_VIA_KEPT_IN_SENT
-            logger.info("Archived %s from Sent Items; leaving it there.", message_id)
-        else:
-            # The move takes over the only reference: nothing in this frame
-            # may keep the mail alive while Outlook is asked to let go of it.
-            held, item = [item], None
-            moved, via = move_out_of_inbox(client, held, archive_folder, message_id)
-            result["moved"] = True
-        result["move_via"] = via
-        result["entry_id"] = client.entry_id(moved)
-    except Exception as exc:
-        logger.exception("Moving %s to %r failed", message_id, archive_folder)
-        result["error"] = move_failure_error(client, exc, message_id)
-        return result
-
-    # Tagged in its own step: a category that would not stick is a different
-    # state from a move that did not happen, and the caller recovers from the
-    # two differently.
-    try:
-        client.set_category(moved, category)
-        result["categorized"] = True
-    except Exception as exc:
-        logger.exception("Tagging %s with %r failed", message_id, category)
-        result["error"] = {
-            "code": ERROR_CATEGORY_FAILED,
-            "message": f"the mail was filed{'' if from_sent else ' and moved'}, but not tagged: "
-                       f"{type(exc).__name__}: {exc}",
-        }
-        return result
-
-    result["ok"] = True
+    # The move takes over the only reference: nothing in this frame may keep
+    # the mail alive while Outlook is asked to let go of it.
+    held, item = [item], None
+    if move_and_tag(
+        client, held, archive_folder, category, message_id, result,
+        done="the mail was filed" if from_sent else "the mail was filed and moved",
+        keep_in_place=from_sent,
+    ):
+        result["ok"] = True
     return result
 
 

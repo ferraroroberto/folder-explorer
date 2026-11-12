@@ -2,7 +2,7 @@
 whose name lost its first letters (``src/email/batch/fix_cut_names.py`` holds the rename).
 
 It touches neither Outlook nor COM, so ``email_batch`` runs it before any mailbox work. Like the other verbs it
-prints one JSON document; the run cannot start (exit 2) with `error.code` ``bad_input`` (an unusable undo log),
+prints one JSON document; the run cannot start (exit 2) with `error.code` ``bad_input`` (an unusable undo log, or a ``--root`` outside the email folders),
 ``email_not_set_up`` (no email index to read) or ``email_busy`` (an index run holds the email lock).
 """
 from __future__ import annotations
@@ -46,6 +46,8 @@ def run(cfg: dict[str, Any], args: argparse.Namespace, emit: Callable[[dict[str,
             document = verb.fix_cut_names(cfg, apply=args.apply, scope=args.root, wait_s=args.wait)
     except verb.UndoLogError as exc:
         return fail(VERB, batch_common.ERROR_BAD_INPUT, str(exc))
+    except indexer.UnknownFolder as exc:
+        return fail(VERB, batch_common.ERROR_BAD_INPUT, exc.args[0])
     except indexer.NotSetUp as exc:
         return fail(VERB, ERROR_EMAIL_NOT_SET_UP, str(exc))
     except indexer.EmailBusy as exc:

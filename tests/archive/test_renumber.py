@@ -264,6 +264,56 @@ def test_a_shared_numbers_attachments_go_to_the_mail_that_carries_them(
     assert entry["attachments_placed"] == renumber_module.PLACED_BY_MSG
 
 
+def test_a_shared_number_uses_the_indexed_attachment_names_and_opens_no_file(
+    repo, folder, roots, monkeypatch
+):
+    """The stage already read each mail's attachment list; opening the file again
+    would be a read outside the stage's budget and lock."""
+    for name, sent, names in (
+        ("087 - earlier.msg", "2026-09-08T16:00:00+02:00", "image001.png"),
+        ("087 - later.msg", "2026-09-09T05:00:00+02:00", "diagram one.png"),
+    ):
+        _write(folder, name)
+        repo.upsert_email(EmailRecord(
+            file_path=str(folder / name), folder_path=str(folder), filename=name,
+            date_sent=sent, file_mtime=1.0, message_id=name + "@example.invalid",
+            attachment_names=names,
+        ))
+    repo.commit()
+    _write(folder, "087 - diagram one.png")
+    monkeypatch.setattr(
+        renumber_module, "read_msg_facts",
+        lambda path: pytest.fail("opened %s" % os.path.basename(path)),
+    )
+
+    result = renumber_folder(str(folder), repo, roots)
+
+    assert _names(folder) == [
+        "087 - earlier.msg", "088 - diagram one.png", "088 - later.msg",
+    ]
+    assert result.renamed[0]["attachments_placed"] == renumber_module.PLACED_BY_MSG
+
+
+def test_a_row_without_an_attachment_list_is_still_read_for_it(
+    repo, folder, roots, monkeypatch
+):
+    _seed(repo, folder, {
+        "087 - earlier.msg": "2026-09-08T16:00:00+02:00",
+        "087 - later.msg": "2026-09-09T05:00:00+02:00",
+    })
+    opened: list[str] = []
+
+    def read(path):
+        opened.append(os.path.basename(path))
+        return MsgFacts("", "", ())
+
+    monkeypatch.setattr(renumber_module, "read_msg_facts", read)
+
+    renumber_folder(str(folder), repo, roots)
+
+    assert sorted(opened) == ["087 - earlier.msg", "087 - later.msg"]
+
+
 def test_an_attachment_archived_under_its_ascii_only_name_still_bundles(
     repo, folder, roots, monkeypatch
 ):

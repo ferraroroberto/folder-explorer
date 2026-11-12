@@ -31,6 +31,8 @@ class EmailRecord:
     flag_status: int = 0
     message_id: str = ""
     id: Optional[int] = None
+    # Newline-joined, as the stage stores it; None is a row the stage never read.
+    attachment_names: Optional[str] = None
 
 
 class EmailRepository(repository.EmailRepository):
@@ -43,13 +45,14 @@ class EmailRepository(repository.EmailRepository):
     def upsert_email(self, rec: EmailRecord) -> None:
         self._retry_locked(lambda: self._seed_conn.execute(
             "INSERT INTO emails (file_path, folder_path, filename, subject, sender, recipients, date_sent, "
-            "body_preview, file_mtime, flag_status, message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "body_preview, file_mtime, flag_status, message_id, attachment_names) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(file_path) DO UPDATE SET subject = excluded.subject, sender = excluded.sender, "
             "recipients = excluded.recipients, date_sent = excluded.date_sent, body_preview = excluded.body_preview, "
             "file_mtime = excluded.file_mtime, flag_status = excluded.flag_status, message_id = excluded.message_id, "
-            "indexed_at = datetime('now')",
+            "attachment_names = excluded.attachment_names, indexed_at = datetime('now')",
             (rec.file_path, rec.folder_path, rec.filename, rec.subject, rec.sender, rec.recipients, rec.date_sent,
-             rec.body_preview, rec.file_mtime, rec.flag_status, rec.message_id)), "upsert_email")
+             rec.body_preview, rec.file_mtime, rec.flag_status, rec.message_id, rec.attachment_names)), "upsert_email")
 
 
 def init_db(path: str | Path) -> sqlite3.Connection:

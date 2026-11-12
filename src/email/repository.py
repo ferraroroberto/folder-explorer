@@ -56,6 +56,15 @@ class EmailRecord:
     date_sent: str = ""
     # Internet Message-ID without angle brackets; "" means the .msg carried none.
     message_id: str = ""
+    # The attachment names the stage read; None when the row never had them (filed since the last run).
+    attachment_names: Optional[tuple[str, ...]] = None
+
+
+def _split_names(stored: Optional[str]) -> Optional[tuple[str, ...]]:
+    """A row's newline-joined attachment names; None for a row that never had the column filled."""
+    if stored is None:
+        return None
+    return tuple(n for n in stored.split("\n") if n)
 
 
 @dataclass
@@ -162,10 +171,11 @@ class EmailRepository:
         used; a case-sensitive match would look like a folder never indexed.
         """
         rows = self._conn.execute(
-            "SELECT file_path, folder_path, filename, date_sent, message_id FROM emails "
+            "SELECT file_path, folder_path, filename, date_sent, message_id, attachment_names FROM emails "
             "WHERE folder_path = ? COLLATE NOCASE", (folder_path,)).fetchall()
         return [EmailRecord(file_path=r["file_path"], folder_path=r["folder_path"], filename=r["filename"],
-                            date_sent=r["date_sent"] or "", message_id=r["message_id"] or "") for r in rows]
+                            date_sent=r["date_sent"] or "", message_id=r["message_id"] or "",
+                            attachment_names=_split_names(r["attachment_names"])) for r in rows]
 
     def exact_subject_counts(self, subject: str) -> dict[str, int]:
         """Per folder, how many mails have a stored (cleaned) subject of exactly ``subject``, case-blind."""

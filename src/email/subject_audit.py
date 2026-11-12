@@ -30,7 +30,7 @@ from src.email.archive import (
 from src.email.archive_settings import DEFAULT_MAX_PATH_LENGTH, get_max_path_length
 from src.email.manifest import Manifest
 from src.email.reader import ReadError, read_facts
-from src.email.settings import email_part
+from src.email.settings import email_part, is_under
 from src.email.stage import Reader
 from src.roots import resolve_roots
 
@@ -142,6 +142,8 @@ def audited(scope: Optional[str] = None, wait_s: float = 0.0, read: Optional[Rea
     part = email_part(cfg, roots)
     if part.stage_problem is not None or part.index_path is None:
         raise indexer.NotSetUp(part.stage_problem or "no email index")
+    if scope is not None and not any(is_under(scope, f) for f in part.roots):
+        raise indexer.UnknownFolder("not inside an email folder: " + scope)
     guard = indexer.lock()
     indexer.take_lock(guard, wait_s)
     try:

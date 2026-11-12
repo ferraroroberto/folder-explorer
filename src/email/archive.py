@@ -68,6 +68,9 @@ _OL_MSG_FORMAT = 9
 # through that, so the naming rules stay owned by this module.
 _RE_DATED_PREFIX = re.compile(r"^(\d{4}-\d{2}-\d{2}) - (\d{3}) - ")
 _RE_UNDATED_PREFIX = re.compile(r"^(\d{3}) - ")
+# The prefix regexes read three digits, so a fourth would never be parsed back and the folder would number
+# its next filing 1000 again.
+_MAX_SEQUENCE = 999
 
 # Appended to a filename's stem when it has to be cut to fit the path budget
 # (see ``_fit_filename_to_path``).
@@ -89,6 +92,10 @@ _MAX_DEDUPE_ATTEMPTS = 100
 
 
 # ----------------------------------------------------------------- types ----
+
+class ArchiveError(Exception):
+    """A filing the archive refuses rather than risk an archived mail: a full numbering, or a name already taken."""
+
 
 @dataclass
 class ArchiveResult:
@@ -271,7 +278,7 @@ def _scan_folder(folder_path: str) -> _FolderScan:
             undated += 1
 
     next_num = (max(numbers) + 1) if numbers else 1
-    if next_num > 999:
+    if next_num > _MAX_SEQUENCE:
         logger.warning("Sequence number exceeds 999 in %s", folder_path)
     next_sequence = f"{next_num:03d}"
 
@@ -464,6 +471,11 @@ class EmailArchiver:
         # config mode is "auto") the per-folder date-prefix inference.
         scan = _scan_folder(folder_path)
         seq = scan.next_sequence
+        if int(seq) > _MAX_SEQUENCE:
+            raise ArchiveError(
+                f"this folder already holds sequence {_MAX_SEQUENCE}; the next number would have four digits "
+                "and could not be read back, so nothing was saved"
+            )
         date_prefix_enabled = self._resolve_date_prefix_enabled(
             scan.inferred_date_prefix
         )
@@ -520,6 +532,9 @@ class EmailArchiver:
             date_prefix=date_prefix, max_path=self._max_path,
         )
         file_path = os.path.join(folder_path, filename)
+        if os.path.exists(file_path):
+            # Outlook's SaveAs overwrites silently, and that file is an earlier archived mail.
+            raise ArchiveError(f"{filename} already exists in the folder, so nothing was saved")
 
         try:
             mail_item.SaveAs(file_path, _OL_MSG_FORMAT)

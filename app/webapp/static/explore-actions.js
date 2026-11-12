@@ -1,5 +1,7 @@
 /* Explore's item actions: each row's menu, double-click to open on this PC, and Copy path on every device.
  * Off the PC the menu says opening works there, instead of showing Copy path alone.
+ * A Markdown file opens in the app's own viewer instead, on every device: a tap
+ * on a touch screen or a double-click, and View or Open in new window in its menu.
  *
  * Opening asks the server, which looks the item up by its id in the scan the
  * page shows and refuses any caller but this PC; the page never sends a path.
@@ -9,6 +11,8 @@ import { postJSON } from './api.js';
 import { esc, glyph } from './fmt.js';
 import { copyText } from './search-state.js';
 import { rootInfo, state } from './state.js';
+import { docUrl } from './doc-view.js';
+import { openDoc } from './doc-sheet.js';
 import { createRowMenu } from './_vendored/row-menu/row-menu.js';
 import { showToast } from './_vendored/toast/toast.js';
 
@@ -19,6 +23,9 @@ const DONE = { explore: 'Opened in File Explorer', open: 'Opening', edit: 'Openi
 
 // The one line a menu opens with when this device can't open anything, so Copy path isn't alone without a reason.
 const NOT_HERE = 'Opening files and folders works on the PC';
+const DOC_EXTS = new Set(['md', 'markdown']);
+// A touch screen has no double-click, so one tap opens a Markdown row there.
+const TOUCH = window.matchMedia('(pointer: coarse)');
 
 let source = () => null;
 const menus = new Map();
@@ -32,14 +39,28 @@ export function initExploreActions(getContents) {
   document.addEventListener('click', (e) => {
     if (e.detail !== 1) return;
     const el = e.target.closest('[data-open]');
-    press = el ? { kind: el.dataset.open, id: Number(el.dataset.id), at: e.timeStamp } : null;
+    press = el ? { kind: el.dataset.open, id: Number(el.dataset.id), doc: !!el.dataset.doc, at: e.timeStamp } : null;
+    if (press && press.doc && TOUCH.matches && !e.target.closest('[data-kebab]')) viewDoc(press.id);
   }, true);
   document.addEventListener('dblclick', (e) => {
     const p = press;
     press = null;
-    if (!p || !canOpen() || e.timeStamp - p.at > DOUBLE_MS) return;
-    openItem(p.kind, p.id, p.kind === 'folder' ? 'explore' : 'open');
+    if (!p || e.timeStamp - p.at > DOUBLE_MS) return;
+    if (p.doc) viewDoc(p.id);
+    else if (canOpen()) openItem(p.kind, p.id, p.kind === 'folder' ? 'explore' : 'open');
   });
+}
+
+/** True for a file the viewer reads: Markdown, by its extension. */
+export const isDocument = (it) => it.kind !== 'folder' && DOC_EXTS.has(String(it.ext || '').toLowerCase());
+
+const docLoc = (id) => {
+  const it = source().items.find((x) => x.kind === 'file' && x.id === id);
+  return { root: state.root, scan_id: source().scan_id, id, name: it ? it.name : '' };
+};
+
+function viewDoc(id) {
+  if (source()) openDoc(docLoc(id));
 }
 
 export async function openItem(kind, id, verb) {
@@ -72,6 +93,15 @@ function menuItems(it) {
   if (it.kind === 'folder') {
     return [{ label: 'Open in File Explorer', glyph: 'folder-open', hidden: off, onTap: run('explore') }, copy];
   }
+  if (isDocument(it)) {
+    return [
+      { label: 'View', glyph: 'file-text', onTap: () => viewDoc(it.id) },
+      { label: 'Open in new window', glyph: 'external-link', onTap: () => window.open(docUrl(docLoc(it.id)), '_blank', 'noopener') },
+      { label: 'Open in default app', glyph: 'external-link', hidden: off, onTap: run('open') },
+      { label: 'Show in File Explorer', glyph: 'folder-open', hidden: off, onTap: run('reveal') },
+      copy,
+    ];
+  }
   return [
     { label: 'Open', glyph: 'external-link', hidden: off, onTap: run('open') },
     { label: 'Edit', glyph: 'pencil', hidden: off, onTap: run('edit') },
@@ -95,7 +125,7 @@ export function wireRowMenus(container) {
   }
   container.querySelectorAll('[data-kebab]').forEach((btn) => {
     const it = c.items[Number(btn.dataset.kebab)];
-    if (it) menu.attach(it.kind + ':' + it.id, btn, menuItems(it), { header: () => (canOpen() ? '' : NOT_HERE) });
+    if (it) menu.attach(it.kind + ':' + it.id, btn, menuItems(it), { header: () => (canOpen() || isDocument(it) ? '' : NOT_HERE) });
   });
   menu.endRender();
 }

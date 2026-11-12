@@ -3,3 +3,6 @@ uvicorn>=0.29
 hypercorn>=0.18
 requests>=2.31
 cryptography>=42
+markdown-it-py>=3.0
+mdit-py-plugins>=0.4
+pygments>=2.17

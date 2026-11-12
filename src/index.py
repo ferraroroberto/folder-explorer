@@ -222,6 +222,13 @@ class Index:
             raise KeyError("no such file")
         return row
 
+    def file_record(self, file_id: int) -> dict[str, Any]:
+        """One file's record by its id, as the listings give it, plus its ``folder_id``; ``KeyError`` when there is none."""
+        row = self.conn.execute("SELECT rowid id, * FROM files WHERE rowid = ?", (file_id,)).fetchone()
+        if row is None:
+            raise KeyError("no such file")
+        return {**self._file(row), "folder_id": int(row["folder_id"])}
+
     def percentile(self, fid: int, p: float, basis: str, ext: Optional[str]) -> dict[str, Any]:
         """How much of the folder sits in its largest ``p`` percent of files, and where those files are."""
         f = self.folder(fid)
@@ -379,9 +386,9 @@ class Index:
         return int(row["lo"]), int(row["hi"])
 
     def find_file(self, folder_id: int, name: str) -> Optional[dict[str, Any]]:
-        """One file's indexed size and cloud state, by its folder and name."""
+        """One file's id, indexed size and cloud state, by its folder and name."""
         row = self.conn.execute(
-            "SELECT * FROM files WHERE folder_id = ? AND name = ? COLLATE NOCASE", (folder_id, name)
+            "SELECT rowid id, * FROM files WHERE folder_id = ? AND name = ? COLLATE NOCASE", (folder_id, name)
         ).fetchone()
         return self._file(row) if row is not None else None
 

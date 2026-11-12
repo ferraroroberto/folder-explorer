@@ -3,7 +3,7 @@
 import { getJSON, postJSON } from './api.js';
 import { state, query, val } from './state.js';
 import { bar, cloudMark, esc, extLabel, fmtBytes, fmtDate, fmtNum, plural, fmtPct, glyph, pct } from './fmt.js';
-import { initExploreActions, kebab, wireRowMenus } from './explore-actions.js';
+import { initExploreActions, isDocument, kebab, wireRowMenus } from './explore-actions.js';
 import { switchEl } from './_vendored/switch/switch.js';
 
 const $ = (id) => document.getElementById(id);
@@ -144,8 +144,10 @@ function fileRow(f, whole, nested, i) {
   const p = pct(val(f), whole);
   const where = nested ? (f.path && f.path.length ? 'in ' + f.path.join(' › ') : 'in this folder') : '';
   const meta = nested ? where : extLabel(f.ext) + ' · ' + fmtDate(f.mtime) + ' · ' + fmtPct(p);
-  return rowItem(f, i, '<div class="list-row' + (nested ? ' has-path' : '') + '" data-open="file" data-id="' + f.id + '" title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes">' + glyph('file-text') +
-    '<span class="lr-name"><span>' + esc(f.name) + '</span>' + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
+  const doc = isDocument(f);
+  return rowItem(f, i, '<div class="list-row' + (nested ? ' has-path' : '') + '" data-open="file" data-id="' + f.id + '"' + (doc ? ' data-doc="1"' : '') +
+    ' title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes">' + glyph('file-text') +
+    '<span class="lr-name"><span>' + esc(f.name) + '</span>' + (doc ? '<span class="chip doc-badge">MD</span>' : '') + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
     '<span class="lr-meta' + (nested ? ' is-path' : '') + '">' + esc(meta) + '</span>' +
     '<span class="lr-type">' + (f.ext ? esc(extLabel(f.ext)) : '—') + '</span><span class="lr-date">' + fmtDate(f.mtime) + '</span><span class="lr-share">' + fmtPct(p) + '</span>' +
     '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div>');

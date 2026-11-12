@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=auto">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Folders">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<title>Document · Folder explorer</title>
+<script>
+  (function () {
+    var app = 'folder-explorer';
+    var root = document.documentElement;
+    var theme = null;
+    var size = null;
+    try {
+      theme = localStorage.getItem(app + '.theme');
+      size = localStorage.getItem(app + '.textsize');
+    } catch (e) {}
+    var dark = theme ? theme === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'dark' : 'light';
+    root.dataset.textsize = size === 'small' || size === 'large' ? size : 'default';
+  })();
+</script>
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/_vendored/base/base.css">
+<link rel="stylesheet" href="/static/_vendored/card/card.css">
+<link rel="stylesheet" href="/static/_vendored/button/button.css">
+<link rel="stylesheet" href="/static/_vendored/icon-button/icon-button.css">
+<link rel="stylesheet" href="/static/_vendored/code-listing/code-listing.css">
+<link rel="stylesheet" href="/static/_vendored/modal/modal.css">
+<link rel="stylesheet" href="/static/_vendored/sign-in/sign-in.css">
+<link rel="stylesheet" href="/static/_vendored/home-head/home-head.css">
+<link rel="stylesheet" href="/static/_vendored/toast/toast.css">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/doc.css">
+<link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
+</head>
+<body class="doc-window">
+<svg width="0" height="0" aria-hidden="true" focusable="false"
+     style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="i-folder" viewBox="0 0 24 24" fill="none">
+    <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+  </symbol>
+  <symbol id="i-file-text" viewBox="0 0 24 24" fill="none">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+    <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+  </symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24" fill="none">
+    <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+  </symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2" />
+    <path d="M12 20v2" />
+    <path d="m4.93 4.93 1.41 1.41" />
+    <path d="m17.66 17.66 1.41 1.41" />
+    <path d="M2 12h2" />
+    <path d="M20 12h2" />
+    <path d="m6.34 17.66-1.41 1.41" />
+    <path d="m19.07 4.93-1.41 1.41" />
+  </symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none">
+    <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />
+  </symbol>
+  <symbol id="i-info" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none">
+    <path d="m21 21-4.34-4.34" />
+    <circle cx="11" cy="11" r="8" />
+  </symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24" fill="none">
+    <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" />
+    <path d="M5 21h14" />
+  </symbol>
+  <symbol id="i-layout-grid" viewBox="0 0 24 24" fill="none">
+    <rect width="7" height="7" x="3" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="14" rx="1" />
+    <rect width="7" height="7" x="3" y="14" rx="1" />
+  </symbol>
+  <symbol id="i-refresh-cw" viewBox="0 0 24 24" fill="none">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24" fill="none">
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none">
+    <path d="M20 6 9 17l-5-5" />
+  </symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none">
+    <path d="M3 5h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 19h.01" />
+    <path d="M8 5h13" />
+    <path d="M8 12h13" />
+    <path d="M8 19h13" />
+  </symbol>
+  <symbol id="i-external-link" viewBox="0 0 24 24" fill="none">
+    <path d="M15 3h6v6" />
+    <path d="M10 14 21 3" />
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none">
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24" fill="none">
+    <path d="m15 18-6-6 6-6" />
+  </symbol>
+</svg>
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button id="tabSearch" type="button" class="tab" data-tab="search" role="tab" aria-selected="false" data-track="doc-tab-search">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
+    <span class="tab-label">Search</span>
+  </button>
+  <button id="tabExplore" type="button" class="tab" data-tab="explore" role="tab" aria-selected="false" tabindex="-1" data-track="doc-tab-explore">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg>
+    <span class="tab-label">Explore</span>
+  </button>
+  <button id="tabLargest" type="button" class="tab" data-tab="largest" role="tab" aria-selected="false" tabindex="-1" data-track="doc-tab-largest">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-crown"></use></svg>
+    <span class="tab-label">Largest</span>
+  </button>
+  <button id="tabTypes" type="button" class="tab" data-tab="types" role="tab" aria-selected="false" tabindex="-1" data-track="doc-tab-types">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-layout-grid"></use></svg>
+    <span class="tab-label">Types</span>
+  </button>
+  <button id="tabScans" type="button" class="tab" data-tab="scans" role="tab" aria-selected="false" tabindex="-1" data-track="doc-tab-scans">
+    <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-refresh-cw"></use></svg>
+    <span class="tab-label">Scans</span>
+  </button>
+</nav>
+
+<main class="app doc-app">
+  <div class="card home-head">
+    <span class="home-title">
+      <svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
+      <span id="docTitle">Document</span>
+    </span>
+    <span class="status head-status" id="docStatus" role="status" aria-live="polite"></span>
+    <button type="button" class="icon-button home-toggle doc-outline-toggle" id="docOutlineBtn" aria-label="Outline" title="Outline" aria-expanded="false" aria-controls="docOutline" data-track="doc-page-outline" hidden>
+      <svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>
+    </button>
+    <button type="button" class="icon-button home-toggle theme-toggle" aria-label="Switch to dark theme" title="Switch to dark theme" data-track="doc-theme-toggle">
+      <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
+    </button>
+  </div>
+  <div class="doc-layout">
+    <aside class="card doc-side" id="docOutline" aria-label="Outline" hidden></aside>
+    <div class="card doc-main" id="docBody"><p class="doc-loading" role="status">Loading…</p></div>
+  </div>
+</main>
+
+<script type="module" src="/static/doc-page.js"></script>
+</body>
+</html>

@@ -33,7 +33,7 @@ from playwright.sync_api import BrowserContext
 from tests.e2e._e2e_live_guard import require_disposable_instance
 from tests.e2e._scan_capture import NO_WINDOW, run_utf8
 from tests.email_fixture import build_email_index
-from tests.fixture_tree import add_hidden, build_tree
+from tests.fixture_tree import add_docs, add_hidden, build_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 LIVE_PORT = 8453
@@ -105,7 +105,7 @@ def app_url(roots_count: int) -> Iterator[str]:
         yield "http://127.0.0.1:%d" % LIVE_PORT
         return
     work = Path(tempfile.mkdtemp(prefix="folder-explorer-e2e-"))
-    roots = [add_hidden(build_tree(work / "Cloud drive")), build_tree(work / "Media disk")][:roots_count]
+    roots = [add_hidden(build_tree(work / "Cloud drive")), add_docs(build_tree(work / "Media disk"))][:roots_count]
     mail = roots[0] / "Mail"
     emails = build_email_index(work / "emails.db", mail)
     port = _free_port()

@@ -23,12 +23,13 @@ folder-explorer/
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool, its housekeeping, and the folder search the route, the sheet and the window share
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
-│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), search, emails, scans, settings,
+│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the Markdown viewer), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
-│                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md)
+│                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
+│                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
@@ -44,6 +45,9 @@ folder-explorer/
 │   ├── search_window/          # the tray's Quick search window (Tk): model (rows and states, no Tk), client (the web app's
 │   │                           #   local API, its only source), view (the widgets, the archive window's theme)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
+│   ├── docs/                   # the Markdown viewer: reader (the only reader of a document's bytes, with the size,
+│   │                           #   link and cloud-only checks), locate (a relative link fenced to its root, then its
+│   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
 │   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window (the Archive sheet and window offer it)

@@ -50,6 +50,7 @@
 <link rel="stylesheet" href="/static/search.css">
 <link rel="stylesheet" href="/static/archive.css">
 <link rel="stylesheet" href="/static/email-scans.css">
+<link rel="stylesheet" href="/static/doc.css">
 <link rel="stylesheet" href="/static/_vendored/nav/nav-tabs.css">
 </head>
 <body>
@@ -222,6 +223,17 @@
     <rect width="20" height="5" x="2" y="3" rx="1" />
     <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
     <path d="M10 12h4" />
+  </symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none">
+    <path d="M20 6 9 17l-5-5" />
+  </symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none">
+    <path d="M3 5h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 19h.01" />
+    <path d="M8 5h13" />
+    <path d="M8 12h13" />
+    <path d="M8 19h13" />
   </symbol>
   <symbol id="i-circle" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" />
@@ -645,6 +657,29 @@
       </button>
     </div>
     <div id="contentsSheetBody"></div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog doc-dialog" id="docDialog" data-track-view="doc-sheet" aria-labelledby="docDialogTitle">
+  <div class="detail-card doc-card">
+    <div class="detail-header doc-header">
+      <button type="button" class="icon-button doc-tool" id="docBack" aria-label="Back to the previous document" title="Back" data-track="doc-back" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-left"></use></svg>
+      </button>
+      <h2 tabindex="-1" id="docDialogTitle">Document</h2>
+      <button type="button" class="icon-button doc-tool" id="docOutlineBtn" aria-label="Outline" title="Outline" aria-expanded="false" aria-controls="docOutline" data-track="doc-outline" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>
+      </button>
+      <a class="icon-button doc-tool" id="docWindow" href="/doc" target="_blank" rel="noopener" aria-label="Open in new window" title="Open in new window" data-track="doc-new-window">
+        <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>
+      </a>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="doc-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <p class="doc-where" id="docWhere"></p>
+    <div class="doc-outline-pop" id="docOutline" hidden></div>
+    <div class="doc-scroll" id="docSheetBody"></div>
   </div>
 </dialog>
 

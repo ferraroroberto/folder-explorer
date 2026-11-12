@@ -3,7 +3,7 @@
 A request from this PC (loopback, or the PC's own tailnet or LAN address) always passes. A request from any other
 device must carry ``Authorization: Bearer <token>``; the page gets the token
 by posting the password to ``/api/login`` through the vendored sign-in sheet.
-The page shell, static assets, ``/healthz`` and ``/api/version`` stay open so
+The page shells (``/`` and the document window ``/doc``), static assets, ``/healthz`` and ``/api/version`` stay open so
 the sheet and the build line can render before sign-in.
 """
 
@@ -29,7 +29,7 @@ from src.this_pc import is_local_address
 logger = logging.getLogger(__name__)
 
 LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
-_OPEN_EXACT = frozenset({"/", "/healthz", "/api/login", "/api/version", "/favicon.ico", "/manifest.webmanifest"})
+_OPEN_EXACT = frozenset({"/", "/doc", "/healthz", "/api/login", "/api/version", "/favicon.ico", "/manifest.webmanifest"})
 _OPEN_PREFIXES = ("/static/",)
 
 router = APIRouter()

@@ -247,7 +247,7 @@ export async function previewAction(act) {
   if (!item) return;
   if (effectiveMode() === 'folders') {
     if (act === 'copy') showToast((await copyText(item.path)) ? 'Path copied' : 'Copy isn\'t allowed here');
-    else if (act === 'explorer' && S.status.pc) post('/api/folders/open', { root: item.root, id: item.id }, 'Opened in File Explorer');
+    else if (act === 'explorer' && S.status.pc) post('/api/folders/open', { root: item.root, scan_id: item.scan_id, id: item.id }, 'Opened in File Explorer');
     else if (act === 'folder') showInExplore(item.root, item.id);
     return;
   }

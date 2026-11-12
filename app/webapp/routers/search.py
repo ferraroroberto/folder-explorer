@@ -18,8 +18,9 @@ from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
+from app.webapp.routers.browse import scanned_path_or_http
 from app.webapp.state import EMAILS, POOL, folder_hits
-from src import config, folder_search, store
+from src import config, store
 from src.desktop import (
     GoneError,
     ensure_there,
@@ -208,14 +209,7 @@ def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
 def open_folder(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
     started = time.perf_counter()
     _pc_only(request)
-    root = next((r for r in _roots() if r.key == body.get("root")), None)
-    scan = store.current_index(root.key) if root else None
-    if root is None or scan is None or not isinstance(body.get("id"), int):
-        raise HTTPException(status_code=404, detail="no such folder")
-    index, lock = POOL.get(store.index_dir() / scan["index_file"])
-    with lock:
-        names = [p["name"] for p in index.path(body["id"])][1:]
-    path = folder_search.full_path(root, names)
+    path = scanned_path_or_http(_roots(), body, "folder")
     try:
         ensure_there(path, True, started)
         open_in_explorer(path, started)

@@ -85,10 +85,14 @@ def folder_hits(cfg: dict[str, Any], q: str, prune: Optional[bool] = None, skip:
     with ExitStack() as stack:
         for _, _, (_, lock) in entries:
             stack.enter_context(lock)
-        return folder_search.search([(root, ix) for root, _, (ix, _) in entries], q,
-                                    opts["prune_people"] if prune is None else prune,
-                                    opts["skip_levels"] if skip is None else skip,
-                                    onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
+        found = folder_search.search([(root, ix) for root, _, (ix, _) in entries], q,
+                                     opts["prune_people"] if prune is None else prune,
+                                     opts["skip_levels"] if skip is None else skip,
+                                     onedrive_prevails=opts["onedrive_prevails"] if onedrive is None else onedrive)
+    # Each hit names the scan it was read from, taken from the indexes just searched: a folder id means nothing without it.
+    scan_ids = {root.key: scan["id"] for root, scan, _ in entries}
+    found["results"] = [{**hit, "scan_id": scan_ids[hit["root"]]} for hit in found["results"]]
+    return found
 
 
 def _subfolders(cfg: dict[str, Any], root: Root, scan: dict[str, Any], path: str, fid: int) -> list[dict[str, Any]]:
@@ -125,6 +129,25 @@ class ScanChanged(Exception):
     """A folder id was read from a scan that is no longer the root's current one, so it could name another folder now."""
 
 
+def scanned_item_path(roots: list[Root], root_key: str, scan_id: object, kind: str,
+                      item_id: int) -> tuple[Root, dict[str, Any], str]:
+    """A folder or file named by root key, scan id and item id: its root, the root's current scan row and its path on disk.
+
+    Every route that hands an id to Windows or to a listing resolves it here, never from a client path.
+    ``KeyError`` when the root, its scan or the item is unknown, ``ScanChanged`` when ``scan_id`` is not the
+    root's current scan (an id from an older scan could name another item now).
+    """
+    root = next((r for r in roots if r.key == root_key), None)
+    scan = store.current_index(root.key) if root else None
+    if root is None or scan is None:
+        raise KeyError("no such root")
+    if scan_id != scan["id"]:
+        raise ScanChanged(root_key)
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        return root, scan, item_path(root, index, kind, item_id)
+
+
 def sheet_hit(hit: dict[str, Any], scan_id: int, email_roots: list[str]) -> dict[str, Any]:
     """One folder as the Archive sheet lists it: its path and name, its place in the scan, and whether a mail may be filed in it."""
     return {"path": hit["path"], "name": hit["name"], "fileable": under_any(hit["path"], email_roots),
@@ -144,8 +167,7 @@ def sheet_folders(cfg: dict[str, Any], query: str) -> dict[str, Any]:
     in File Explorer, never filed in (the filer refuses it).
     """
     email_roots = list((cfg.get("email") or {}).get("roots") or [])
-    scan_ids = {root.key: scan["id"] for root, scan, _ in _open_scans(cfg)}
-    return _sheet_page([sheet_hit(r, scan_ids[r["root"]], email_roots) for r in folder_hits(cfg, query)["results"]])
+    return _sheet_page([sheet_hit(r, r["scan_id"], email_roots) for r in folder_hits(cfg, query)["results"]])
 
 
 def sheet_subfolders(cfg: dict[str, Any], root_key: str, scan_id: int, folder_id: int) -> dict[str, Any]:
@@ -154,15 +176,7 @@ def sheet_subfolders(cfg: dict[str, Any], root_key: str, scan_id: int, folder_id
     Never takes a path from the client: the path is rebuilt from the scan. ``KeyError`` when the root, the scan or
     the folder is unknown, ``ScanChanged`` when ``scan_id`` is not the root's current scan.
     """
-    root = next((r for r in resolve_roots(cfg["roots"]) if r.key == root_key), None)
-    scan = store.current_index(root.key) if root else None
-    if root is None or scan is None:
-        raise KeyError("no such root")
-    if scan_id != scan["id"]:
-        raise ScanChanged(root_key)
-    index, lock = POOL.get(store.index_dir() / scan["index_file"])
-    with lock:
-        path = item_path(root, index, "folder", folder_id)
+    root, scan, path = scanned_item_path(resolve_roots(cfg["roots"]), root_key, scan_id, "folder", folder_id)
     email_roots = list((cfg.get("email") or {}).get("roots") or [])
     kids = [sheet_hit(k, scan["id"], email_roots) for k in _subfolders(cfg, root, scan, path, folder_id)]
     return {"path": path, **_sheet_page(kids)}

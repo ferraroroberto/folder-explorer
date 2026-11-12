@@ -90,8 +90,8 @@ class SearchClient:
     def emails(self, query: str) -> dict[str, Any]:
         return self._call("GET", "/api/search/emails", params={"q": query, "sort": "relevance", "offset": 0})
 
-    def open_folder(self, root: str, folder_id: int) -> dict[str, Any]:
-        return self._call("POST", "/api/folders/open", json={"root": root, "id": folder_id})
+    def open_folder(self, root: str, scan_id: Optional[int], folder_id: int) -> dict[str, Any]:
+        return self._call("POST", "/api/folders/open", json={"root": root, "scan_id": scan_id, "id": folder_id})
 
     def open_email(self, row_id: int) -> dict[str, Any]:
         return self._call("POST", "/api/emails/%d/open" % row_id, json={})

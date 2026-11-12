@@ -82,7 +82,7 @@ def test_the_folders_tab_lists_what_the_search_tab_gets(api: TestClient) -> None
     for query in ("harbour", "photos 2025", "invoices;documents", "BUDGET"):
         page = api.get("/api/search/folders", params={"q": query}).json()
         answer = fetch(_client(api), FOLDERS, query)
-        assert [r.target for r in answer.rows] == [{"root": h["root"], "id": h["id"]} for h in page["results"]]
+        assert [r.target for r in answer.rows] == [{"root": h["root"], "scan_id": h["scan_id"], "id": h["id"]} for h in page["results"]]
         assert answer.total == page["total"]
     harbour = fetch(_client(api), FOLDERS, "harbour")
     assert harbour.status is Status.RESULTS and plain(harbour.rows[0].title) == "harbour-trip"

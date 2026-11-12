@@ -27,6 +27,7 @@ const STATES = {
   app_mismatch: { text: 'This usually means the app was just updated or is restarting. Reload the page in a moment.', act: 'reload', label: 'Reload' },
   app_error: { text: 'Something went wrong in the app. Try again in a moment.' },
   no_answer: { text: 'Check the connection to the PC, then try again.' },
+  dropped_gone: { text: 'A dropped file is kept only by the page it was dropped on. Drop it again on the app to open it.' },
   not_utf8: { text: 'This file is not saved as UTF-8 text, so it opens read-only here.' },
   edit_too_large: { text: 'Markdown files up to 1 MB can be edited here.' },
 };

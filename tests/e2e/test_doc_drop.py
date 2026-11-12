@@ -1,10 +1,11 @@
-"""A Markdown file dropped on the window: an indexed one opens with Edit, any other renders read-only, the rest is ignored.
+"""A Markdown file dropped on the window opens in its own /doc window: an indexed one with Edit, any other read-only; the rest is ignored.
 
 Playwright can't drag from the desktop, so each test builds the browser's own
 File and DataTransfer in the page and dispatches the drag events. The indexed
 case takes its name, size and modified time from the app's listing of the
 invented fixture, so it is the very file the scan saw; the other files are
-invented. Every request the drop makes is recorded: none may carry a path.
+invented. A blocked pop-up is a window.open that answers null, and the drop
+then shows the file in the app's own sheet. Every request the drop makes is recorded: none may carry a path.
 """
 
 from __future__ import annotations
@@ -66,14 +67,13 @@ def _only_the_page_knows(sent: list[tuple[str, Any]]) -> None:
         assert "Invented" not in json.dumps({k: v for k, v in body.items() if k != "text"}), (route, body)
 
 
-def test_a_dropped_indexed_file_opens_in_the_sheet_with_edit(page: Page, app_url: str) -> None:
+def test_a_dropped_indexed_file_opens_in_its_own_window_with_edit(page: Page, app_url: str) -> None:
     errors = _errors(page)
     sent = _requests(page)
     guide = _guide(page, app_url)
     page.goto(app_url + "/")
-    sheet = page.locator("#docDialog")
 
-    # The drag shows the target, the drop opens the indexed copy: the same sheet an Explore row opens.
+    # The drag shows the target, the drop opens the indexed copy in a /doc window, as Explore's "Open in new window" does.
     page.evaluate(DROP, {"name": "guide.md", "size": guide["size"], "modified": guide["modified"], "text": None, "step": ["dragenter"]})
     expect(page.locator(".drop-overlay")).to_be_visible()
     for theme in ("light", "dark"):
@@ -82,47 +82,88 @@ def test_a_dropped_indexed_file_opens_in_the_sheet_with_edit(page: Page, app_url
     page.evaluate(DROP, {"name": "guide.md", "size": 1, "modified": 0, "text": None, "step": ["dragleave"]})
     expect(page.locator(".drop-overlay")).to_be_hidden()
 
-    _drop(page, "guide.md", guide["size"], guide["modified"])
-    expect(sheet.locator("#docDialogTitle")).to_have_text("guide.md")
-    expect(sheet.locator("#docSheetBody h1")).to_have_text("Garden guide")
-    expect(sheet.locator(".doc-drop-note")).to_have_count(0)
+    with page.expect_popup() as opened:
+        _drop(page, "guide.md", guide["size"], guide["modified"])
+    win = opened.value
+    win.wait_for_url("**/doc?*id=%d*" % guide["id"])
+    expect(win.locator("#docTitle")).to_have_text("guide.md")
+    expect(win.locator("#docBody h1")).to_have_text("Garden guide")
+    expect(win.locator("#docBody .doc-drop-note")).to_have_count(0)
+    win.locator('.doc-mode [data-mode="edit"]').click()
+    expect(win.locator(".doc-src-input")).to_be_visible()
+    # The app's own page is left as it was: no sheet, no overlay.
+    expect(page.locator("#docDialog")).to_be_hidden()
     expect(page.locator(".drop-overlay")).to_be_hidden()
-    sheet.locator('.doc-mode [data-mode="edit"]').click()
-    expect(sheet.locator(".doc-src-input")).to_be_visible()
     assert [route for route, _ in sent] == ["match"]
     _only_the_page_knows(sent)
     assert errors == []
 
 
-def test_a_dropped_unknown_file_renders_read_only(page: Page, app_url: str) -> None:
+def test_a_dropped_unknown_file_opens_read_only_in_its_own_window(page: Page, app_url: str) -> None:
     errors = _errors(page)
     sent = _requests(page)
     page.goto(app_url + "/")
-    sheet = page.locator("#docDialog")
     text = "# Scratch note\n\n## Part two\n\nSee [the guide](guide.md) and ![plan](plan.png).\n"
-    _drop(page, "scratch.md", len(text.encode()), text=text)
+    with page.expect_popup() as opened:
+        _drop(page, "scratch.md", len(text.encode()), text=text)
+    win = opened.value
 
-    expect(sheet.locator("#docDialogTitle")).to_have_text("scratch.md")
-    expect(sheet.locator("#docSheetBody h1")).to_have_text("Scratch note")
-    expect(sheet.locator(".doc-drop-note")).to_contain_text("read-only")
-    expect(sheet.locator(".doc-link-off")).to_have_count(1)
-    expect(sheet.locator(".doc-mode")).to_be_hidden()
-    expect(sheet.locator("#docWindow")).to_be_hidden()
-    sheet.locator("#docOutlineBtn").click()
-    expect(sheet.locator("#docOutline a")).to_have_text(["Scratch note", "Part two"])
+    expect(win.locator("#docTitle")).to_have_text("scratch.md")
+    expect(win.locator("#docBody h1")).to_have_text("Scratch note")
+    expect(win.locator("#docBody .doc-drop-note")).to_contain_text("read-only")
+    expect(win.locator("#docBody .doc-link-off")).to_have_count(1)
+    expect(win.locator(".doc-modebar")).to_be_hidden()
+    expect(win.locator("#docStatus")).to_contain_text("Dropped file")
     for theme in ("light", "dark"):
-        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
-        assert_layout_clean(page, allow={"#docSheetBody .doc-prose a": "below the fold of the sheet's own scroller"})
+        win.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        assert_layout_clean(win)
+    expect(page.locator("#docDialog")).to_be_hidden()
     assert [route for route, _ in sent] == ["match", "render"]
     _only_the_page_knows(sent)
 
-    # The sheet closes cleanly, and the next document opened from it shows no trace of the drop.
+    # The text lives in the app's page, not in the address: a reload of the window asks for it once more and is told it is gone.
+    assert "Scratch" not in win.url
+    win.reload()
+    expect(win.locator("#docBody .doc-state")).to_contain_text("Drop it again")
+    assert errors == []
+
+
+def _toast_over_the_sheet(page: Page) -> None:
+    """The toast says why and is in the top layer with the sheet: a modal sheet covers any toast outside it, whatever its z-index.
+
+    A hit test can't show it (the modal makes everything outside it inert), so the popover state stands for it.
+    """
+    toast = page.locator("#toast")
+    expect(toast).to_contain_text("pop-up")
+    expect(toast).to_be_visible()
+    assert page.evaluate("() => document.getElementById('toast').matches(':popover-open')")
+
+
+def test_a_blocked_pop_up_falls_back_to_the_sheet_with_a_note(page: Page, app_url: str) -> None:
+    errors = _errors(page)
+    sent = _requests(page)
+    guide = _guide(page, app_url)
+    page.goto(app_url + "/")
+    sheet = page.locator("#docDialog")
+    page.evaluate("() => { window.open = () => null; }")  # what a browser that blocks the pop-up answers
+
+    _drop(page, "guide.md", guide["size"], guide["modified"])
+    expect(sheet.locator("#docDialogTitle")).to_have_text("guide.md")
+    expect(sheet.locator("#docSheetBody h1")).to_have_text("Garden guide")
+    _toast_over_the_sheet(page)
+    for theme in ("light", "dark"):
+        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        assert_layout_clean(page)
     sheet.locator("[data-close]").click()
     expect(sheet).to_be_hidden()
-    guide = _guide(page, app_url)
-    _drop(page, "guide.md", guide["size"], guide["modified"])
-    expect(sheet.locator(".doc-mode")).to_be_visible()
-    expect(sheet.locator("#docWindow")).to_be_visible()
+
+    text = "# Scratch note\n\nJust text.\n"
+    _drop(page, "scratch.md", len(text.encode()), text=text)
+    expect(sheet.locator("#docDialogTitle")).to_have_text("scratch.md")
+    expect(sheet.locator(".doc-drop-note")).to_contain_text("read-only")
+    expect(sheet.locator(".doc-mode")).to_be_hidden()
+    _toast_over_the_sheet(page)
+    _only_the_page_knows(sent)
     assert errors == []
 
 

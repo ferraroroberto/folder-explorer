@@ -35,7 +35,8 @@ folder-explorer/
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
 │                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
-│                           #   doc-drop.js takes a Markdown file dropped on the window (drop-files.js its DOM-free request builders)
+│                           #   doc-drop.js takes a Markdown file dropped on the window (drop-files.js its DOM-free request builders,
+│                           #   doc-handoff.js hands a rendered one to the /doc window it opens in)
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier

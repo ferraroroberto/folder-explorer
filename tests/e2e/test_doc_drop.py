@@ -128,6 +128,17 @@ def test_a_dropped_unknown_file_opens_read_only_in_its_own_window(page: Page, ap
     assert errors == []
 
 
+def _toast_over_the_sheet(page: Page) -> None:
+    """The toast says why and is in the top layer with the sheet: a modal sheet covers any toast outside it, whatever its z-index.
+
+    A hit test can't show it (the modal makes everything outside it inert), so the popover state stands for it.
+    """
+    toast = page.locator("#toast")
+    expect(toast).to_contain_text("pop-up")
+    expect(toast).to_be_visible()
+    assert page.evaluate("() => document.getElementById('toast').matches(':popover-open')")
+
+
 def test_a_blocked_pop_up_falls_back_to_the_sheet_with_a_note(page: Page, app_url: str) -> None:
     errors = _errors(page)
     sent = _requests(page)
@@ -139,7 +150,10 @@ def test_a_blocked_pop_up_falls_back_to_the_sheet_with_a_note(page: Page, app_ur
     _drop(page, "guide.md", guide["size"], guide["modified"])
     expect(sheet.locator("#docDialogTitle")).to_have_text("guide.md")
     expect(sheet.locator("#docSheetBody h1")).to_have_text("Garden guide")
-    expect(page.locator("#toast")).to_contain_text("pop-up")
+    _toast_over_the_sheet(page)
+    for theme in ("light", "dark"):
+        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        assert_layout_clean(page)
     sheet.locator("[data-close]").click()
     expect(sheet).to_be_hidden()
 
@@ -148,7 +162,7 @@ def test_a_blocked_pop_up_falls_back_to_the_sheet_with_a_note(page: Page, app_ur
     expect(sheet.locator("#docDialogTitle")).to_have_text("scratch.md")
     expect(sheet.locator(".doc-drop-note")).to_contain_text("read-only")
     expect(sheet.locator(".doc-mode")).to_be_hidden()
-    expect(page.locator("#toast")).to_contain_text("pop-up")
+    _toast_over_the_sheet(page)
     _only_the_page_knows(sent)
     assert errors == []
 

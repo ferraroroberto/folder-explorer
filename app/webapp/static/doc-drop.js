@@ -62,6 +62,17 @@ function overlay() {
 }
 
 const BLOCKED = 'The browser blocked the new window, so the file opened here. Allow pop-ups for this app to open it in its own window.';
+const BLOCKED_MS = 6000;
+
+/** The blocked-window note, above the sheet it just opened: a modal sheet is in the top layer, which no z-index beats, so the toast joins it as a popover. */
+function toastAboveSheet(message) {
+  const el = showToast(message, undefined, { ms: BLOCKED_MS });
+  if (typeof el.showPopover !== 'function') return;
+  el.setAttribute('popover', 'manual');
+  el.showPopover();
+  // Back to a plain toast, so the next one raised from the page is not left in the top layer.
+  setTimeout(() => el.removeAttribute('popover'), BLOCKED_MS);
+}
 
 /** Show a resolved drop in the window ``popup`` that was opened for it; false when it can't (the caller closes the window). */
 function showInWindow(popup, r) {
@@ -119,9 +130,9 @@ export function initDrop(host) {
       if (popup) popup.close();
       if (r.kind === 'refused') showToast(r.message, 'error');
       else {
-        if (host.ownWindow) showToast(BLOCKED, undefined, { ms: 6000 });
-        if (r.kind === 'indexed') host.open(r.loc);
-        else host.show(r.doc);
+        // The sheet is open once the host answers, so the note goes on top of it.
+        await (r.kind === 'indexed' ? host.open(r.loc) : host.show(r.doc));
+        if (host.ownWindow) toastAboveSheet(BLOCKED);
       }
     } finally {
       busy = false;

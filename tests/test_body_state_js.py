@@ -1,4 +1,7 @@
-"""The Search preview's body-state module is JavaScript, so its table test runs under Node inside the suite."""
+"""The front end's pure modules are JavaScript, so their tests run under Node inside the suite.
+
+The Search preview's body-state table, and the Markdown editor's text helpers.
+"""
 
 from __future__ import annotations
 
@@ -13,10 +16,11 @@ from src.no_window import NO_WINDOW
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_body_state_table_passes_under_node() -> None:
+@pytest.mark.parametrize("name", ["body_state.test.mjs", "md_source.test.mjs"])
+def test_the_js_module_tests_pass_under_node(name: str) -> None:
     node = shutil.which("node")
     if node is None:
-        pytest.fail("node is not on PATH: the body-state table test cannot run (the gate needs Node for jscpd as well)")
-    done = subprocess.run([node, "--test", str(ROOT / "tests" / "js" / "body_state.test.mjs")], capture_output=True, text=True,
+        pytest.fail("node is not on PATH: %s cannot run (the gate needs Node for jscpd as well)" % name)
+    done = subprocess.run([node, "--test", str(ROOT / "tests" / "js" / name)], capture_output=True, text=True,
                           encoding="utf-8", errors="replace", timeout=120, creationflags=NO_WINDOW)
     assert done.returncode == 0, done.stdout + done.stderr

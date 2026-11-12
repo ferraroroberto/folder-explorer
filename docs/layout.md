@@ -30,6 +30,8 @@ folder-explorer/
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
+│                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
+│                           #   sheets, md-source.js its DOM-free text helpers)
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
@@ -48,6 +50,7 @@ folder-explorer/
 │   ├── docs/                   # the Markdown viewer: reader (the only reader of a document's bytes, with the size,
 │   │                           #   link and cloud-only checks), locate (a relative link fenced to its root, then its
 │   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
+│   │                           #   and writer (the editor's only writer: the opened file only, after its version check)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
 │   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window (the Archive sheet and window offer it)
@@ -70,7 +73,7 @@ folder-explorer/
 │   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
 │   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
 │   ├── config.py               # config.json with defaults and validation
-│   ├── atomic_write.py         # the one atomic text writer (config.json, .env): unique temp, cleanup on failure; swap_in renames a built file
+│   ├── atomic_write.py         # the one atomic writer: text (config.json, .env) and bytes (a saved Markdown file); unique temp, cleanup on failure; swap_in renames a built file
 │   ├── runtime_files.py        # mkdir, lock-file open and SQLite connects for a path a caller names; raises on a path under a code folder
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison

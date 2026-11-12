@@ -38,6 +38,10 @@ REASON_MESSAGES = {
     "cloud_only": "Only in OneDrive",
     "gone": "It is no longer there",
     "unreadable": "Windows could not read it",
+    # The writer's refusals (src/docs/writer.py), keyed the same way so the page has one vocabulary.
+    "not_utf8": "Not UTF-8 text, so it opens read-only",
+    "edit_too_large": "Too large to edit here",
+    "not_writable": "Windows would not let it be saved",
 }
 
 
@@ -115,7 +119,7 @@ else:
             return f.read(limit)
 
 
-def _read(path: str, cap: int, index_online: bool, download: bool) -> bytes:
+def _read(path: str, cap: int, index_online: bool, download: bool) -> tuple[bytes, int]:
     entry = _listed(path)
     if entry is None or entry.is_dir:
         raise Refused("gone")
@@ -141,7 +145,7 @@ def _read(path: str, cap: int, index_online: bool, download: bool) -> bytes:
         raise Refused("too_large")
     if download:
         logger.info("ℹ️ doc: downloaded one %s file on request (%d bytes)", os.path.splitext(path)[1].lower(), len(data))
-    return data
+    return data, entry.mtime
 
 
 def read_document(path: str, index_online: bool, download: bool = False) -> bytes:
@@ -151,13 +155,18 @@ def read_document(path: str, index_online: bool, download: bool = False) -> byte
     its folder decides, since the file may have been downloaded or freed since.
     ``download`` is the one tap that lets a cloud-only file come down.
     """
+    return read_document_listed(path, index_online, download)[0]
+
+
+def read_document_listed(path: str, index_online: bool, download: bool = False, cap: int = DOC_MAX_BYTES) -> tuple[bytes, int]:
+    """A Markdown file's bytes and the modified time its fresh listing gave, up to ``cap`` bytes; the editor's read."""
     if not is_document(path):
         raise Refused("not_document")
-    return _read(path, DOC_MAX_BYTES, index_online, download)
+    return _read(path, cap, index_online, download)
 
 
 def read_image(path: str, index_online: bool, download: bool = False) -> bytes:
     """An image's bytes, up to :data:`IMAGE_MAX_BYTES`, under the same checks as :func:`read_document`."""
     if not is_image(path):
         raise Refused("not_document")
-    return _read(path, IMAGE_MAX_BYTES, index_online, download)
+    return _read(path, IMAGE_MAX_BYTES, index_online, download)[0]

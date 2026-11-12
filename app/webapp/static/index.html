@@ -670,6 +670,7 @@
       <button type="button" class="icon-button doc-tool" id="docOutlineBtn" aria-label="Outline" title="Outline" aria-expanded="false" aria-controls="docOutline" data-track="doc-outline" hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>
       </button>
+      <button type="button" class="button-primary doc-save" id="docSave" data-track="doc-save" disabled hidden>Save</button>
       <a class="icon-button doc-tool" id="docWindow" href="/doc" target="_blank" rel="noopener" aria-label="Open in new window" title="Open in new window" data-track="doc-new-window">
         <svg class="icon" aria-hidden="true"><use href="#i-external-link"></use></svg>
       </a>
@@ -677,7 +678,13 @@
         <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
       </button>
     </div>
-    <p class="doc-where" id="docWhere"></p>
+    <div class="doc-modebar">
+      <div class="segmented doc-mode" role="group" aria-label="Mode">
+        <button type="button" class="segmented-item" aria-pressed="true" data-mode="view" data-track="doc-mode-view">View</button>
+        <button type="button" class="segmented-item" aria-pressed="false" data-mode="edit" data-track="doc-mode-edit">Edit</button>
+      </div>
+      <p class="doc-where" id="docWhere"></p>
+    </div>
     <div class="doc-outline-pop" id="docOutline" hidden></div>
     <div class="doc-scroll" id="docSheetBody"></div>
   </div>

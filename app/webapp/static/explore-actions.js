@@ -1,7 +1,7 @@
 /* Explore's item actions: each row's menu, double-click to open on this PC, and Copy path on every device.
  * Off the PC the menu says opening works there, instead of showing Copy path alone.
  * A Markdown file opens in the app's own viewer instead, on every device: a tap
- * on a touch screen or a double-click, and View or Open in new window in its menu.
+ * on a touch screen or a double-click, and View, Edit here or Open in new window in its menu.
  *
  * Opening asks the server, which looks the item up by its id in the scan the
  * page shows and refuses any caller but this PC; the page never sends a path.
@@ -59,8 +59,8 @@ const docLoc = (id) => {
   return { root: state.root, scan_id: source().scan_id, id, name: it ? it.name : '' };
 };
 
-function viewDoc(id) {
-  if (source()) openDoc(docLoc(id));
+function viewDoc(id, edit) {
+  if (source()) openDoc(docLoc(id), edit);
 }
 
 export async function openItem(kind, id, verb) {
@@ -96,6 +96,7 @@ function menuItems(it) {
   if (isDocument(it)) {
     return [
       { label: 'View', glyph: 'file-text', onTap: () => viewDoc(it.id) },
+      { label: 'Edit here', glyph: 'pencil', onTap: () => viewDoc(it.id, true) },
       { label: 'Open in new window', glyph: 'external-link', onTap: () => window.open(docUrl(docLoc(it.id)), '_blank', 'noopener') },
       { label: 'Open in default app', glyph: 'external-link', hidden: off, onTap: run('open') },
       { label: 'Show in File Explorer', glyph: 'folder-open', hidden: off, onTap: run('reveal') },

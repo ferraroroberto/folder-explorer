@@ -33,6 +33,7 @@
 <link rel="stylesheet" href="/static/_vendored/card/card.css">
 <link rel="stylesheet" href="/static/_vendored/button/button.css">
 <link rel="stylesheet" href="/static/_vendored/icon-button/icon-button.css">
+<link rel="stylesheet" href="/static/_vendored/segmented/segmented.css">
 <link rel="stylesheet" href="/static/_vendored/code-listing/code-listing.css">
 <link rel="stylesheet" href="/static/_vendored/modal/modal.css">
 <link rel="stylesheet" href="/static/_vendored/sign-in/sign-in.css">
@@ -158,9 +159,16 @@
     <button type="button" class="icon-button home-toggle doc-outline-toggle" id="docOutlineBtn" aria-label="Outline" title="Outline" aria-expanded="false" aria-controls="docOutline" data-track="doc-page-outline" hidden>
       <svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>
     </button>
+    <button type="button" class="button-primary doc-save" id="docSave" data-track="doc-page-save" disabled hidden>Save</button>
     <button type="button" class="icon-button home-toggle theme-toggle" aria-label="Switch to dark theme" title="Switch to dark theme" data-track="doc-theme-toggle">
       <svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg>
     </button>
+  </div>
+  <div class="doc-modebar">
+    <div class="segmented doc-mode" role="group" aria-label="Mode">
+      <button type="button" class="segmented-item" aria-pressed="true" data-mode="view" data-track="doc-page-mode-view">View</button>
+      <button type="button" class="segmented-item" aria-pressed="false" data-mode="edit" data-track="doc-page-mode-edit">Edit</button>
+    </div>
   </div>
   <div class="doc-layout">
     <aside class="card doc-side" id="docOutline" aria-label="Outline" hidden></aside>

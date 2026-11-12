@@ -116,16 +116,19 @@ WATERING_MD = """# Watering
 
 Back to the [guide](../guide.md).
 """
+# The page the editor tests change; nothing else reads it, so a save never moves another test's text.
+JOURNAL_MD = b"# Journal\n\nFirst entry.\n"
 # One byte past the viewer's 2 MB cap.
 BIG_MD_BYTES = 2 * 1024 * 1024 + 1
 
 
 def add_docs(root: Path) -> Path:
-    """Write the invented Markdown notes under ``root``: a guide, a page it links to, an image and an oversize file."""
+    """Write the invented Markdown notes under ``root``: a guide, a page it links to, a journal to edit, an image and an oversize file."""
     folder = root / DOCS_FOLDER
     (folder / "sub").mkdir(parents=True, exist_ok=True)
     (folder / "guide.md").write_text(GUIDE_MD, encoding="utf-8")
     (folder / "sub" / "watering.md").write_text(WATERING_MD, encoding="utf-8")
+    (folder / "journal.md").write_bytes(JOURNAL_MD)
     (folder / "diagram.png").write_bytes(TINY_PNG)
     (folder / "big.md").write_bytes(b"#" * BIG_MD_BYTES)
     return root

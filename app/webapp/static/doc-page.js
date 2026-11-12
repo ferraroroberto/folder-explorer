@@ -3,28 +3,69 @@
  * The address names the file by root, scan id and item id, so it can be
  * bookmarked and still opens after a restart; a newer scan that renumbered it
  * says so and offers Explore. The outline is a sidebar on a wide window and a
- * popover below it. The fleet nav leads back into the app: a tab opens the
- * app on that tab.
+ * popover below it. View | Edit switches to the editor; Esc goes back to View.
+ * The fleet nav leads back into the app: a tab opens the app on that tab,
+ * after asking when there are unsaved changes.
  */
 
 import { authHeaders } from './api.js';
 import { APP } from './state.js';
-import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
+import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
+import { openEditor } from './doc-edit.js';
 import { wireThemeToggle } from './theme.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
+import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
 // Wide windows show the outline beside the text; narrower ones open it from the header.
 const WIDE = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
 
 const loc = locFromUrl(location.href);
+let editor = null;
+// Set once the reader chose how to leave (the in-app question), so the browser's own prompt doesn't ask again.
+let leaving = false;
+
+/** Leave for ``href``, asking first when the editor holds unsaved changes. */
+async function go(href) {
+  if (editor && !(await editor.leave())) return;
+  leaving = true;
+  location.href = href;
+}
 
 /** Open the app itself on ``tab``: the app reads the tab it last showed. */
 function toApp(tab) {
   try { localStorage.setItem(APP + '.tab', tab); } catch (e) { /* the app opens on its default tab */ }
-  location.href = '/';
+  go('/');
+}
+
+function markMode(mode) {
+  document.querySelectorAll('.doc-mode .segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  document.body.classList.toggle('is-editing', mode === 'edit');
+  $('docSave').hidden = mode !== 'edit';
+  $('docSave').disabled = true;
+}
+
+function startEditing() {
+  if (editor || !loc) return;
+  markMode('edit');
+  placeOutline(false);
+  releaseDoc($('docBody'));
+  editor = openEditor($('docBody'), loc, {
+    onDirty: (dirty) => { $('docSave').disabled = !dirty; },
+    onReady: (editable) => { if (!editable) $('docSave').hidden = true; },
+  });
+}
+
+/** Back to View: the draft, if any, stays on the device and the page shows the copy on disk. */
+function stopEditing() {
+  if (!editor) return;
+  if (editor.dirty()) showToast('Your unsaved draft is kept on this device');
+  editor.close();
+  editor = null;
+  markMode('view');
+  load(false);
 }
 
 function placeOutline(hasOutline) {
@@ -67,7 +108,7 @@ function boot() {
   ready = true;
   wireThemeToggle();
   wireDocHost(document.body, $('docBody'), {
-    onDocLink: (next) => { location.href = docUrl(next) + (next.fragment ? '#' + encodeURIComponent(next.fragment) : ''); },
+    onDocLink: (next) => go(docUrl(next) + (next.fragment ? '#' + encodeURIComponent(next.fragment) : '')),
     onDownload: () => load(true),
     onExplore: () => toApp('explore'),
     onAnchor: () => { if (!WIDE.matches) $('docOutline').hidden = true; },
@@ -78,7 +119,24 @@ function boot() {
     $('docOutline').hidden = !open;
     $('docOutlineBtn').setAttribute('aria-expanded', String(open));
   });
-  WIDE.addEventListener('change', () => placeOutline(!!$('docOutline').querySelector('li')));
+  WIDE.addEventListener('change', () => { if (!editor) placeOutline(!!$('docOutline').querySelector('li')); });
+  document.querySelector('.doc-mode').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (b && b.dataset.mode === 'edit') startEditing();
+    else if (b) stopEditing();
+  });
+  $('docSave').addEventListener('click', () => { if (editor) editor.save(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && editor && !document.querySelector('dialog[open]')) stopEditing();
+  });
+  window.addEventListener('beforeunload', (e) => {
+    if (!editor) return;
+    editor.keepDraft();
+    if (leaving || !editor.dirty()) return;
+    e.preventDefault();
+    e.returnValue = '';  // older Safari asks only when this is set
+  });
+  if (!loc) document.querySelector('.doc-modebar').hidden = true;
   load(false);
 }
 

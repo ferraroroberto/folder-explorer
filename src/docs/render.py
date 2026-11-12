@@ -135,12 +135,18 @@ def _heading_text(tok: Token) -> str:
     return "".join(c.content for c in tok.children or [] if c.type in ("text", "code_inline")).strip()
 
 
-def render(text: str, link: Lookup, image: Lookup) -> dict[str, Any]:
-    """``{html, outline}`` for ``text``; ``outline`` lists each heading's level, text and element id."""
+def render(text: str, link: Lookup, image: Lookup, lines: bool = False) -> dict[str, Any]:
+    """``{html, outline}`` for ``text``; ``outline`` lists each heading's level, text and element id.
+
+    ``lines`` marks each top-level block with the source line it starts on
+    (``data-line``), so the editor's preview can follow the cursor.
+    """
     env: dict[str, Any] = {}
     tokens = _MD.parse(text, env)
     outline = []
     for i, tok in enumerate(tokens):
+        if lines and tok.nesting == 1 and tok.level == 0 and tok.map:
+            tok.attrSet("data-line", str(tok.map[0]))
         if tok.type == "heading_open":
             outline.append({"level": int(tok.tag[1]), "text": _heading_text(tokens[i + 1]), "id": tok.attrGet("id")})
         elif tok.type == "inline" and tok.children:

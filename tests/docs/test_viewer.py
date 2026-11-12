@@ -25,7 +25,7 @@ from tests.fixture_tree import BIG_MD_BYTES, DOCS_FOLDER, TINY_PNG, add_docs, bu
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.7", 50000)
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 READER = ROOT / "src" / "docs" / "reader.py"
 
 # Calls that read a file's bytes; outside the reader, the viewer's modules make none.

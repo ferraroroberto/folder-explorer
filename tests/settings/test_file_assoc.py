@@ -17,7 +17,7 @@ from src import file_assoc
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.7", 50000)
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CMD = '"X:\\Invented\\pythonw.exe" -c "..." "%1"'
 
 

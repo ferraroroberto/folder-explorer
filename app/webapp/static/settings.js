@@ -173,6 +173,14 @@ export function initSettings(opts) {
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
+  // Built here, not in index.html: the row exists only for a server that reports this PC's association.
+  const assocRow = document.createElement('div');
+  assocRow.className = 'row row-stack';
+  assocRow.id = 'mdAssocRow';
+  assocRow.hidden = true;
+  assocRow.innerHTML = '<div class="row-line"><span>Associate Markdown files with this app</span>' +
+    '<span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span></div><p class="row-note" id="mdAssocNote"></p>';
+  $('reuseExplorerSlot').closest('.row').after(assocRow);
   assocSwitch = switchEl(false, { label: 'Associate Markdown files with this app', onToggle: saveAssoc });
   $('mdAssocSlot').appendChild(assocSwitch);
   categorySwitch = switchEl(false, {

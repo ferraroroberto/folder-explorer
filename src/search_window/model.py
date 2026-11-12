@@ -120,7 +120,7 @@ def folder_row(hit: dict[str, Any], marks: list[str]) -> Row:
         meta.append("OneDrive")
     return Row(FOLDERS, highlight(hit.get("name") or "", marks), _size(int(hit.get("size") or 0)),
                highlight(win_path(hit.get("display") or hit.get("path") or ""), marks), " · ".join(meta),
-               win_path(hit.get("path") or ""), {"root": hit.get("root"), "id": hit.get("id")})
+               win_path(hit.get("path") or ""), {"root": hit.get("root"), "scan_id": hit.get("scan_id"), "id": hit.get("id")})
 
 
 def email_row(hit: dict[str, Any]) -> Row:
@@ -248,7 +248,7 @@ class QuickSearchModel:
             return False, ""
         try:
             if row.kind == FOLDERS:
-                self.client.open_folder(row.target["root"], row.target["id"])
+                self.client.open_folder(row.target["root"], row.target["scan_id"], row.target["id"])
                 return True, "Opened in File Explorer"
             self.client.open_email(row.target["id"])
             return True, "Opening in Outlook"

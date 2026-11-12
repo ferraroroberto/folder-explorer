@@ -30,7 +30,7 @@ class FakeResponse:
         return self.body
 
 
-FOLDER_HITS = [{"root": "inv", "id": 7, "name": "harbour-trip", "display": "Photos\\2024\\harbour-trip",
+FOLDER_HITS = [{"root": "inv", "scan_id": 3, "id": 7, "name": "harbour-trip", "display": "Photos\\2024\\harbour-trip",
                 "path": "X:\\Invented\\Photos\\2024\\harbour-trip", "files": 3, "size": 1_990_000, "people": 0, "kind": "local"}]
 EMAIL_HITS = [{"id": 4, "subject": "Q4 " + MARK_START + "budget" + MARK_END, "from_name": "Ana Lopez", "from_addr": "ana@example.com",
                "date": "2025-10-14T09:12:00", "folder": "X:\\Invented\\Mail\\Clients\\Northwind",
@@ -122,7 +122,7 @@ def test_enter_searches_a_query_not_yet_answered_then_opens_and_hides(window: tu
     _settle(view)
     assert view.model.is_current()
     view.enter()
-    assert fake.calls[-1][:2] == ("POST", "/api/folders/open") and fake.calls[-1][2]["json"] == {"root": "inv", "id": 7}
+    assert fake.calls[-1][:2] == ("POST", "/api/folders/open") and fake.calls[-1][2]["json"] == {"root": "inv", "scan_id": 3, "id": 7}
     assert hidden == ["withdraw"]
 
 

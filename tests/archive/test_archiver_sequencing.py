@@ -3,11 +3,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from src.email.archive import (
+    ArchiveError,
+    EmailArchiver,
     _get_sent_date_prefix,
     _scan_folder,
     infer_date_prefix,
 )
+from tests.archive.fakes import _FakeMailItem as _SavingMailItem
 
 
 class _FakeMailItem:
@@ -125,3 +130,20 @@ def test_returns_none_and_logs_when_neither_date_resolves(caplog):
         result = _get_sent_date_prefix(item)
     assert result is None
     assert any("sent date" in rec.message for rec in caplog.records)
+
+
+# ------------------------------------------------- a full numbering never overwrites ---
+
+def test_a_folder_at_sequence_999_refuses_the_next_filing_and_keeps_the_mail_in_it(tmp_path):
+    (tmp_path / "999 - budget.msg").write_text("first", encoding="utf-8")
+    with pytest.raises(ArchiveError):
+        EmailArchiver({"archive": {"max_path_length": 255}}).archive(_SavingMailItem(), str(tmp_path), "budget")
+    assert [p.name for p in tmp_path.iterdir()] == ["999 - budget.msg"]
+    assert (tmp_path / "999 - budget.msg").read_text(encoding="utf-8") == "first"
+
+
+def test_a_name_already_in_the_folder_is_refused_not_saved_over(tmp_path):
+    (tmp_path / "005 - budget.msg").write_text("first", encoding="utf-8")
+    with pytest.raises(ArchiveError):
+        EmailArchiver({"archive": {"max_path_length": 255}})._save_msg(_SavingMailItem(), str(tmp_path), "005", "budget", None)
+    assert (tmp_path / "005 - budget.msg").read_text(encoding="utf-8") == "first"

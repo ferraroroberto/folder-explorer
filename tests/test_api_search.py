@@ -90,6 +90,26 @@ def test_a_mails_folder_opens_through_the_folder_views_route(setup: Path, monkey
     assert len(launched) == 1
 
 
+def test_a_folder_opens_only_by_an_id_of_the_current_scan(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src import desktop
+
+    launched: list[str] = []
+    monkeypatch.setattr(desktop, "_shell", lambda path, verb: launched.append(path))
+    monkeypatch.setattr(search_routes, "open_in_explorer", lambda path, *_: launched.append(path))
+    with TestClient(app, client=LOCAL) as c:
+        hit = c.get("/api/search/folders", params={"q": "kestrel"}).json()["results"][0]
+        ask = {"root": hit["root"], "scan_id": hit["scan_id"], "id": hit["id"]}
+        assert c.post("/api/folders/open", json=ask).json() == {"status": "opened"}
+        assert launched == [hit["path"]]
+        # An id no folder holds opens nothing (it used to open the root), and an id read from an older scan is refused.
+        assert c.post("/api/folders/open", json={**ask, "id": 999_999}).status_code == 404
+        assert c.post("/api/folders/open", json={**ask, "scan_id": hit["scan_id"] - 1}).status_code == 409
+        assert c.post("/api/folders/open", json={"root": ask["root"], "id": ask["id"]}).status_code == 409
+        assert c.post("/api/folders/open", json={**ask, "root": "outside-the-roots"}).status_code == 404
+        assert c.post("/api/folders/open", json={**ask, "id": True}).status_code == 404
+    assert launched == [hit["path"]]
+
+
 def test_show_all_reads_only_inside_the_email_folders(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     read: list[str] = []
     monkeypatch.setattr(search_routes, "fetch_body", lambda p: read.append(p) or Body(True, text="Full text"))

@@ -20,11 +20,10 @@ from typing import Any, Callable, Optional
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from app.webapp.auth import is_pc_itself
-from app.webapp.state import POOL
+from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, desktop, store
-from src.folder_search import item_path
 from src.index import BASES, Index
-from src.roots import resolve_roots
+from src.roots import Root, resolve_roots
 
 router = APIRouter(prefix="/api")
 
@@ -98,29 +97,34 @@ def folder_contents(request: Request, root: str, folder: int = 0, basis: str = "
     return _query(root, run)
 
 
+def scanned_path_or_http(roots: list[Root], body: dict[str, Any], kind: str) -> str:
+    """The path on disk of the item a request body names by ``root``, ``scan_id`` and ``id``; 404 or 409 when it can't be resolved.
+
+    The one place a PC-only open action turns ids into a path: an id from an older scan could name another
+    item now, so the scan must be the root's current one.
+    """
+    item_id = body.get("id")
+    if not isinstance(item_id, int) or isinstance(item_id, bool):
+        raise HTTPException(status_code=404, detail="no such item")
+    try:
+        return scanned_item_path(roots, str(body.get("root")), body.get("scan_id"), kind, item_id)[2]
+    except ScanChanged as exc:
+        raise HTTPException(status_code=409, detail="the index changed since this page loaded: reload it") from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="no such item") from exc
+
+
 @router.post("/open")
 def open_item(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
     """Ask Windows to open a folder (``explore``) or a file (``open``, ``edit``, ``reveal``) on this PC."""
     started = time.perf_counter()
     if not is_pc_itself(request):
         raise HTTPException(status_code=403, detail="this works on the PC only")
-    kind, verb, item_id = body.get("kind"), body.get("verb"), body.get("id")
+    kind, verb = body.get("kind"), body.get("verb")
     verbs = desktop.FOLDER_VERBS if kind == "folder" else desktop.FILE_VERBS if kind == "file" else ()
     if verb not in verbs:
         raise HTTPException(status_code=400, detail="unknown action for a " + str(kind))
-    root = next((r for r in resolve_roots(config.load()["roots"]) if r.key == body.get("root")), None)
-    scan = store.current_index(root.key) if root else None
-    if root is None or scan is None or not isinstance(item_id, int) or isinstance(item_id, bool):
-        raise HTTPException(status_code=404, detail="no such item")
-    # Ids belong to one scan: an id from an older one could name another item now.
-    if body.get("scan_id") != scan["id"]:
-        raise HTTPException(status_code=409, detail="the index changed since this page loaded: reload it")
-    index, lock = POOL.get(store.index_dir() / scan["index_file"])
-    try:
-        with lock:
-            path = item_path(root, index, str(kind), item_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="no such item") from exc
+    path = scanned_path_or_http(resolve_roots(config.load()["roots"]), body, str(kind))
     try:
         desktop.ensure_there(path, kind == "folder", started)
         desktop.open_item(path, str(verb), started)

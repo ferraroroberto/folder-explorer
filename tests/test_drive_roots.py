@@ -68,5 +68,5 @@ def test_open_folder_checks_and_launches_the_clean_path(isolated: Path, monkeypa
         (typed_root,) = resolve_roots([typed])
         monkeypatch.setattr(search_routes, "_roots", lambda: [dataclasses.replace(typed_root, key=real.key)])
         checked.clear()
-        assert c.post("/api/folders/open", json={"root": hit["root"], "id": hit["id"]}).json() == {"status": "opened"}
+        assert c.post("/api/folders/open", json={"root": hit["root"], "scan_id": hit["scan_id"], "id": hit["id"]}).json() == {"status": "opened"}
     assert [p for p in checked if p.startswith("Z:")] == launched == ["Z:\\Photos\\2025\\garden"]

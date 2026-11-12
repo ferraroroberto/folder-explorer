@@ -67,13 +67,15 @@ Downloaded mail stays on the disk until OneDrive frees it. The app never sets a 
 
 ## What opens a file
 
-The disk walk never opens a file. Mail is the one exception: a `.msg` inside the email folders (`email.roots`), opened by five callers, all through `src/email/reader.py`:
+The disk walk never opens a file. Mail is one exception: a `.msg` inside the email folders (`email.roots`), opened by five callers, all through `src/email/reader.py`:
 
 - the email stage, on every scan and on `email index`;
 - Show all in the Search preview, for the single mail you pick;
 - `email batch renumber`, when the index lacks a mail's date or attachment names;
 - `email subjects`, the dry run that lists names cut by an old rule;
 - `email batch fix-cut-names`, the rename that follows from it.
+
+The Markdown viewer is the other exception: a `.md` or `.markdown` file up to 2 MB, and the images beside it that it shows (`.png .jpg .jpeg .gif .webp .svg`, up to 10 MB), read only through `src/docs/reader.py` when someone opens the document in Explore's sheet or the `/doc` window. The file is named by root, scan id and item id; its path is rebuilt from the scan. Before any byte is read, a fresh listing of its folder (the same directory handle the scan uses) checks that it is still there, is not a link, is under the cap, and is not cloud-only. A cloud-only file is refused with "Only in OneDrive", and the open asks Windows not to recall data (`FILE_FLAG_OPEN_NO_RECALL`), so a placeholder the listing missed fails instead of downloading. **Download and open** (and an image's own Download) is the one path that brings a cloud-only file down: one file, on a tap. A relative link or image in a document resolves on the server against the document's folder and must stay inside its root; one that leaves it, or that the scan did not see, renders inert. Rendering reads nothing from disk. The viewer writes nothing.
 
 Nothing else opens a scanned file. Filing mail (the Archive sheet, the macro, the archive verbs) writes only inside `email.roots`: [archive.md](archive.md). Explore's open actions read nothing; they hand a path to Windows.
 

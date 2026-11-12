@@ -11,6 +11,7 @@ import { initEmailScans, loadEmailScans } from './email-scans.js';
 import { initSettings, openSettings } from './settings.js';
 import { initSearch, leaveSearch, loadSearch } from './search.js';
 import { initArchive, startArchivePoll } from './archive.js';
+import { wireThemeToggle } from './theme.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -20,8 +21,6 @@ import { emptyStateEl } from './_vendored/empty-state/empty-state.js';
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
 
 const $ = (id) => document.getElementById(id);
-// The key the pre-paint boot script in index.html reads.
-const THEME_KEY = 'folder-explorer.theme';
 const PANES = { search: 'paneSearch', explore: 'paneExplore', largest: 'paneLargest', types: 'paneTypes', scans: 'paneScans' };
 const LOADERS = { explore: loadExplore, largest: loadLargest, types: loadTypes };
 // How often the page re-reads scan progress while a scan runs.
@@ -280,23 +279,8 @@ function wireToolbar(nav) {
 }
 
 function wireTheme() {
-  const paint = () => {
-    const dark = document.documentElement.dataset.theme === 'dark';
-    const label = dark ? 'Switch to light theme' : 'Switch to dark theme';
-    document.querySelectorAll('.theme-toggle').forEach((b) => {
-      b.querySelector('use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
-      b.setAttribute('aria-label', label);
-      b.title = label;
-    });
-  };
-  document.querySelectorAll('.theme-toggle').forEach((b) => b.addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* this visit only */ }
-    paint();
-  }));
+  wireThemeToggle();
   document.querySelectorAll('.open-settings').forEach((b) => b.addEventListener('click', () => openSettings()));
-  paint();
 }
 
 async function showBuild() {

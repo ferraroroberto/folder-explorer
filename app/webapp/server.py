@@ -1,8 +1,9 @@
 """The FastAPI app: the browse, search, scan and settings API, sign-in, and the static PWA.
 
 Read-only over the disk: it lists folders through ``src/scanner.py`` and
-never moves or deletes a file. The one file it reads is a mail's ``.msg`` for
-"Show all", through ``src/email/reader.py`` in a child process. Start it with ``python -m app.webapp``
+never moves or deletes a file. The files it reads are a mail's ``.msg`` for
+"Show all", through ``src/email/reader.py`` in a child process, and a Markdown
+file or an image beside it for the viewer, through ``src/docs/reader.py``. Start it with ``python -m app.webapp``
 (which picks the bind from the ``remote_access`` setting) or from the tray.
 """
 
@@ -28,6 +29,7 @@ from app.webapp.routers import (
     archive,
     archive_v1,
     browse,
+    docs,
     emails,
     scans,
     search,
@@ -105,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(settings.router)
     app.include_router(browse.router)
+    app.include_router(docs.router)
     app.include_router(scans.router)
     app.include_router(search.router)
     app.include_router(search_v1.router)
@@ -115,14 +118,22 @@ def create_app() -> FastAPI:
     # Local-only view/tap log, under the same sign-in rule as every other route.
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
 
-    @app.get("/", include_in_schema=False)
-    def index(request: Request) -> Response:
-        html = BUILD_INFO.stamp_html((STATIC_DIR / "index.html").read_text(encoding="utf-8"))
+    def shell(request: Request, page: str) -> Response:
+        html = BUILD_INFO.stamp_html((STATIC_DIR / page).read_text(encoding="utf-8"))
         headers = {"Cache-Control": _SHELL_CACHE, "ETag": _shell_etag(html)}
         # The shell revalidates on every launch; an unchanged build answers with no body.
         if _etag_matches(request.headers.get("if-none-match", ""), headers["ETag"]):
             return Response(status_code=304, headers=headers)
         return HTMLResponse(html, headers=headers)
+
+    @app.get("/", include_in_schema=False)
+    def index(request: Request) -> Response:
+        return shell(request, "index.html")
+
+    @app.get("/doc", include_in_schema=False)
+    def doc_page(request: Request) -> Response:
+        """The document window's shell; it holds no document, which the page fetches by id after sign-in."""
+        return shell(request, "doc.html")
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> FileResponse:

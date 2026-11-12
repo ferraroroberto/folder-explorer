@@ -1,0 +1,151 @@
+/* The Markdown viewer: the rendered document, its outline, Explore's document sheet and the /doc window.
+ * Every value is a design token from tokens.css; code listings use the vendored code-listing frame. */
+
+/* ------------------------------------------------------------- the document */
+.doc-prose { font-size: var(--font-body); line-height: 1.6; color: var(--ink); overflow-wrap: anywhere; }
+.doc-prose > :first-child { margin-top: 0; }
+.doc-prose > :last-child { margin-bottom: 0; }
+.doc-prose h1, .doc-prose h2, .doc-prose h3, .doc-prose h4, .doc-prose h5, .doc-prose h6 {
+  margin: var(--space-lg) 0 var(--space-sm);
+  line-height: 1.25;
+  font-weight: 700;
+  scroll-margin-top: var(--space-md);
+}
+.doc-prose h1 { font-size: var(--font-heading-lg); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--line-muted); }
+.doc-prose h2 { font-size: var(--font-heading-md); padding-bottom: var(--space-xs); border-bottom: 1px solid var(--line-muted); }
+.doc-prose h3, .doc-prose h4 { font-size: var(--font-body); }
+.doc-prose h5, .doc-prose h6 { font-size: var(--font-body-sm); }
+.doc-prose h6 { color: var(--muted); }
+.doc-prose p, .doc-prose ul, .doc-prose ol, .doc-prose blockquote, .doc-prose .doc-table, .doc-prose .code-listing, .doc-prose hr {
+  margin: 0 0 var(--space-md);
+}
+.doc-prose ul, .doc-prose ol { padding-left: var(--space-lg); }
+.doc-prose li + li { margin-top: var(--space-xs); }
+.doc-prose li > ul, .doc-prose li > ol, .doc-prose li > p { margin-bottom: 0; }
+.doc-prose a { color: var(--accent); text-underline-offset: 2px; }
+.doc-prose .doc-link-off { color: var(--muted); text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+.doc-prose blockquote { padding: 0 var(--space-md); border-left: 4px solid var(--line); color: var(--muted); }
+.doc-prose hr { border: 0; border-top: 1px solid var(--line-muted); }
+.doc-prose :not(pre) > code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--neutral-soft);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875em;
+}
+.doc-prose img { max-width: 100%; height: auto; border-radius: var(--radius-sm); vertical-align: middle; }
+.doc-img-off {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: var(--font-body-sm);
+}
+.doc-img-off .button-ghost { min-height: var(--hit-min); }
+
+/* Tables scroll inside their own box, so a wide one never widens the page. */
+.doc-table { overflow-x: auto; }
+.doc-prose table { border-collapse: collapse; font-size: var(--font-body-sm); }
+.doc-prose th, .doc-prose td { padding: 6px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.doc-prose th { background: var(--neutral-soft); font-weight: 600; }
+
+.doc-prose .contains-task-list { padding-left: var(--space-xs); list-style: none; }
+.doc-prose .task-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  margin-right: var(--space-sm);
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  vertical-align: -2px;
+}
+.doc-prose .task-mark.is-done { border-color: var(--accent-fill); background: var(--accent-fill); color: var(--accent-fg); }
+.doc-prose .task-mark .icon { width: 0.75em; height: 0.75em; stroke-width: 3; }
+
+.doc-prose .footnotes-sep { margin-top: var(--space-lg); }
+.doc-prose .footnotes { font-size: var(--font-body-sm); color: var(--muted); }
+.doc-prose .footnote-ref a, .doc-prose .footnote-backref { text-decoration: none; }
+
+/* Pygments token classes, mapped onto the fleet's text tokens so both themes keep their contrast. */
+.doc-prose .code-listing pre code { font: inherit; }
+.code-listing :is(.k, .kc, .kd, .kn, .kp, .kr, .kt, .ow, .nb, .bp) { color: var(--accent-text); }
+.code-listing :is(.s, .s1, .s2, .sa, .sb, .sc, .sd, .se, .sh, .si, .sx, .sr, .ss, .dl) { color: var(--success); }
+.code-listing :is(.c, .c1, .ch, .cm, .cp, .cpf, .cs) { color: var(--muted); }
+.code-listing :is(.m, .mb, .mf, .mh, .mi, .mo, .il) { color: var(--attention-text); }
+.code-listing :is(.nf, .fm, .nc, .nn, .nd) { font-weight: 600; }
+.code-listing :is(.err, .gd) { color: var(--danger-text); }
+.code-listing .gi { color: var(--success); }
+
+/* ------------------------------------------------------- states and outline */
+.doc-loading { margin: 0; padding: var(--space-lg) 0; color: var(--muted); font-size: var(--font-body-sm); }
+.doc-state { display: grid; justify-items: start; gap: var(--space-sm); padding: var(--space-md) 0; }
+.doc-state-title { display: flex; align-items: center; gap: var(--space-sm); margin: 0; font-weight: 600; }
+.doc-state-text { margin: 0; color: var(--muted); font-size: var(--font-body-sm); }
+
+.doc-outline-list { list-style: none; margin: 0; padding: 0; }
+.doc-outline-list li { padding-left: calc(var(--level, 0) * 12px); }
+.doc-outline-list a {
+  display: flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: var(--font-body-sm);
+  text-decoration: none;
+}
+.doc-outline-list a:hover { background: var(--neutral-soft); }
+.doc-outline-empty { margin: 0; color: var(--muted); font-size: var(--font-body-sm); }
+
+/* ------------------------------------------------------ Explore's sheet */
+.lr-name .doc-badge { flex: none; }
+.detail-dialog.doc-dialog { width: min(860px, 94vw); height: 92vh; height: 92dvh; overflow: hidden; }
+.doc-dialog .doc-card { position: relative; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; }
+.doc-header { gap: var(--space-xs); }
+.doc-header h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-header .doc-tool { flex: none; }
+/* icon-button.css sets display on the control, so a hidden tool needs it back. */
+.doc-tool[hidden], .doc-outline-toggle[hidden] { display: none; }
+.doc-where { margin: 0 0 var(--space-sm); color: var(--muted); font-size: var(--font-body-sm); overflow-wrap: anywhere; }
+.doc-where:empty { display: none; }
+.doc-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding-bottom: 18px; }
+.doc-outline-pop {
+  position: absolute;
+  top: 60px;
+  right: 18px;
+  z-index: 2;
+  width: min(320px, calc(100% - 36px));
+  max-height: 60%;
+  overflow: auto;
+  padding: var(--space-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.doc-outline-pop[hidden] { display: none; }
+@media (pointer: coarse) and (max-width: 520px) {
+  .detail-dialog.doc-dialog {
+    height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--space-lg) - var(--gap));
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--space-lg) - var(--gap));
+  }
+}
+
+/* --------------------------------------------------------- the /doc window */
+.doc-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); align-items: start; }
+.doc-side[hidden] { display: none; }
+.doc-side, .doc-main { min-width: 0; }
+.doc-main { padding: var(--space-md) 18px var(--space-lg); }
+.doc-side-title { margin: 0 0 var(--space-xs); padding: 0 var(--space-sm); color: var(--muted); font-size: var(--font-label); font-weight: 600; }
+@media (min-width: 1100px) and (pointer: fine) {
+  .doc-app { max-width: calc(var(--layout-measure) + 260px + var(--gap)); }
+  .doc-layout { grid-template-columns: 260px minmax(0, var(--layout-measure)); justify-content: center; }
+  .doc-side { position: sticky; top: var(--gap); max-height: calc(100vh - 2 * var(--gap)); overflow: auto; }
+}

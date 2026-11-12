@@ -70,3 +70,62 @@ def add_hidden(root: Path) -> Path:
     set_hidden(folder)
     set_hidden(root / HIDDEN_FILE)
     return root
+
+
+# A tiny valid 1x1 PNG, so a browser draws the invented diagram.
+TINY_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c6360606060000000050001a5f645400000000049454e44ae426082"
+)
+
+# Invented Markdown notes add_docs writes: a guide that exercises the renderer
+# and every link rule, a second page it links to, and one past the size cap.
+DOCS_FOLDER = "Notes"
+GUIDE_MD = """# Garden guide
+
+Some *emphasis*, a `code chip` and a [second page](sub/watering.md#schedule).
+
+## Beds
+
+| Bed | Plant |
+| --- | ----- |
+| A1  | Basil |
+
+- [x] Dig the bed
+- [ ] Sow the seeds
+
+```python
+def water(bed: str) -> None:
+    print("watering", bed)
+```
+
+![Bed plan](diagram.png)
+
+## Out of reach
+
+An [escape](../../elsewhere.md), an [unscanned page](missing.md), a [web link](https://example.invalid/page)
+and ![escaped image](../../outside.png). Raw HTML stays text: <script>alert(1)</script>
+
+A footnote[^1].
+
+[^1]: The invented note.
+"""
+WATERING_MD = """# Watering
+
+## Schedule
+
+Back to the [guide](../guide.md).
+"""
+# One byte past the viewer's 2 MB cap.
+BIG_MD_BYTES = 2 * 1024 * 1024 + 1
+
+
+def add_docs(root: Path) -> Path:
+    """Write the invented Markdown notes under ``root``: a guide, a page it links to, an image and an oversize file."""
+    folder = root / DOCS_FOLDER
+    (folder / "sub").mkdir(parents=True, exist_ok=True)
+    (folder / "guide.md").write_text(GUIDE_MD, encoding="utf-8")
+    (folder / "sub" / "watering.md").write_text(WATERING_MD, encoding="utf-8")
+    (folder / "diagram.png").write_bytes(TINY_PNG)
+    (folder / "big.md").write_bytes(b"#" * BIG_MD_BYTES)
+    return root

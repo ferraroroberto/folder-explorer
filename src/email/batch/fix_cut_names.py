@@ -111,7 +111,7 @@ def fix_cut_names(
 ) -> dict[str, Any]:
     """List (or, with ``apply``, rename) the archived mails whose name lost its first letters.
 
-    Raises ``indexer.NotSetUp`` / ``indexer.EmailBusy`` before anything is read.
+    Raises ``indexer.NotSetUp`` / ``indexer.UnknownFolder`` / ``indexer.EmailBusy`` before anything is read.
     """
     roots = _archive_roots(cfg)
     items: list[dict[str, str]] = []

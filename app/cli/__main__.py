@@ -100,6 +100,9 @@ def cmd_email_subjects(scope: Optional[str], wait_s: float, limit: int) -> int:
     except indexer.NotSetUp as exc:
         logger.info("ℹ️ subject audit not run: %s", exc)
         return EXIT_NOT_SET_UP
+    except indexer.UnknownFolder as exc:
+        logger.error("❌ %s", exc.args[0])
+        return EXIT_UNKNOWN_ROOT
     except indexer.EmailBusy:
         logger.warning("⚠️ another email run held the lock for %.0f s; nothing read", wait_s)
         return EXIT_BUSY

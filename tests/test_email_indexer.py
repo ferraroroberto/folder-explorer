@@ -10,12 +10,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from app.cli import email_batch
 from app.cli.__main__ import main as cli
 from app.webapp.routers import emails as email_routes
 from app.webapp.server import app
 from app.webapp.state import EMAILS
-from src import scan_runner, store
-from src.email import indexer, manifest
+from src import config, scan_runner, store
+from src.email import indexer, manifest, subject_audit
 from src.email.schema import own_index_path
 from src.index import Index, open_index
 from src.scanner import exclude_keys, scan_to_index
@@ -89,6 +90,27 @@ def test_a_scoped_run_lists_only_its_folder(setup: Path) -> None:
     assert result["counts"]["files"] == 1 and indexed_names() == ["003 - Invoice.msg"]
     with pytest.raises(indexer.UnknownFolder):
         indexer.run(str(setup / "Photos"))
+
+
+def test_the_subject_audit_and_fix_cut_names_refuse_a_folder_outside_the_email_folders(
+    setup: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    listed: list[Any] = []
+    monkeypatch.setattr(indexer, "manifests", lambda *a, **k: listed.append(a) or [])
+    outside = str(setup / "Photos")
+    with pytest.raises(indexer.UnknownFolder):
+        subject_audit.run(outside)
+    assert cli(["email", "subjects", "--root", outside]) == 3
+    monkeypatch.setattr(email_batch, "load_config", config.load)
+    capsys.readouterr()
+    assert email_batch.main(["fix-cut-names", "--root", outside]) == email_batch.EXIT_CANNOT_START
+    assert json.loads(capsys.readouterr().out)["error"]["code"] == "bad_input"
+    assert listed == []
+    held = indexer.lock()
+    held.acquire()  # the refusals above left the email lock free
+    held.release()
+    assert subject_audit.run(str(setup / "Mail" / "Clients")).files == 0
+    assert len(listed) == 1
 
 
 def test_busy_is_its_own_outcome(setup: Path) -> None:

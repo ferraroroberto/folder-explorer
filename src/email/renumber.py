@@ -247,23 +247,24 @@ def _facts_for(
     The index answers first — it is already read and costs nothing. The file
     itself is opened only when the index cannot answer: no row (archived since
     the last scan), no usable date, or an attachment list is needed to place a
-    shared number's files.
+    shared number's files and the row has none.
     """
     record = indexed.get(name.lower())
     sent = _parse_sent(record.date_sent) if record is not None else None
     message_id = (record.message_id or "") if record is not None else ""
-    attachment_names: tuple[str, ...] = ()
+    attachment_names = record.attachment_names if record is not None else None
 
-    if sent is None or need_attachments:
+    if sent is None or (need_attachments and attachment_names is None):
         facts = read_msg_facts(os.path.join(folder, name))
         if facts is not None:
             sent = sent or _parse_sent(facts.date_sent)
             message_id = message_id or facts.message_id
-            attachment_names = facts.attachment_names
+            if attachment_names is None:
+                attachment_names = facts.attachment_names
 
     if sent is None:
         logger.info("No sent date for %r; it keeps its position in the folder", name)
-    return _MsgFacts(sent, message_id, attachment_names)
+    return _MsgFacts(sent, message_id, attachment_names or ())
 
 
 # -------------------------------------------------------------- bundling ----

@@ -149,6 +149,8 @@
 @media (min-width: 1100px) and (pointer: fine) {
   .doc-app { max-width: calc(var(--layout-measure) + 260px + var(--gap)); }
   .doc-layout { grid-template-columns: 260px minmax(0, var(--layout-measure)); justify-content: center; }
+  /* With no outline and no recent documents the sidebar is hidden, and the text takes the one column, not the sidebar's. */
+  .doc-layout:has(> .doc-side[hidden]) { grid-template-columns: minmax(0, var(--layout-measure)); }
   .doc-side { position: sticky; top: var(--gap); max-height: calc(100vh - 2 * var(--gap)); overflow: auto; }
 }
 

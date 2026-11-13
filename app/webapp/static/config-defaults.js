@@ -20,6 +20,7 @@ export const DEFAULTS = {
   desktop: { reuse_explorer_window: false },
   macro: { prefer_window: true },
   tray: { left_click: 'quick_search' },
+  quick_search: { open_folder: true },
   archive: { date_prefix: false, max_path_length: 255, max_suggestions: 3, min_score: 0.05 },
   outlook: {
     archive_folder: 'Archive', category: 'Archived by task-os', dismiss_category: 'Dismissed by task-os',

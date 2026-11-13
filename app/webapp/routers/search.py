@@ -26,6 +26,7 @@ from src.desktop import (
     ensure_there,
     open_in_explorer,
     open_in_outlook,
+    open_item,
     outlook_exe,
 )
 from src.docs.listing import MAX_PAGE
@@ -203,6 +204,27 @@ def open_email(row_id: int, request: Request) -> dict[str, str]:
         open_in_outlook(path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"status": "opened"}
+
+
+@router.post("/emails/{row_id}/reveal")
+def reveal_email(row_id: int, request: Request) -> dict[str, str]:
+    """Show an email's ``.msg`` in File Explorer, its folder open with the file selected; the mail itself is not opened."""
+    _pc_only(request)
+    index = _emails()
+    try:
+        with index.lock:
+            path = index.path_of(row_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="no such email in the index") from exc
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=410, detail="the file is no longer there")
+    try:
+        open_item(path, "reveal")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=422, detail="Windows can't show this file: " + str(exc)) from exc
     return {"status": "opened"}
 
 

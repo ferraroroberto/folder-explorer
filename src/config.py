@@ -72,6 +72,9 @@ DEFAULTS: dict[str, Any] = {
     # The tray icon: a left click opens the small always-on-top Quick search window (folders and email)
     # or the web app; the tray menu offers both either way.
     "tray": {"left_click": "quick_search"},
+    # The Quick search window's Emails tab: on, opening a mail shows its folder in File Explorer with the file
+    # selected; off, it opens the mail in Outlook. The window's own "Open folder" toggle writes it.
+    "quick_search": {"open_folder": True},
     # The archive verbs (python -m app.cli email batch): the file-name form
     # (date_prefix true, false or "auto" to follow the destination folder),
     # the longest path the archiver writes, and the folder suggester's limits.
@@ -154,6 +157,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["desktop"] = _clean_desktop(raw.get("desktop"))
     cfg["macro"] = _clean_macro(raw.get("macro"))
     cfg["tray"] = _clean_tray(raw.get("tray"))
+    cfg["quick_search"] = _clean_quick_search(raw.get("quick_search"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     return cfg
@@ -274,6 +278,13 @@ def _clean_tray(raw: Any) -> dict[str, Any]:
     return out
 
 
+def _clean_quick_search(raw: Any) -> dict[str, Any]:
+    out: dict[str, Any] = dict(DEFAULTS["quick_search"])
+    if isinstance(raw, dict) and isinstance(raw.get("open_folder"), bool):
+        out["open_folder"] = raw["open_folder"]
+    return out
+
+
 def load() -> dict[str, Any]:
     """The effective settings: the file's valid keys over the defaults."""
     path = config_path()
@@ -330,6 +341,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "tray":
             if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
+        if key == "quick_search":
+            if not (isinstance(value, dict) and set(value) == {"open_folder"} and isinstance(value["open_folder"], bool)):
+                raise ValueError("quick_search takes open_folder, true or false")
         if key == "outlook":
             if not (isinstance(value, dict) and value and set(value) <= set(OUTLOOK_SWITCHES)
                     and all(isinstance(v, bool) for v in value.values())):

@@ -25,6 +25,7 @@ from src.archive_window.theme import (
 )
 from src.archive_window.view import Segmented
 from src.search_window.model import (
+    EMAILS,
     TABS,
     Answer,
     QuickSearchModel,
@@ -43,6 +44,7 @@ DEBOUNCE_MS = 200
 POLL_MS = 15
 WIDTH, HEIGHT = 680, 520
 KEYS = "↑ ↓ move · Enter open · Ctrl+Shift+C copy path · Tab switches tab · Esc hide"
+OPEN_FOLDER = "Open folder"
 
 
 def _font(size: int = SIZE_BODY, bold: bool = False, mono: bool = False) -> tuple[str, int, str]:
@@ -79,6 +81,11 @@ class QuickSearchView:
         self.tabs.pack(side="left")
         self.count = tk.Label(top, text="", bg=pal.card, fg=pal.muted, font=_font(SIZE_SMALL))
         self.count.pack(side="right")
+        # Shown on the Emails tab only (``_paint_toggle``): the Folders tab always opens its folder.
+        self.open_folder = tk.BooleanVar(value=self.model.open_folder)
+        self.folder_toggle = tk.Checkbutton(top, text=OPEN_FOLDER, variable=self.open_folder, command=self._toggled, bg=pal.card,
+                                            fg=pal.ink, activebackground=pal.card, activeforeground=pal.ink, selectcolor=pal.card_off,
+                                            font=_font(SIZE_SMALL), highlightthickness=0, bd=0, cursor="hand2")
 
         self.query = tk.StringVar(value=self.model.query)
         self.entry = tk.Entry(frame, textvariable=self.query, font=_font(SIZE_BODY), relief="flat", bg=pal.card_off, fg=pal.ink,
@@ -159,9 +166,19 @@ class QuickSearchView:
         t.configure(state="disabled")
         self.count.configure(text=m.count_line())
         has = m.current() is not None
+        self._paint_toggle()
         self.open_btn.configure(state="normal" if has else "disabled")
         self.copy_btn.configure(state="normal" if has else "disabled")
         self._paint_selection()
+
+    def _paint_toggle(self) -> None:
+        if self.model.tab == EMAILS:
+            self.folder_toggle.pack(side="right", padx=(0, SPACE_MD))
+        else:
+            self.folder_toggle.pack_forget()
+
+    def _toggled(self) -> None:
+        self.model.set_open_folder(bool(self.open_folder.get()))
 
     def _segments(self, segments: Segments, tag: str) -> None:
         for text, mark in segments:

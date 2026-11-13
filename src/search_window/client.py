@@ -60,7 +60,7 @@ def _detail(response: Any) -> str:
 
 
 class SearchClient:
-    """The four calls the window makes.
+    """The five calls the window makes.
 
     ``base()`` gives the app's loopback address (``https://127.0.0.1:<port>``), asked on every call so a
     changed bind is followed; the tray passes it, as ``src`` never imports ``app``. ``send(method, path,
@@ -95,4 +95,7 @@ class SearchClient:
 
     def open_email(self, row_id: int) -> dict[str, Any]:
         return self._call("POST", "/api/emails/%d/open" % row_id, json={})
+
+    def reveal_email(self, row_id: int) -> dict[str, Any]:
+        return self._call("POST", "/api/emails/%d/reveal" % row_id, json={})
 

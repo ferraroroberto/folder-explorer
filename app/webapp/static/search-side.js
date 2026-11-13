@@ -5,10 +5,8 @@
  */
 
 import { LABEL, getOp, serialize, tokenize, withOp } from './query.js';
-import { S, $, effectiveMode, recent, recentOpen, shortFolder } from './search-state.js';
+import { S, $, box, effectiveMode, recent, recentOpen, shortFolder } from './search-state.js';
 import { esc, fmtNum, glyph } from './fmt.js';
-
-const box = () => $('q');
 
 // --------------------------------------------------------------- chips
 

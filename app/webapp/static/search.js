@@ -9,7 +9,7 @@ import { getJSON, postJSON, api } from './api.js';
 import { writePref } from './state.js';
 import { withOp } from './query.js';
 import {
-  S, $, WIDE, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, readyModes, setOpen, setRecentOpen, shortFolder,
+  S, $, WIDE, box, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, readyModes, setOpen, setRecentOpen, shortFolder,
 } from './search-state.js';
 import {
   FIELD_OPS, renderChips, renderFacets, renderFilters, renderRecent, renderSaved, resetFilters, toggled, withDate,
@@ -27,8 +27,6 @@ const DEBOUNCE_MS = 200;
 let timer = null;
 let nav = null;
 let booted = false;
-
-const box = () => $('q');
 
 // Per mode: the results card's glyph and title, the box's placeholder, and what one result and the total are called.
 const MODE_UI = {

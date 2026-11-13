@@ -1,4 +1,4 @@
-"""A Markdown file dropped on the window opens in its own /doc window: an indexed one with Edit, any other read-only; the rest is ignored.
+"""A Markdown file dropped on the window opens in its own /doc window: a file on this PC with Edit, any other read-only; the rest is ignored.
 
 Playwright can't drag from the desktop, so each test builds the browser's own
 File and DataTransfer in the page and dispatches the drag events. The indexed
@@ -61,7 +61,7 @@ def _drop(page: Page, name: str, size: int = 0, modified: int = 1_700_000_000_00
 
 def _only_the_page_knows(sent: list[tuple[str, Any]]) -> None:
     """Each recorded body holds only what the page may send, and no path text anywhere."""
-    allowed = {"match": {"name", "size", "modified"}, "render": {"name", "text"}}
+    allowed = {"match": {"name", "size", "modified", "sha256"}, "render": {"name", "text"}}
     for route, body in sent:
         assert set(body) == allowed[route], (route, sorted(body))
         assert "Invented" not in json.dumps({k: v for k, v in body.items() if k != "text"}), (route, body)
@@ -118,6 +118,7 @@ def test_a_dropped_unknown_file_opens_read_only_in_its_own_window(page: Page, ap
         win.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
         assert_layout_clean(win)
     expect(page.locator("#docDialog")).to_be_hidden()
+    expect(page.locator("#toast")).to_contain_text("No copy of it was found")
     assert [route for route, _ in sent] == ["match", "render"]
     _only_the_page_knows(sent)
 
@@ -198,5 +199,36 @@ def test_the_doc_window_takes_a_drop_too(page: Page, app_url: str) -> None:
     page.wait_for_url("**/doc?*id=%d*" % guide["id"])
     expect(page.locator("#docTitle")).to_have_text("guide.md")
     expect(page.locator('.doc-mode [data-mode="edit"]')).to_be_visible()
+    _only_the_page_knows(sent)
+    assert errors == []
+
+
+def test_a_file_edited_since_the_scan_opens_with_edit_and_saves_to_disk(page: Page, app_url: str) -> None:
+    """Another program's edit leaves the scan's size and time stale; the dropped bytes still find the file by their hash."""
+    errors = _errors(page)
+    sent = _requests(page)
+    root = next(r for r in page.request.get(app_url + "/api/roots").json()["roots"] if r["name"].startswith("Media disk"))
+    top = page.request.get(app_url + "/api/folder?" + urlencode({"root": root["key"]})).json()
+    notes = next(it["id"] for it in top["items"] if it["name"] == DOCS_FOLDER)
+    body = page.request.get(app_url + "/api/folder?" + urlencode({"root": root["key"], "folder": notes})).json()
+    loc = {"root": root["key"], "scan": body["scan_id"], "id": next(it["id"] for it in body["items"] if it["name"] == "journal.md")}
+    opened = page.request.get(app_url + "/api/doc/source?" + urlencode(loc)).json()
+    edited = "# Journal\n\nEdited after the scan, then dropped.\n"
+    saved = page.request.post(app_url + "/api/doc/save", data={"root": loc["root"], "scan_id": loc["scan"], "id": loc["id"],
+                                                              "text": edited, "version": opened["version"]})
+    assert saved.ok, saved.text()
+
+    page.goto(app_url + "/")
+    with page.expect_popup() as popup:
+        _drop(page, "journal.md", len(edited.encode()), modified=1_800_000_000_000, text=edited)
+    win = popup.value
+    win.wait_for_url("**/doc?*id=%d*" % loc["id"])
+    expect(win.locator("#docBody p")).to_have_text("Edited after the scan, then dropped.")
+    win.locator('.doc-mode [data-mode="edit"]').click()
+    win.locator(".doc-src-input").fill("# Journal\n\nSaved from the dropped window.\n")
+    win.locator("#docSave").click()
+    expect(win.locator(".doc-edit-status")).to_have_text("Saved")
+    assert page.request.get(app_url + "/api/doc/source?" + urlencode(loc)).json()["text"] == "# Journal\n\nSaved from the dropped window.\n"
+    assert [route for route, _ in sent] == ["match"]
     _only_the_page_knows(sent)
     assert errors == []

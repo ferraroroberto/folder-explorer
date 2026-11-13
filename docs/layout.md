@@ -58,7 +58,8 @@ folder-explorer/
 │   │                           #   sandboxed srcdoc: the files beside it inlined, links by id; no disk)
 │   │                           #   and writer (the editor's only writer: the opened file only, after its version check);
 │   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index);
-│   │                           #   listing (Search's Documents mode: every indexed Markdown and HTML file across the roots, and the match of a dropped file by name, size and time, from the index; no disk)
+│   │                           #   listing (Search's Documents mode: every indexed Markdown and HTML file across the roots, and the match of a dropped file by name, size and time, from the index; no disk),
+│   │                           #   dropmatch (the file a dropped one is when the scan lacks it exactly: edited or new, found by its SHA-256 through the reader, one time and folder budget)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

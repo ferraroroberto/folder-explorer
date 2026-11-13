@@ -1,8 +1,9 @@
 """A Markdown file dropped on the window: matched to its indexed copy by name, size and modified time, or rendered read-only.
 
 The page sends a dropped file's name, size and modified time (and, when no
-indexed copy matches, its text), never a path. Neither route reads the disk:
-the tests replace the reader's and the listing's seams with ones that fail.
+indexed copy matches, its text), never a path. With no hash from the page,
+neither route reads the disk: the tests replace the reader's and the listing's
+seams with ones that fail. The hash lookup is tests/docs/test_dropmatch.py.
 """
 
 from __future__ import annotations
@@ -96,7 +97,7 @@ def test_a_name_matches_whatever_its_case(client: TestClient, tree: Path) -> Non
     {"modified": (STAMP - 5) * 1000},
 ])
 def test_a_file_that_differs_in_name_size_or_time_is_unknown(client: TestClient, tree: Path, change: dict[str, Any]) -> None:
-    assert client.post(MATCH, json=_drop(tree / DOCS_FOLDER / "guide.md", **change)).json() == {"match": None}
+    assert client.post(MATCH, json=_drop(tree / DOCS_FOLDER / "guide.md", **change)).json() == {"match": None, "why": "not_confirmed"}
 
 
 def test_a_modified_time_a_browser_rounded_still_matches(client: TestClient, tree: Path) -> None:
@@ -108,14 +109,14 @@ def test_two_indexed_copies_are_not_a_match(client: TestClient, tree: Path) -> N
     twin = tree / DOCS_FOLDER / "sub" / "guide.md"
     shutil.copy2(tree / DOCS_FOLDER / "guide.md", twin)
     _scan(client)
-    assert client.post(MATCH, json=_drop(twin)).json() == {"match": None}
+    assert client.post(MATCH, json=_drop(twin)).json() == {"match": None, "why": "several"}
 
 
 def test_a_path_the_page_sends_is_never_used(client: TestClient, tree: Path, no_disk: None) -> None:
     body = _drop(tree / DOCS_FOLDER / "guide.md", path=str(tree / "elsewhere" / "other.md"), webkitRelativePath="x/other.md")
     assert client.post(MATCH, json=body).json() == {"match": _id(client, tree, "guide.md")}
     other = _drop(tree / DOCS_FOLDER / "guide.md", name="nothing.md", path=str(tree / DOCS_FOLDER / "guide.md"))
-    assert client.post(MATCH, json=other).json() == {"match": None}
+    assert client.post(MATCH, json=other).json() == {"match": None, "why": "not_confirmed"}
 
 
 @pytest.mark.parametrize("name", ["..\\guide.md", "sub/guide.md", "C:guide.md", "..", ""])

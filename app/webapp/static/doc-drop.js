@@ -1,11 +1,12 @@
 /* Open a Markdown or HTML file dropped on the window: in its own /doc window from the app, in place in the /doc window.
  *
  * A drop gives the page the file's bytes and name, never its path, so the
- * file is looked up by what the page knows: name, size and modified time
- * (``POST /api/doc/dropped/match``). One indexed copy opens like any other
- * document, with Edit; otherwise the page reads the text and has it rendered
- * read-only (``POST /api/doc/dropped/render``). A drop of anything else says
- * so in a toast. The host decides how each opens: ``host.open(loc)`` for an
+ * file is looked up by what the page knows: name, size, modified time and a
+ * SHA-256 of the bytes (``POST /api/doc/dropped/match``). The one file on this
+ * PC with those bytes, scanned or not, opens like any other document, with
+ * Edit; otherwise the page reads the text and has it rendered read-only
+ * (``POST /api/doc/dropped/render``) and a toast says why. A drop of anything
+ * else says so in a toast. The host decides how each opens: ``host.open(loc)`` for an
  * indexed document, ``host.show(doc)`` for a rendered one. A host with
  * ``ownWindow`` opens each in a new /doc window, like Explore's "Open in new
  * window"; if the browser blocks that window, the same two calls show it in
@@ -14,7 +15,7 @@
 
 import { api } from './api.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
-import { dragHasFiles, matchBody, pickDrop, renderBody } from './drop-files.js';
+import { dragHasFiles, matchBody, pickDrop, renderBody, toHex, whyNote } from './drop-files.js';
 import { docUrl } from './doc-view.js';
 import { handOff } from './doc-handoff.js';
 import { glyph } from './fmt.js';
@@ -34,9 +35,19 @@ async function post(path, body) {
   return res.ok ? { ok: true, body: data } : { ok: false, ...refusal(res.status, data) };
 }
 
-/** What a dropped ``file`` is: ``{kind: 'indexed', loc}``, ``{kind: 'dropped', doc}`` or ``{kind: 'refused', message}``. */
+/** The SHA-256 of the dropped bytes as hex, or '' where the browser has no Web Crypto (a page not served securely) or can't read the file. */
+async function digest(file) {
+  try {
+    if (!globalThis.crypto || !crypto.subtle) return '';
+    return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', await file.arrayBuffer())));
+  } catch (e) {
+    return '';
+  }
+}
+
+/** What a dropped ``file`` is: ``{kind: 'indexed', loc}``, ``{kind: 'dropped', doc, note}`` or ``{kind: 'refused', message}``. */
 export async function resolveDrop(file) {
-  const found = await post('/api/doc/dropped/match', matchBody(file));
+  const found = await post('/api/doc/dropped/match', matchBody(file, await digest(file)));
   if (!found.ok) return { kind: 'refused', message: found.message };
   if (found.body.match) return { kind: 'indexed', loc: { ...found.body.match, name: file.name } };
   let text;
@@ -46,7 +57,7 @@ export async function resolveDrop(file) {
     return { kind: 'refused', message: 'The browser could not read the dropped file' };
   }
   const shown = await post('/api/doc/dropped/render', renderBody(file, text));
-  return shown.ok ? { kind: 'dropped', doc: shown.body } : { kind: 'refused', message: shown.message };
+  return shown.ok ? { kind: 'dropped', doc: shown.body, note: whyNote(found.body.why) } : { kind: 'refused', message: shown.message };
 }
 
 function overlay() {
@@ -79,6 +90,7 @@ function showInWindow(popup, r) {
   if (r.kind === 'indexed') popup.location.href = docUrl(r.loc);
   else if (r.kind === 'dropped') handOff(popup, r.doc);
   else return false;
+  if (r.note) showToast(r.note);
   return true;
 }
 
@@ -132,7 +144,8 @@ export function initDrop(host) {
       else {
         // The sheet is open once the host answers, so the note goes on top of it.
         await (r.kind === 'indexed' ? host.open(r.loc) : host.show(r.doc));
-        if (host.ownWindow) toastAboveSheet(BLOCKED);
+        const notes = [r.note, host.ownWindow && BLOCKED].filter(Boolean);
+        if (notes.length) toastAboveSheet(notes.join(' '));
       }
     } finally {
       busy = false;

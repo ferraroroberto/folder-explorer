@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import re
 import threading
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 from src.docs import reader
 from src.folder_match import fold
@@ -35,8 +35,8 @@ def _matches(name: str, words: list[str]) -> bool:
     return all(w in folded for w in words)
 
 
-def match_dropped(sources: Sequence[Source], name: str, size: int, modified_ms: int) -> Optional[dict[str, Any]]:
-    """The one indexed file a dropped file is, by name, size and modified time, or None when none or several fit.
+def dropped_matches(sources: Sequence[Source], name: str, size: int, modified_ms: int) -> list[dict[str, Any]]:
+    """Every indexed file a dropped file could be by name, size and modified time, each as ``{root, scan_id, id}``.
 
     A browser reports the time in milliseconds and some round it, while the index keeps whole seconds:
     the times match within ``MTIME_SLACK_S``. Reads the index only; nothing the page sent is a path.
@@ -47,7 +47,7 @@ def match_dropped(sources: Sequence[Source], name: str, size: int, modified_ms: 
         with lock:
             hits = index.files_named(name, size)
         found.extend({"root": root.key, "scan_id": scan["id"], "id": h["id"]} for h in hits if abs(h["mtime"] - wanted) <= MTIME_SLACK_S)
-    return found[0] if len(found) == 1 else None
+    return found
 
 
 def search(sources: Sequence[Source], query: str, show_hidden: bool, offset: int = 0, limit: int = PAGE) -> dict[str, Any]:

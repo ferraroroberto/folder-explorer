@@ -188,7 +188,7 @@ def test_a_dropped_html_file_opens_its_own_window_editable_or_read_only(page: Pa
     expect(win.frame_locator("#docBody iframe.doc-frame").locator("h1")).to_have_text("Loose page")
     expect(win.locator(".doc-modebar")).to_be_hidden()
 
-    allowed = {"match": {"name", "size", "modified"}, "render": {"name", "text"}}
+    allowed = {"match": {"name", "size", "modified", "sha256"}, "render": {"name", "text"}}
     assert [route for route, _ in sent] == ["match", "match", "render"]
     for route, body in sent:
         assert set(body) == allowed[route], (route, sorted(body))

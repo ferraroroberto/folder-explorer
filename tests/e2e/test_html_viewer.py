@@ -18,12 +18,10 @@ import pytest
 from playwright.sync_api import FrameLocator, Page, Request, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
-from tests.fixture_tree import DOCS_FOLDER
+from tests.fixture_tree import PAGES_FOLDER
 
 # What drawDoc gives the frame (doc-view.js FRAME_SANDBOX): scripts and popups, never the app's origin.
 SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox"
-# On the phone the folder's rows scroll in the contents sheet's own box under the document sheet; a row below that fold is not off the screen.
-CONTENTS_SCROLLER = {"#contentsDialog .row-kebab": "below the fold of the contents sheet's own scroller"}
 DROP = """({ name, size, modified, text }) => {
   const file = new File([text === null ? new Uint8Array(size) : text], name, { lastModified: modified });
   Object.defineProperty(file, 'path', { value: 'C:\\\\Invented\\\\Elsewhere\\\\' + name });
@@ -63,8 +61,8 @@ def _file(page: Page, app_url: str, name: str) -> dict[str, Any]:
     """An invented file's place, size and modified time, read from the app's own listing."""
     root = next(r for r in page.request.get(app_url + "/api/roots").json()["roots"] if r["name"].startswith("Media disk"))
     top = page.request.get(app_url + "/api/folder?" + urlencode({"root": root["key"]})).json()
-    notes = next(it["id"] for it in top["items"] if it["name"] == DOCS_FOLDER)
-    body = page.request.get(app_url + "/api/folder?" + urlencode({"root": root["key"], "folder": notes})).json()
+    pages = next(it["id"] for it in top["items"] if it["name"] == PAGES_FOLDER)
+    body = page.request.get(app_url + "/api/folder?" + urlencode({"root": root["key"], "folder": pages})).json()
     item = next(it for it in body["items"] if it["name"] == name)
     return {"root": root["key"], "scan": body["scan_id"], "id": item["id"], "size": item["size"], "modified": item["mtime"] * 1000}
 
@@ -103,8 +101,11 @@ def test_an_html_row_opens_in_the_sheet_walled_off_and_in_its_own_window(page: P
     expect(page.locator("#rootSelect option", has_text="Media disk")).to_have_count(1)
     media = page.eval_on_selector("#rootSelect", "s => [...s.options].find(o => o.text.startsWith('Media disk')).value")
     page.locator("#rootSelect").select_option(media)
-    page.locator(".tree-main", has_text=DOCS_FOLDER).click()
     rows = page.locator("#contentsDialog" if browser_name == "webkit" else "#contentsDock")
+    # The tree lists only the largest folders; the small pages folder is reached from the root's contents.
+    if browser_name == "webkit":
+        page.locator(".tree-main").first.click()
+    rows.locator(".list-row", has_text=PAGES_FOLDER).click()
     row = rows.locator(".list-row", has_text="page.html")
     expect(row.locator(".doc-badge")).to_have_text("HTML")
     if browser_name == "webkit":
@@ -119,7 +120,7 @@ def test_an_html_row_opens_in_the_sheet_walled_off_and_in_its_own_window(page: P
     _walled_off(page, sheet.frame_locator("#docSheetBody iframe.doc-frame"), calls)
     for theme in ("light", "dark"):
         page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
-        assert_layout_clean(page, allow=CONTENTS_SCROLLER)
+        assert_layout_clean(page)
 
     window = sheet.locator("#docWindow").get_attribute("href") or ""
     assert "id=" in window

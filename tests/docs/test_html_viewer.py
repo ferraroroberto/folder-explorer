@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from app.webapp.server import app
 from src import winfs
 from src.docs import reader
-from tests.fixture_tree import DOCS_FOLDER, PAGE_CSS, PAGE_JS, SKETCH_HTML, TINY_PNG
+from tests.fixture_tree import PAGE_CSS, PAGE_JS, PAGES_FOLDER, SKETCH_HTML, TINY_PNG
 
 LOCAL = ("127.0.0.1", 50000)
 
@@ -108,7 +108,7 @@ def test_an_html_file_edits_with_the_same_version_check(docs: dict[str, Any]) ->
         assert saved.status_code == 200, saved.text
         stale = c.post("/api/doc/save", json={**where, "text": "<p>Third.</p>\n", "version": src["version"]})
     assert stale.status_code == 409 and stale.json()["reason"] == "conflict"
-    assert (Path(docs["path"]) / DOCS_FOLDER / "sketch.htm").read_text(encoding="utf-8") == "<p>Second draft.</p>\n"
+    assert (Path(docs["path"]) / PAGES_FOLDER / "sketch.htm").read_text(encoding="utf-8") == "<p>Second draft.</p>\n"
 
 
 def test_a_dropped_html_file_renders_read_only_with_nothing_inlined(docs: dict[str, Any]) -> None:

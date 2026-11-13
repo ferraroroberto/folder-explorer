@@ -120,8 +120,11 @@ Back to the [guide](../guide.md).
 JOURNAL_MD = b"# Journal\n\nFirst entry.\n"
 # One byte past the viewer's 2 MB cap.
 BIG_MD_BYTES = 2 * 1024 * 1024 + 1
-# An invented HTML page: a stylesheet, a script and an image beside it, every link rule, and a probe
-# that records in its own body whether it could reach the app's page, cookies or API.
+# The invented HTML pages sit in a folder of their own, so the Markdown notes' folder keeps its rows,
+# and the page's image and link into the notes cross folders.
+PAGES_FOLDER = "Pages"
+# An invented HTML page: a stylesheet and a script beside it, an image and a link in the notes, every link
+# rule, and a probe that records in its own body whether it could reach the app's page, cookies, storage or API.
 PAGE_HTML = """<!doctype html>
 <html><head><title>Invented page</title>
 <base href="https://example.invalid/">
@@ -130,9 +133,9 @@ PAGE_HTML = """<!doctype html>
 </head><body>
 <h1 id="top">Invented page</h1>
 <p class="styled">Styled by the stylesheet beside it.</p>
-<img alt="Bed plan" src="diagram.png">
+<img alt="Bed plan" src="../Notes/diagram.png">
 <img alt="Escaped" src="../../outside.png">
-<p><a href="guide.md">The guide</a>, <a href="missing.html">a missing page</a>,
+<p><a href="../Notes/guide.md">The guide</a>, <a href="missing.html">a missing page</a>,
 <a href="../../elsewhere.html">an escape</a>, <a href="https://example.invalid/x">the web</a>, <a href="#top">the top</a>.</p>
 <script>
 (async () => {
@@ -161,7 +164,7 @@ SKETCH_HTML = b"<!doctype html>\n<h1>Sketch</h1>\n<p>First draft.</p>\n"
 
 def add_docs(root: Path) -> Path:
     """Write the invented notes under ``root``: a guide, a page it links to, a journal to edit, an image, an oversize file,
-    and an HTML page with its stylesheet and script plus an HTML sketch to edit."""
+    and, in their own folder, an HTML page with its stylesheet and script plus an HTML sketch to edit."""
     folder = root / DOCS_FOLDER
     (folder / "sub").mkdir(parents=True, exist_ok=True)
     (folder / "guide.md").write_text(GUIDE_MD, encoding="utf-8")
@@ -169,8 +172,10 @@ def add_docs(root: Path) -> Path:
     (folder / "journal.md").write_bytes(JOURNAL_MD)
     (folder / "diagram.png").write_bytes(TINY_PNG)
     (folder / "big.md").write_bytes(b"#" * BIG_MD_BYTES)
-    (folder / "page.html").write_bytes(PAGE_HTML.encode("utf-8"))
-    (folder / "page.css").write_bytes(PAGE_CSS.encode("utf-8"))
-    (folder / "page.js").write_bytes(PAGE_JS.encode("utf-8"))
-    (folder / "sketch.htm").write_bytes(SKETCH_HTML)
+    pages = root / PAGES_FOLDER
+    pages.mkdir(exist_ok=True)
+    (pages / "page.html").write_bytes(PAGE_HTML.encode("utf-8"))
+    (pages / "page.css").write_bytes(PAGE_CSS.encode("utf-8"))
+    (pages / "page.js").write_bytes(PAGE_JS.encode("utf-8"))
+    (pages / "sketch.htm").write_bytes(SKETCH_HTML)
     return root

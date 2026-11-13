@@ -179,7 +179,7 @@ def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_
     rows = page.locator("#results .result-row")
     expect(page.locator("#modeSeg .segmented-item[aria-pressed=true]")).to_have_text("Documents")
     expect(page.locator("#resultsTitle")).to_contain_text("Documents")
-    expect(page.locator("#resultsMeta")).to_have_text("6 documents")
+    expect(page.locator("#resultsMeta")).to_have_text("6 files")
     names = [r.locator(".rr-who").inner_text().strip() for r in rows.all()]
     assert sorted(names) == ["big.md", "guide.md", "journal.md", "page.html", "sketch.htm", "watering.md"]
     expect(rows.filter(has_text="watering.md").locator(".rr-snip")).to_contain_text(DOCS_FOLDER + " › sub")
@@ -197,7 +197,7 @@ def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_
     page.locator("#q").fill("gui")
     expect(rows).to_have_count(1)
     expect(rows.first).to_contain_text("guide.md")
-    expect(page.locator("#resultsMeta")).to_have_text("1 document")
+    expect(page.locator("#resultsMeta")).to_have_text("1 file")
     assert "q=gui" in page.url
     page.locator("#q").fill("gui jour")
     expect(page.locator("#results .empty-state-message")).to_contain_text("No document name matches")
@@ -219,10 +219,10 @@ def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_
         expect(sheet.locator("#docSave")).to_be_visible()
         sheet.locator("[data-close]").click()
 
-    # An HTML hit opens in the same viewer, drawn in its sandboxed frame.
-    rows.filter(has_text="page.html").click()
-    expect(sheet.locator("#docDialogTitle")).to_have_text("page.html")
-    expect(sheet.frame_locator("#docSheetBody iframe.doc-frame").locator("h1")).to_have_text("Invented page")
+    # An HTML hit opens in the same viewer, drawn in its sandboxed frame (the sketch: the probe page's refused calls are its own test).
+    rows.filter(has_text="sketch.htm").click()
+    expect(sheet.locator("#docDialogTitle")).to_have_text("sketch.htm")
+    expect(sheet.frame_locator("#docSheetBody iframe.doc-frame").locator("h1")).to_have_text("Sketch")
     sheet.locator("[data-close]").click()
     expect(sheet).to_be_hidden()
 

@@ -317,7 +317,9 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     assert "mode=folders" in page.url
     page.locator("#q").fill("harbour")
     expect(page.locator("#results .result-row").first).to_contain_text("harbour")
-    page.locator('#modeSeg .segmented-item[data-value="emails"]').click()
+    # The first mail's preview fetch starts with the mode; navigating on before it answers cancels it, which WebKit logs as a page error.
+    with page.expect_response(re.compile(r"/api/emails/\d+\?")):
+        page.locator('#modeSeg .segmented-item[data-value="emails"]').click()
     expect(page.locator("#resultsTitle")).to_contain_text("Emails")
 
     # It survives a reload, and a link to the Markdown mode lands on Folders.

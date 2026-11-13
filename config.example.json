@@ -35,6 +35,9 @@
   "tray": {
     "left_click": "quick_search"
   },
+  "quick_search": {
+    "open_folder": true
+  },
   "archive": {
     "date_prefix": false,
     "max_path_length": 255,

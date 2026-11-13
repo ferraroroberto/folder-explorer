@@ -14,6 +14,7 @@ import queue
 import threading
 from typing import TYPE_CHECKING, Callable, Optional
 
+from src import config
 from src.search_window.client import SearchClient
 
 if TYPE_CHECKING:
@@ -23,6 +24,14 @@ logger = logging.getLogger(__name__)
 
 # How often the Tk thread looks for a show request from the tray's thread.
 SHOW_POLL_MS = 100
+
+
+def _remember_open_folder(on: bool) -> None:
+    """Keep the Emails tab's "Open folder" choice in config.json, so the next start has it as it was left."""
+    try:
+        config.save({"quick_search": {"open_folder": on}})
+    except (OSError, ValueError):
+        logger.exception("❌ quick search: couldn't remember the Open folder choice")
 
 
 class QuickSearch:
@@ -52,7 +61,8 @@ class QuickSearch:
 
         try:
             if self._model is None:
-                self._model = QuickSearchModel(self.client)
+                self._model = QuickSearchModel(self.client, open_folder=config.load()["quick_search"]["open_folder"],
+                                               on_open_folder=_remember_open_folder)
             view = QuickSearchView(self._model, palette(self.dark))
             view.build()
 

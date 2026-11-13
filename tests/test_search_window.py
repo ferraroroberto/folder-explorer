@@ -192,12 +192,53 @@ def test_open_goes_through_the_apps_routes_by_id(api: TestClient, monkeypatch: p
     monkeypatch.setattr(search_routes, "ensure_there", lambda *a, **k: None)
     monkeypatch.setattr(search_routes, "open_in_explorer", lambda path, *a: folders.append(path))
     monkeypatch.setattr(search_routes, "open_in_outlook", mails.append)
-    model = QuickSearchModel(_client(api), query="harbour")
+    model = QuickSearchModel(_client(api), query="harbour", open_folder=False)
     model.run()
     assert model.open() == (True, "Opened in File Explorer") and folders[0].endswith("harbour-trip")
     model.tab, model.query = EMAIL_TAB, "invoice"
     model.run()
     assert model.open(0) == (True, "Opening in Outlook") and mails[0].endswith(".msg")
+
+
+def test_an_email_opens_its_folder_by_default_and_never_the_mail(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    shown: list[tuple[str, str]] = []
+    mails: list[str] = []
+    monkeypatch.setattr(search_routes, "open_item", lambda path, verb, *a: shown.append((path, verb)))
+    monkeypatch.setattr(search_routes, "open_in_outlook", mails.append)
+    model = QuickSearchModel(_client(api), tab=EMAIL_TAB, query="invoice")
+    assert model.open_folder is True
+    model.run()
+    assert model.open(0) == (True, "Opened the folder")
+    assert len(shown) == 1 and shown[0][0].endswith(".msg") and shown[0][1] == "reveal" and mails == []
+
+
+def test_the_folders_tab_ignores_the_open_folder_toggle(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    folders: list[str] = []
+    monkeypatch.setattr(search_routes, "ensure_there", lambda *a, **k: None)
+    monkeypatch.setattr(search_routes, "open_in_explorer", lambda path, *a: folders.append(path))
+    for on in (True, False):
+        model = QuickSearchModel(_client(api), query="harbour", open_folder=on)
+        model.run()
+        assert model.open() == (True, "Opened in File Explorer")
+    assert len(folders) == 2
+
+
+def test_the_toggle_tells_its_owner_so_the_choice_can_be_kept() -> None:
+    told: list[bool] = []
+    model = QuickSearchModel(SearchClient(lambda: ""), on_open_folder=told.append)
+    model.set_open_folder(False)
+    model.set_open_folder(True)
+    assert told == [False, True] and model.open_folder is True
+
+
+def test_a_missing_mail_file_still_says_it_is_no_longer_there(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    shown: list[str] = []
+    monkeypatch.setattr(search_routes, "open_item", lambda path, verb, *a: shown.append(path))
+    model = QuickSearchModel(_client(api), tab=EMAIL_TAB, query="invoice")
+    model.run()
+    Path(model.current().path).unlink()
+    ok, text = model.open(0)
+    assert ok is False and "no longer there" in text and shown == []
 
 
 def test_a_refused_open_says_so_and_keeps_the_window(api: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -244,6 +285,24 @@ def test_the_tray_left_click_setting_defaults_to_quick_search_and_saves(api: Tes
     saved = api.post("/api/config", json={"tray": {"left_click": "open_app"}})
     assert saved.status_code == 200 and saved.json()["config"]["tray"] == {"left_click": "open_app"}
     assert config.load()["tray"] == {"left_click": "open_app"}
+
+
+def test_the_quick_search_setting_defaults_on_saves_and_refuses_anything_else(api: TestClient) -> None:
+    assert config.DEFAULTS["quick_search"] == {"open_folder": True} and config.load()["quick_search"] == {"open_folder": True}
+    for bad in ({"open_folder": "yes"}, {"open_folder": 1}, {"open_folder": False, "other": 1}, {}, "off"):
+        assert api.post("/api/config", json={"quick_search": bad}).status_code == 400
+    saved = api.post("/api/config", json={"quick_search": {"open_folder": False}})
+    assert saved.status_code == 200 and saved.json()["config"]["quick_search"] == {"open_folder": False}
+    assert config.load()["quick_search"] == {"open_folder": False}
+
+
+def test_the_window_remembers_the_toggle_in_config(isolated: Path) -> None:
+    from src.search_window import _remember_open_folder
+
+    _remember_open_folder(False)
+    assert config.load()["quick_search"] == {"open_folder": False}
+    _remember_open_folder(True)
+    assert config.load()["quick_search"] == {"open_folder": True}
 
 
 def test_the_tray_default_item_follows_the_setting_at_click_time(isolated: Path) -> None:

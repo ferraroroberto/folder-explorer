@@ -126,6 +126,27 @@ def test_enter_searches_a_query_not_yet_answered_then_opens_and_hides(window: tu
     assert hidden == ["withdraw"]
 
 
+def test_the_open_folder_toggle_shows_on_the_emails_tab_only_and_steers_enter(window: tuple[QuickSearchView, FakeApi],
+                                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    view, fake = window
+    monkeypatch.setattr(view.root, "withdraw", lambda: None)
+    told: list[bool] = []
+    view.model.on_open_folder = told.append
+    assert not view.folder_toggle.winfo_manager(), "the Folders tab has no toggle"
+    view.query.set("budget")
+    view.switch(EMAILS)
+    _settle(view)
+    assert view.folder_toggle.winfo_manager() and view.folder_toggle.cget("text") == "Open folder" and view.open_folder.get() is True
+    view.enter()
+    assert fake.calls[-1][1] == "/api/emails/4/reveal"
+    view.folder_toggle.invoke()
+    assert told == [False] and view.model.open_folder is False
+    view.enter()
+    assert fake.calls[-1][1] == "/api/emails/4/open"
+    view.switch("folders")
+    assert not view.folder_toggle.winfo_manager()
+
+
 def test_copy_path_puts_the_whole_path_on_the_clipboard(window: tuple[QuickSearchView, FakeApi]) -> None:
     view, _ = window
     view.query.set("harbour")

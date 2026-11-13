@@ -146,6 +146,27 @@ def test_pc_only_actions_refuse_other_devices(setup: Path, monkeypatch: pytest.M
     assert len(opened) == 1
 
 
+def test_reveal_shows_the_mail_file_on_the_pc_only_and_opens_no_mail(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FOLDER_EXPLORER_PASSWORD", "invented-password")
+    monkeypatch.setenv("FOLDER_EXPLORER_TOKEN", "invented-token")
+    shown: list[tuple[str, str]] = []
+    opened: list[str] = []
+    monkeypatch.setattr(search_routes, "open_item", lambda path, verb, *a: shown.append((path, verb)))
+    monkeypatch.setattr(search_routes, "open_in_outlook", opened.append)
+    auth = {"Authorization": "Bearer invented-token"}
+    with TestClient(app, client=REMOTE) as c:
+        row = c.get("/api/search/emails", headers=auth).json()["hits"][0]["id"]
+        assert c.post("/api/emails/%d/reveal" % row, headers=auth).status_code == 403
+    assert shown == []
+    with TestClient(app, client=LOCAL) as c:
+        assert c.post("/api/emails/%d/reveal" % row).json() == {"status": "opened"}
+        assert c.post("/api/emails/999999/reveal").status_code == 404
+        Path(c.get("/api/emails/%d" % row).json()["path"]).unlink()
+        gone = c.post("/api/emails/%d/reveal" % row)
+        assert gone.status_code == 410 and "no longer there" in gone.json()["detail"]
+    assert len(shown) == 1 and shown[0][0].endswith(".msg") and shown[0][1] == "reveal" and opened == []
+
+
 def test_find_in_mailbox_asks_the_bridge_by_message_id_on_the_pc_only(setup: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FOLDER_EXPLORER_PASSWORD", "invented-password")
     monkeypatch.setenv("FOLDER_EXPLORER_TOKEN", "invented-token")

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Callable, Optional, Protocol, Union
 
 from src.archive_window.model import mail_date, plural, win_path
 from src.search_window.client import ApiError, SearchClient, Unreachable
@@ -196,6 +196,15 @@ class QuickSearchModel:
     query: str = ""
     answer: Optional[Answer] = None
     selected: int = 0
+    # The Emails tab's "Open folder" toggle: on, opening a mail shows its folder; off, it opens the mail in Outlook.
+    open_folder: bool = True
+    # Told the new value when the toggle changes, so the owner of the window can remember it across restarts.
+    on_open_folder: Optional[Callable[[bool], None]] = None
+
+    def set_open_folder(self, on: bool) -> None:
+        self.open_folder = on
+        if self.on_open_folder is not None:
+            self.on_open_folder(on)
 
     @property
     def status(self) -> Status:
@@ -250,6 +259,9 @@ class QuickSearchModel:
             if row.kind == FOLDERS:
                 self.client.open_folder(row.target["root"], row.target["scan_id"], row.target["id"])
                 return True, "Opened in File Explorer"
+            if self.open_folder:
+                self.client.reveal_email(row.target["id"])
+                return True, "Opened the folder"
             self.client.open_email(row.target["id"])
             return True, "Opening in Outlook"
         except Unreachable as exc:

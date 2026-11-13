@@ -219,6 +219,13 @@ def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_
         expect(sheet.locator("#docSave")).to_be_visible()
         sheet.locator("[data-close]").click()
 
+    # An HTML hit opens in the same viewer, drawn in its sandboxed frame.
+    rows.filter(has_text="page.html").click()
+    expect(sheet.locator("#docDialogTitle")).to_have_text("page.html")
+    expect(sheet.frame_locator("#docSheetBody iframe.doc-frame").locator("h1")).to_have_text("Invented page")
+    sheet.locator("[data-close]").click()
+    expect(sheet).to_be_hidden()
+
     # A cloud-only file opens to the viewer's own refusal, and the list never read it.
     page.route("**/api/doc?*", lambda route: route.fulfill(
         status=423, content_type="application/json", body=json.dumps({"detail": "Only in OneDrive", "reason": "cloud_only"})))

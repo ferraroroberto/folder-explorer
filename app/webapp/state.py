@@ -8,7 +8,7 @@ from contextlib import ExitStack
 from typing import Any, Optional
 
 from src import folder_search, store
-from src.docs import listing
+from src.docs import dropmatch, listing
 from src.email.search import EmailIndexHolder
 from src.email.settings import is_under, under_any
 from src.folder_search import item_path
@@ -102,10 +102,13 @@ def doc_hits(cfg: dict[str, Any], q: str, offset: int, limit: int) -> dict[str, 
     return listing.search(sources, q, cfg["explore"]["show_hidden"], offset, limit)
 
 
-def dropped_doc(cfg: dict[str, Any], name: str, size: int, modified_ms: int) -> Optional[dict[str, Any]]:
-    """The indexed document a dropped file is (``{root, scan_id, id}``), or None: ``POST /api/doc/dropped/match``. Reads no disk."""
+def dropped_doc(cfg: dict[str, Any], name: str, size: int, modified_ms: int, digest: Optional[str], on_pc: bool) -> dict[str, Any]:
+    """The document a dropped file is, ``{match: {root, scan_id, id}}``, or ``{match: None, why}``: ``POST /api/doc/dropped/match``.
+
+    Reads the index; when ``digest`` is given and the caller is this PC it also reads candidate files through the reader.
+    """
     sources = [(root, scan, index, lock) for root, scan, (index, lock) in _open_scans(cfg)]
-    return listing.match_dropped(sources, name, size, modified_ms)
+    return dropmatch.lookup(sources, name, size, modified_ms, digest, on_pc)
 
 
 def _subfolders(cfg: dict[str, Any], root: Root, scan: dict[str, Any], path: str, fid: int) -> list[dict[str, Any]]:

@@ -413,6 +413,25 @@ class Index:
         ).fetchall()
         return [{**self._file(r), "folder_id": int(r["folder_id"])} for r in rows]
 
+    def files_called(self, name: str) -> list[dict[str, Any]]:
+        """Every file called ``name`` (any case), whatever its size, each with its ``folder_id``."""
+        rows = self.conn.execute("SELECT rowid id, * FROM files WHERE name = ? COLLATE NOCASE", (name,)).fetchall()
+        return [{**self._file(r), "folder_id": int(r["folder_id"])} for r in rows]
+
+    def doc_folders(self, exts: Sequence[str]) -> list[tuple[int, int]]:
+        """``(folder id, newest modified time)`` of every folder holding a file of one of ``exts``, newest first."""
+        rows = self.conn.execute(
+            "SELECT folder_id, MAX(mtime) m FROM files WHERE ext IN (%s) GROUP BY folder_id ORDER BY m DESC, folder_id"
+            % ",".join("?" * len(exts)), list(exts)).fetchall()
+        return [(int(r["folder_id"]), int(r["m"])) for r in rows]
+
+    def folders_without(self, exts: Sequence[str], limit: int) -> list[int]:
+        """The ids, in scan order, of up to ``limit`` folders that hold no file of ``exts``."""
+        rows = self.conn.execute(
+            "SELECT id FROM folders WHERE id NOT IN (SELECT DISTINCT folder_id FROM files WHERE ext IN (%s)) ORDER BY id LIMIT ?"
+            % ",".join("?" * len(exts)), [*exts, limit]).fetchall()
+        return [int(r["id"]) for r in rows]
+
     def types(self, fid: int, basis: str) -> dict[str, Any]:
         """Bytes, file count and share per extension under the folder, heaviest first."""
         key = (fid, basis)

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request
@@ -271,6 +272,10 @@ def _name(value: object) -> Optional[str]:
     return value if not any(c in value for c in "\\/:") else None
 
 
+# What the page's Web Crypto digest looks like once written as hex.
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
 def _count(body: dict[str, Any], key: str) -> int:
     """A whole number from a request, never a bool and never negative."""
     value = body.get(key)
@@ -289,22 +294,35 @@ def _dropped_name(body: dict[str, Any]) -> str:
     return name
 
 
-@router.post("/dropped/match")
-def dropped_match(body: dict[str, Any] = Body(...)) -> Any:
-    """Is a file dropped on the window one the scan has: ``{match: {root, scan_id, id} | null}``.
+def _digest(body: dict[str, Any]) -> Optional[str]:
+    """The SHA-256 the page sent for the dropped bytes (64 lower-case hex digits), or None when it sent none."""
+    value = body.get("sha256")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _SHA256.fullmatch(value):
+        raise HTTPException(422, "sha256 must be 64 lower-case hex digits")
+    return value
 
-    The page sends the file's name, size and modified time (milliseconds), never a path.
-    Exactly one indexed Markdown file of that name, size and time is a match; none or
-    several is ``null`` and the page renders the dropped text read-only instead.
+
+@router.post("/dropped/match")
+def dropped_match(request: Request, body: dict[str, Any] = Body(...)) -> Any:
+    """Is a file dropped on the window one on this PC: ``{match: {root, scan_id, id} | null, why?}``.
+
+    The page sends the file's name, size, modified time (milliseconds) and a SHA-256 of its bytes, never a
+    path. One indexed document of that name, size and time matches from the index alone. Otherwise, for a
+    caller on this PC, the indexed files of that name and the scanned folders are searched for exactly
+    one file with those bytes (``src/docs/dropmatch.py``). No match is ``null`` with ``why`` (``several``,
+    ``not_found`` or ``not_confirmed``) and the page renders the dropped text read-only instead.
     """
     try:
         name = _dropped_name(body)
         size, modified = _count(body, "size"), _count(body, "modified")
     except _Refusal as exc:
         return _refuse(exc.reason)
+    digest = _digest(body)
     if size > reader.DOC_MAX_BYTES:
         return _refuse("too_large")
-    return {"match": state.dropped_doc(config.load(), name, size, modified)}
+    return state.dropped_doc(config.load(), name, size, modified, digest, is_pc_itself(request))
 
 
 @router.post("/dropped/render")

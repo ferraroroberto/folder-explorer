@@ -1,4 +1,4 @@
-"""The Markdown viewer and editor: a document rendered, its source, a draft's preview and a save, each by root, scan id and item id.
+"""The document viewer and editor (Markdown, and HTML in a sandboxed frame): a document rendered, its source, a draft's preview and a save, each by root, scan id and item id.
 
 Any signed-in device may view and edit. The path is rebuilt from the root's current
 scan, never taken from the client, and every byte comes through
@@ -23,6 +23,7 @@ from app.webapp.auth import is_pc_itself
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, store, winfs
 from src.docs import reader, writer
+from src.docs.html_frame import frame
 from src.docs.locate import find_item, resolve_href
 from src.docs.render import render
 from src.roots import Root, resolve_roots
@@ -108,24 +109,66 @@ def _found_item(root_key: str, scan_id: object, item_id: int) -> tuple[Root, dic
     return root, scan, os.path.join(folder_path, entry.name), record
 
 
-def _lookup(root: Root, scan: dict[str, Any], doc_path: str, wanted: Callable[[str], bool], kind: str
-            ) -> Callable[[str], tuple[Any, str]]:
-    """A renderer lookup: a relative address in the document to the scanned file it names, or why it has none."""
+_UNWANTED = {"link": "Only Markdown and HTML files open here", "image": "Not an image this viewer shows",
+             "css": "Not a stylesheet", "js": "Not a script"}
+_WANTED: dict[str, Callable[[str], bool]] = {
+    "link": reader.is_document, "image": reader.is_image,
+    "css": lambda p: p.lower().endswith(".css"), "js": lambda p: p.lower().endswith(".js")}
+
+
+def _scanned_file(root: Root, scan: dict[str, Any], doc_path: str, href: str, kind: str
+                  ) -> tuple[Optional[tuple[str, dict[str, Any]]], str]:
+    """The scanned file a relative address in the document names (its path and index row), or why it has none."""
+    path = resolve_href(root.path, doc_path, href)
+    if path is None:
+        return None, "Points outside this folder tree"
+    if not _WANTED[kind](path):
+        return None, _UNWANTED[kind]
     index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        hit = find_item(root.path, index, path)
+    if hit is None:
+        return None, "Not in the last scan"
+    return (path, hit), ""
+
+
+def _lookup(root: Root, scan: dict[str, Any], doc_path: str, kind: str) -> Callable[[str], tuple[Any, str]]:
+    """A renderer lookup: a relative address in the document to the scanned file it names by id, or why it has none."""
 
     def find(href: str) -> tuple[Any, str]:
-        path = resolve_href(root.path, doc_path, href)
-        if path is None:
-            return None, "Points outside this folder tree"
-        if not wanted(path):
-            return None, "Only Markdown files open here" if kind == "link" else "Not an image this viewer shows"
-        with lock:
-            hit = find_item(root.path, index, path)
-        if hit is None:
-            return None, "Not in the last scan"
-        return {"root": root.key, "scan_id": scan["id"], "id": hit["id"], "online": hit["online"]}, ""
+        found, why = _scanned_file(root, scan, doc_path, href, kind)
+        if found is None:
+            return None, why
+        return {"root": root.key, "scan_id": scan["id"], "id": found[1]["id"], "online": found[1]["online"]}, ""
 
     return find
+
+
+def _assets(root: Root, scan: dict[str, Any], doc_path: str) -> Callable[[str, str], tuple[Optional[bytes], str]]:
+    """The HTML frame's asset lookup: a stylesheet, script or image beside the page, its bytes and type, never downloaded."""
+
+    def asset(href: str, kind: str) -> tuple[Optional[bytes], str]:
+        found, why = _scanned_file(root, scan, doc_path, href, kind)
+        if found is None:
+            return None, why
+        path, hit = found
+        ext = os.path.splitext(path)[1].lower()
+        try:
+            if kind == "image":
+                return reader.read_image(path, hit["online"]), reader.IMAGE_TYPES[ext]
+            return reader.read_asset(path, hit["online"]), reader.ASSET_TYPES[ext]
+        except reader.Refused as exc:
+            return None, exc.message
+
+    return asset
+
+
+def _shown(root: Root, scan: dict[str, Any], path: str, text: str, lines: bool = False) -> dict[str, Any]:
+    """A document's text as the page draws it: an HTML page's frame, or Markdown rendered with its outline."""
+    if reader.is_html(path):
+        return frame(text, _lookup(root, scan, path, "link"), _assets(root, scan, path),
+                     config.load()["docs"]["block_remote_html"])
+    return {**render(text, _lookup(root, scan, path, "link"), _lookup(root, scan, path, "image"), lines=lines), "kind": "markdown"}
 
 
 def _document(root_key: str, scan_id: object, item_id: object, download: bool) -> Any:
@@ -138,7 +181,7 @@ def _document(root_key: str, scan_id: object, item_id: object, download: bool) -
         return _refuse(exc.reason)
     store.touch_recent(root.key, record["folder"][1:] + [record["name"]])
     text = data.decode("utf-8-sig", errors="replace")
-    body = render(text, _lookup(root, scan, path, reader.is_document, "link"), _lookup(root, scan, path, reader.is_image, "image"))
+    body = _shown(root, scan, path, text)
     return {"name": record["name"], "root": root.key, "scan_id": scan["id"], "id": record["id"], "size": len(data),
             "mtime": record["mtime"], "folder": record["folder"], **body}
 
@@ -156,7 +199,7 @@ def _image(root_key: str, scan_id: object, item_id: object, download: bool) -> R
 
 @router.get("")
 def document(root: str, scan: int, id: int = Query(...)) -> Any:  # noqa: A002 - the page's own query name
-    """One Markdown file rendered: ``{name, folder, html, outline, ...}``, or a refusal with its ``reason``."""
+    """One document drawn: ``{name, folder, html, outline, kind, ...}``, or a refusal with its ``reason``."""
     return _document(root, scan, id, download=False)
 
 
@@ -183,7 +226,7 @@ def source(root: str, scan: int, id: int = Query(...)) -> Any:  # noqa: A002
     """The editor's text and the version a save is checked against, or why this file opens read-only."""
     try:
         _root, _scan, path, record = _item(root, scan, id)
-        return writer.source(path, record["online"])
+        return {**writer.source(path, record["online"]), "kind": "html" if reader.is_html(path) else "markdown"}
     except _Refusal as exc:
         return _refuse(exc.reason)
     except reader.Refused as exc:
@@ -200,8 +243,7 @@ def render_draft(body: dict[str, Any] = Body(...)) -> Any:
         root, scan, path, _record = _item(str(body.get("root")), body.get("scan_id"), body.get("id"))
     except _Refusal as exc:
         return _refuse(exc.reason)
-    return render(text, _lookup(root, scan, path, reader.is_document, "link"), _lookup(root, scan, path, reader.is_image, "image"),
-                  lines=True)
+    return _shown(root, scan, path, text, lines=True)
 
 
 @router.post("/save")
@@ -238,7 +280,7 @@ def _count(body: dict[str, Any], key: str) -> int:
 
 
 def _dropped_name(body: dict[str, Any]) -> str:
-    """The name of a file the page was handed by a drop: a bare name, never a path, and a Markdown one."""
+    """The name of a file the page was handed by a drop: a bare name, never a path, and a document's (Markdown or HTML)."""
     name = _name(body.get("name"))
     if name is None:
         raise HTTPException(422, "name must be a file name, not a path")
@@ -278,8 +320,13 @@ def dropped_render(body: dict[str, Any] = Body(...)) -> Any:
     text = _text(body, "text")
     if len(text.encode("utf-8")) > reader.DOC_MAX_BYTES:
         return _refuse("too_large")
-    rendered = render(text, lambda _href: (None, "Open the file from its folder to follow relative links"),
-                      lambda _src: (None, "Open the file from its folder to show its images"))
+    no_link = "Open the file from its folder to follow relative links"
+    if reader.is_html(name):
+        rendered = frame(text, lambda _href: (None, no_link), lambda _src, _kind: (None, "Open the file from its folder to load it"),
+                         config.load()["docs"]["block_remote_html"])
+    else:
+        rendered = {**render(text, lambda _href: (None, no_link), lambda _src: (None, "Open the file from its folder to show its images")),
+                    "kind": "markdown"}
     logger.info("ℹ️ a dropped %s file rendered read-only (no indexed copy)", os.path.splitext(name)[1].lower())
     return {"name": name, "dropped": True, "folder": [], "size": len(text.encode("utf-8")), **rendered}
 

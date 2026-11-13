@@ -5,6 +5,11 @@ device must carry ``Authorization: Bearer <token>``; the page gets the token
 by posting the password to ``/api/login`` through the vendored sign-in sheet.
 The page shells (``/`` and the document window ``/doc``), static assets, ``/healthz`` and ``/api/version`` stay open so
 the sheet and the build line can render before sign-in.
+
+No API request from an opaque origin passes, from this PC or any other
+(``Origin: null``, or a cross-site no-cors fetch): that is what a page in a
+sandboxed frame sends (the HTML viewer draws a file's page in one, scripts
+on), and the loopback exemption must not hand it the API.
 """
 
 from __future__ import annotations
@@ -13,7 +18,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -57,6 +62,23 @@ def token_ok(presented: str) -> bool:
     return secrets_equal(presented, get_secret(TOKEN_VAR))
 
 
+def _framed_page_mark(scope: Scope) -> Optional[str]:
+    """The header that shows an API request came from an opaque origin (the HTML viewer's sandboxed frame), or None.
+
+    A CORS request from one says ``Origin: null``; a no-cors one (an ``<img>``, a ``fetch`` in no-cors mode) carries no
+    Origin, but the browser marks it ``Sec-Fetch-Site: cross-site``. The app's own page sends neither, a top-level
+    navigation stays allowed, and clients that aren't browsers send no such header.
+    """
+    if not str(scope.get("path", "")).startswith("/api/"):
+        return None
+    headers = dict(scope.get("headers") or [])
+    if headers.get(b"origin", b"").strip().lower() == b"null":
+        return "Origin: null"
+    if headers.get(b"sec-fetch-site", b"").lower() == b"cross-site" and headers.get(b"sec-fetch-mode", b"").lower() != b"navigate":
+        return "Sec-Fetch-Site: cross-site"
+    return None
+
+
 class SignInMiddleware:
     """Plain ASGI gate (not ``BaseHTTPMiddleware``, which re-chunks every body)."""
 
@@ -64,6 +86,13 @@ class SignInMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        mark = _framed_page_mark(scope) if scope["type"] == "http" else None
+        if mark is not None:
+            logger.info("ℹ️ refused an API request from a sandboxed page (%s): %s", mark, scope.get("path", ""))
+            refused = JSONResponse({"detail": "a page shown in the viewer cannot call the app", "reason": "framed_page"},
+                                   status_code=403)
+            await refused(scope, receive, send)
+            return
         if scope["type"] != "http" or self._allowed(scope):
             await self.app(scope, receive, send)
             return

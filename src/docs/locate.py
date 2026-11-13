@@ -13,7 +13,7 @@ import ntpath
 import os
 import re
 from typing import Any, Optional
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 
 from src.index import Index
 
@@ -25,6 +25,13 @@ def split_fragment(href: str) -> tuple[str, str]:
     """``href`` without its query and fragment, and the fragment (no ``#``)."""
     path, _, fragment = href.partition("#")
     return path.partition("?")[0], fragment
+
+
+def doc_address(target: dict[str, Any], href: str) -> str:
+    """The ``/doc`` address of a linked document by root, scan id and id, keeping the link's fragment."""
+    fragment = href.partition("#")[2]
+    query = urlencode({"root": target["root"], "scan": target["scan_id"], "id": target["id"]})
+    return "/doc?" + query + ("#" + fragment if fragment else "")
 
 
 def resolve_href(root_path: str, doc_path: str, href: str) -> Optional[str]:

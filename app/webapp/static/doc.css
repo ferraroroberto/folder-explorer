@@ -353,3 +353,23 @@
   margin: 0;
   overflow: visible;
 }
+
+/* ------------------------------------------------------- an HTML page's frame */
+/* The page draws as its author made it: on white whatever the app's theme, and as tall as the view so it scrolls on its own. */
+.doc-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 220px);
+  height: calc(100dvh - 220px);
+  min-height: 360px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color-scheme: light;
+}
+.doc-edit-preview .doc-frame { height: 100%; min-height: 0; }
+.doc-editor[data-kind="html"] .doc-edit-preview { padding: 0; }
+/* HTML source has no Markdown tools: no format bar and no key row. */
+.doc-editor[data-kind="html"] .doc-format,
+.doc-editor[data-kind="html"].is-typing .doc-keyrow { display: none; }
+.doc-editor[data-kind="html"].is-typing .doc-src { margin-bottom: 0; }

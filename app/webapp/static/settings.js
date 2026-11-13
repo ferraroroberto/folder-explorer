@@ -1,4 +1,4 @@
-/* Settings: text size, the Markdown search switch, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -12,6 +12,7 @@ const $ = (id) => document.getElementById(id);
 let remoteSwitch = null;
 let reuseSwitch = null;
 let markdownSwitch = null;
+let remoteHtmlSwitch = null;
 let assocSwitch = null;
 let categorySwitch = null;
 let moveSwitch = null;
@@ -35,8 +36,12 @@ function render(body) {
   $('setupCard').hidden = body.config_file.exists;
   setSwitch(markdownSwitch, cfg.search.markdown);
   $('markdownSearchNote').textContent = cfg.search.markdown
-    ? 'On: Search offers a Markdown mode that lists Markdown files by name.'
-    : 'Off: Search looks only in folders and emails, and the Markdown mode is hidden.';
+    ? 'On: Search offers a Documents mode that lists Markdown and HTML files by name.'
+    : 'Off: Search looks only in folders and emails, and the Documents mode is hidden.';
+  setSwitch(remoteHtmlSwitch, cfg.docs.block_remote_html);
+  $('blockRemoteHtmlNote').textContent = cfg.docs.block_remote_html
+    ? 'On: an HTML page shows only its own content and the files beside it; nothing loads from the web.'
+    : 'Off: an HTML page loads its web images, styles and fonts as a browser would. Either way it runs walled off from the app.';
   setSwitch(reuseSwitch, cfg.desktop.reuse_explorer_window);
   $('reuseExplorerNote').textContent = cfg.desktop.reuse_explorer_window
     ? 'On: Open shows the folder in the File Explorer window you used last, which is faster but replaces what that window showed.'
@@ -176,10 +181,15 @@ export function initSettings(opts) {
   onRootsChanged = opts.onRootsChanged;
   onSearchChanged = opts.onSearchChanged;
   markdownSwitch = switchEl(true, {
-    label: 'Markdown search',
+    label: 'Documents search',
     onToggle: async (next) => { if (await save({ search: { markdown: next } })) onSearchChanged(); },
   });
   $('markdownSearchSlot').appendChild(markdownSwitch);
+  remoteHtmlSwitch = switchEl(false, {
+    label: 'Block remote content in HTML',
+    onToggle: (next) => save({ docs: { block_remote_html: next } }),
+  });
+  $('blockRemoteHtmlSlot').appendChild(remoteHtmlSwitch);
   reuseSwitch = switchEl(false, {
     label: 'Reuse an open Explorer window',
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),

@@ -97,13 +97,13 @@ def folder_hits(cfg: dict[str, Any], q: str, prune: Optional[bool] = None, skip:
 
 
 def doc_hits(cfg: dict[str, Any], q: str, offset: int, limit: int) -> dict[str, Any]:
-    """One page of the Markdown list: ``GET /api/search/docs``. Reads each root's current index and nothing on disk."""
+    """One page of the Documents list: ``GET /api/search/docs``. Reads each root's current index and nothing on disk."""
     sources = [(root, scan, index, lock) for root, scan, (index, lock) in _open_scans(cfg)]
     return listing.search(sources, q, cfg["explore"]["show_hidden"], offset, limit)
 
 
 def dropped_doc(cfg: dict[str, Any], name: str, size: int, modified_ms: int) -> Optional[dict[str, Any]]:
-    """The indexed Markdown file a dropped file is (``{root, scan_id, id}``), or None: ``POST /api/doc/dropped/match``. Reads no disk."""
+    """The indexed document a dropped file is (``{root, scan_id, id}``), or None: ``POST /api/doc/dropped/match``. Reads no disk."""
     sources = [(root, scan, index, lock) for root, scan, (index, lock) in _open_scans(cfg)]
     return listing.match_dropped(sources, name, size, modified_ms)
 

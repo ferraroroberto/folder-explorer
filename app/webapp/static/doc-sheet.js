@@ -1,6 +1,6 @@
-/* Explore's document sheet: a Markdown file read, or edited, in a full-height sheet, with its outline, links and a way out to its own window.
+/* Explore's document sheet: a Markdown or HTML file read, or edited, in a full-height sheet, with its outline, links and a way out to its own window.
  *
- * A relative link to another scanned Markdown file opens in the same sheet,
+ * A relative link to another scanned document opens in the same sheet,
  * and Back returns to the one before. View | Edit switches to the editor;
  * Esc goes back to View, and closing the sheet with unsaved changes asks
  * first. The sheet never sends a path: every document is named by root,

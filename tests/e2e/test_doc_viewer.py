@@ -1,4 +1,4 @@
-"""The Markdown viewer: Explore's document sheet and the /doc window, in both themes, on the phone and the desktop.
+"""The document viewer: Explore's document sheet and the /doc window, in both themes, on the phone and the desktop.
 
 The documents are invented fixture files under a temp root ("Media disk" in
 conftest); the cloud-only answer is faked at the route, so nothing here
@@ -162,7 +162,7 @@ def test_the_doc_window_lists_recent_documents_and_opens_one(page: Page, app_url
     assert errors == []
 
 
-def test_search_lists_every_markdown_file_and_a_row_opens_the_viewer(page: Page, app_url: str, browser_name: str) -> None:
+def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_url: str, browser_name: str) -> None:
     errors = _errors(page)
     flagged: list[str] = []
 
@@ -177,11 +177,11 @@ def test_search_lists_every_markdown_file_and_a_row_opens_the_viewer(page: Page,
     page.route("**/api/search/docs?*", mark_cloud_only)
     page.goto(app_url + "/#search?mode=docs&q=")
     rows = page.locator("#results .result-row")
-    expect(page.locator("#modeSeg .segmented-item[aria-pressed=true]")).to_have_text("Markdown")
-    expect(page.locator("#resultsTitle")).to_contain_text("Markdown files")
-    expect(page.locator("#resultsMeta")).to_have_text("4 files")
+    expect(page.locator("#modeSeg .segmented-item[aria-pressed=true]")).to_have_text("Documents")
+    expect(page.locator("#resultsTitle")).to_contain_text("Documents")
+    expect(page.locator("#resultsMeta")).to_have_text("6 documents")
     names = [r.locator(".rr-who").inner_text().strip() for r in rows.all()]
-    assert sorted(names) == ["big.md", "guide.md", "journal.md", "watering.md"]
+    assert sorted(names) == ["big.md", "guide.md", "journal.md", "page.html", "sketch.htm", "watering.md"]
     expect(rows.filter(has_text="watering.md").locator(".rr-snip")).to_contain_text(DOCS_FOLDER + " › sub")
     expect(rows.filter(has_text="journal.md").locator(".chip")).to_have_text("Online-only")
     expect(rows.filter(has_text="guide.md").locator(".chip")).to_have_count(0)
@@ -197,12 +197,12 @@ def test_search_lists_every_markdown_file_and_a_row_opens_the_viewer(page: Page,
     page.locator("#q").fill("gui")
     expect(rows).to_have_count(1)
     expect(rows.first).to_contain_text("guide.md")
-    expect(page.locator("#resultsMeta")).to_have_text("1 file")
+    expect(page.locator("#resultsMeta")).to_have_text("1 document")
     assert "q=gui" in page.url
     page.locator("#q").fill("gui jour")
-    expect(page.locator("#results .empty-state-message")).to_contain_text("No Markdown file name matches")
+    expect(page.locator("#results .empty-state-message")).to_contain_text("No document name matches")
     page.locator("#clearQuery").click()
-    expect(rows).to_have_count(4)
+    expect(rows).to_have_count(6)
 
     rows.filter(has_text="guide.md").click()
     sheet = page.locator("#docDialog")

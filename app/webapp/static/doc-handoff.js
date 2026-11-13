@@ -1,4 +1,4 @@
-/* Hands a dropped Markdown file the scan doesn't have to the /doc window it opens in.
+/* Hands a dropped document the scan doesn't have to the /doc window it opens in.
  *
  * Such a file has no address: the server rendered it from text the page read,
  * and kept nothing. So the app page holds the rendered document and the new

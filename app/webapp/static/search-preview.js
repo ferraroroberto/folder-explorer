@@ -1,4 +1,4 @@
-/* The Search tab's preview: one mail's indexed fields and "Show all", one folder's totals or one Markdown file's facts, plus their actions.
+/* The Search tab's preview: one mail's indexed fields and "Show all", one folder's totals or one document's facts, plus their actions.
  *
  * On a wide desktop it fills the right-hand pane; on a phone it opens as a sheet.
  */
@@ -156,7 +156,7 @@ function folderHtml(f) {
     '</div></div>';
 }
 
-// -------------------------------------------------------------- Markdown
+// ------------------------------------------------------------- documents
 
 const docLoc = (h) => ({ root: h.root, scan_id: h.scan_id, id: h.id, name: h.name });
 

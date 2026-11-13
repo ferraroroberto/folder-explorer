@@ -29,7 +29,9 @@ REMOTE = ("100.64.0.7", 50000)
 DAY = 86_400
 NOW = 1_700_000_000
 # Invented modification times, one per file, so the order never depends on the order the files were written.
-STAMPS = {"guide.md": NOW - 1 * DAY, "watering.md": NOW - 5 * DAY, "journal.md": NOW - 9 * DAY, "big.md": NOW - 30 * DAY}
+STAMPS = {"guide.md": NOW - 1 * DAY, "page.html": NOW - 2 * DAY, "watering.md": NOW - 5 * DAY, "journal.md": NOW - 9 * DAY,
+          "big.md": NOW - 30 * DAY, "sketch.htm": NOW - 40 * DAY}
+ORDER = ["Roadmap.MD", "guide.md", "page.html", "archive.markdown", "watering.md", "journal.md", "big.md", "sketch.htm"]
 
 
 def _scan(c: TestClient) -> None:
@@ -43,7 +45,7 @@ def _scan(c: TestClient) -> None:
 
 @pytest.fixture()
 def two_roots(isolated: Path) -> dict[str, Path]:
-    """Two scanned invented roots: the Markdown notes, and a small root with an upper-case, a .markdown and a hidden file."""
+    """Two scanned invented roots: the invented notes (Markdown and HTML), and a small root with an upper-case, a .markdown and a hidden file."""
     first = add_docs(build_tree(isolated / "Invented root"))
     second = isolated / "Second root"
     (second / "Plans").mkdir(parents=True)
@@ -53,7 +55,7 @@ def two_roots(isolated: Path) -> dict[str, Path]:
     (second / "Plans" / "readme.md.bak").write_text("not markdown either\n", encoding="utf-8")
     (second / "secret.md").write_text("# Hidden\n", encoding="utf-8")
     set_hidden(second / "secret.md")
-    for path in first.rglob("*.md"):
+    for path in (p for p in first.rglob("*") if p.name in STAMPS):
         os.utime(path, (STAMPS[path.name], STAMPS[path.name]))
     os.utime(second / "Plans" / "Roadmap.MD", (NOW, NOW))
     os.utime(second / "Plans" / "archive.markdown", (NOW - 3 * DAY, NOW - 3 * DAY))
@@ -65,17 +67,15 @@ def _names(body: dict[str, Any]) -> list[str]:
     return [h["name"] for h in body["hits"]]
 
 
-def test_every_root_s_markdown_files_are_listed_newest_first(two_roots: dict[str, Path]) -> None:
+def test_every_root_s_documents_are_listed_newest_first(two_roots: dict[str, Path]) -> None:
     with TestClient(app, client=LOCAL) as c:
         _scan(c)
         body = c.get("/api/search/docs").json()
-    assert _names(body) == ["Roadmap.MD", "guide.md", "archive.markdown", "watering.md", "journal.md", "big.md"][:0] or True
-    assert _names(body) == ["Roadmap.MD", "guide.md", "archive.markdown", "watering.md", "journal.md", "big.md"] or \
-        _names(body) == ["Roadmap.MD", "guide.md", "archive.markdown", "watering.md", "journal.md", "big.md"]
-    assert body["total"] == 6
+    assert _names(body) == ORDER
+    assert body["total"] == 8
 
 
-def test_only_markdown_is_listed_and_hidden_files_stay_out(two_roots: dict[str, Path]) -> None:
+def test_only_documents_are_listed_and_hidden_files_stay_out(two_roots: dict[str, Path]) -> None:
     with TestClient(app, client=LOCAL) as c:
         _scan(c)
         names = _names(c.get("/api/search/docs").json())
@@ -125,7 +125,7 @@ def test_building_the_list_opens_and_lists_nothing_on_disk(two_roots: dict[str, 
         for seam in ("read_document", "read_document_listed", "read_image", "find_document"):
             monkeypatch.setattr(reader, seam, forbid)
         monkeypatch.setattr(winfs, "list_dir", forbid)
-        assert c.get("/api/search/docs").json()["total"] == 6
+        assert c.get("/api/search/docs").json()["total"] == 8
 
 
 def test_a_cloud_only_file_carries_its_online_mark_from_the_index(tmp_path: Path) -> None:
@@ -136,7 +136,8 @@ def test_a_cloud_only_file_carries_its_online_mark_from_the_index(tmp_path: Path
         conn.execute("UPDATE files SET attrs = attrs | ? WHERE name = 'journal.md'", (ONLINE_ONLY_ATTRS,))
     index = Index(open_index(path))
     online = {f["name"]: f["online"] for f in index.files_by_ext(listing.EXTS)}
-    assert online == {"guide.md": False, "watering.md": False, "journal.md": True, "big.md": False}
+    assert online == {"guide.md": False, "watering.md": False, "journal.md": True, "big.md": False, "page.html": False,
+                      "sketch.htm": False}
 
 
 def test_the_list_pages_and_the_total_is_the_whole(two_roots: dict[str, Path]) -> None:
@@ -144,9 +145,9 @@ def test_the_list_pages_and_the_total_is_the_whole(two_roots: dict[str, Path]) -
         _scan(c)
         first = c.get("/api/search/docs", params={"limit": 4}).json()
         rest = c.get("/api/search/docs", params={"limit": 4, "offset": 4}).json()
-    assert first["total"] == rest["total"] == 6
-    assert len(first["hits"]) == 4 and len(rest["hits"]) == 2
-    assert _names(first) + _names(rest) == ["Roadmap.MD", "guide.md", "archive.markdown", "watering.md", "journal.md", "big.md"]
+    assert first["total"] == rest["total"] == 8
+    assert len(first["hits"]) == 4 and len(rest["hits"]) == 4
+    assert _names(first) + _names(rest) == ORDER
 
 
 def test_the_list_says_when_nothing_is_scanned(isolated: Path) -> None:
@@ -167,7 +168,7 @@ def test_status_turns_the_list_on_with_a_scan_and_a_signed_in_remote_device_may_
     with TestClient(app, client=REMOTE) as c:
         assert c.get("/api/search/docs").status_code in (401, 403)
         assert c.get("/api/search/status", headers=auth).json()["docs"]["ready"] is True
-        assert c.get("/api/search/docs", headers=auth).json()["total"] == 6
+        assert c.get("/api/search/docs", headers=auth).json()["total"] == 8
 
 
 def test_the_extensions_come_from_the_readers_own_list() -> None:

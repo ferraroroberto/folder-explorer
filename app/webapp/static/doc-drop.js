@@ -1,4 +1,4 @@
-/* Open a Markdown file dropped on the window: in its own /doc window from the app, in place in the /doc window.
+/* Open a Markdown or HTML file dropped on the window: in its own /doc window from the app, in place in the /doc window.
  *
  * A drop gives the page the file's bytes and name, never its path, so the
  * file is looked up by what the page knows: name, size and modified time
@@ -53,7 +53,7 @@ function overlay() {
   const el = document.createElement('div');
   el.className = 'drop-overlay';
   el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = '<div class="drop-card">' + glyph('file-text') + '<p class="drop-title">Drop a Markdown file to open it</p>' +
+  el.innerHTML = '<div class="drop-card">' + glyph('file-text') + '<p class="drop-title">Drop a Markdown or HTML file to open it</p>' +
     '<p class="drop-text">It opens for editing when the scan has it, and read-only when it doesn\'t.</p></div>';
   // The top layer keeps it above an open sheet; a browser without popovers shows it as a fixed layer.
   if (typeof el.showPopover === 'function') el.setAttribute('popover', 'manual');
@@ -82,7 +82,7 @@ function showInWindow(popup, r) {
   return true;
 }
 
-/** Wire the whole window as a drop target for Markdown files; ``host`` is ``{open(loc), show(doc), ownWindow?}``. */
+/** Wire the whole window as a drop target for Markdown and HTML files; ``host`` is ``{open(loc), show(doc), ownWindow?}``. */
 export function initDrop(host) {
   const el = overlay();
   const popover = el.hasAttribute('popover');

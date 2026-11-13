@@ -1,8 +1,9 @@
-/* The Markdown editor, shared by Explore's document sheet and the /doc window.
+/* The document editor (Markdown and HTML), shared by Explore's document sheet and the /doc window.
  *
  * A wide window with a mouse shows the source beside a live preview that
  * follows the cursor; a phone toggles Write | Preview and gets a row of
- * Markdown keys above its keyboard. The preview posts the draft to the
+ * Markdown keys above its keyboard. An HTML file is plain source with no
+ * Markdown tools, and its preview is the same sandboxed frame View draws. The preview posts the draft to the
  * server's renderer, so it reads exactly as View will. Saving is explicit
  * (Save or Ctrl+S): it sends the version the editor opened, and a file that
  * changed on disk since then stops at the conflict screen instead of being
@@ -65,7 +66,7 @@ function shell() {
     '<button type="button" class="button-ghost doc-discard" data-track="doc-discard" hidden>Discard</button></div>' +
     '<div class="doc-conflict-slot" hidden></div><div class="doc-edit-split">' +
     '<div class="doc-src"><div class="doc-src-stack"><pre class="doc-src-hl" aria-hidden="true"></pre>' +
-    '<textarea class="doc-src-input" aria-label="Markdown source" spellcheck="false" data-track="doc-edit-source"></textarea></div></div>' +
+    '<textarea class="doc-src-input" aria-label="Source" spellcheck="false" data-track="doc-edit-source"></textarea></div></div>' +
     '<div class="doc-edit-preview" aria-label="Preview"></div></div>' +
     '<div class="doc-keyrow" role="toolbar" aria-label="Markdown keys">' + keys +
     '<button type="button" class="doc-key" data-format="link" aria-label="Link" data-track="doc-key-link">[ ]</button>' +
@@ -85,6 +86,7 @@ class Editor {
     this.saving = false;
     this.closed = false;
     this.seq = 0;
+    this.html = false;
     this.timers = { draft: 0, preview: 0, frame: 0 };
     this.el = {};
     this.placeKeys = this.placeKeys.bind(this);
@@ -108,11 +110,13 @@ class Editor {
 
   paint() {
     cancelAnimationFrame(this.timers.frame);
-    this.timers.frame = requestAnimationFrame(() => { this.el.hl.innerHTML = highlightSource(this.el.ta.value); });
+    const text = this.el.ta.value;
+    this.timers.frame = requestAnimationFrame(() => { this.el.hl.innerHTML = this.html ? esc(text) + '\n' : highlightSource(text); });
   }
 
-  /** Scroll the preview to the block the cursor is in, a third of the way down. */
+  /** Scroll the preview to the block the cursor is in, a third of the way down; an HTML page's frame keeps its own scroll. */
   follow() {
+    if (this.html) return;
     const { ta, preview } = this.el;
     const line = caretLine(ta.value, ta.selectionStart);
     let target = null;
@@ -302,6 +306,8 @@ class Editor {
     const q = (sel) => this.mount.querySelector(sel);
     this.el = { root: q('.doc-editor'), ta: q('.doc-src-input'), hl: q('.doc-src-hl'), preview: q('.doc-edit-preview'),
       status: q('.doc-edit-status'), slot: q('.doc-conflict-slot'), discard: q('.doc-discard') };
+    this.html = body.kind === 'html';
+    this.el.root.dataset.kind = this.html ? 'html' : 'markdown';
     this.disk = { text: body.text, version: body.version };
     this.ready = true;
     const draft = readDraft(this.loc);

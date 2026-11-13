@@ -31,7 +31,7 @@ let booted = false;
 // Per mode: the results card's glyph and title, the box's placeholder, and what one result and the total are called.
 const MODE_UI = {
   folders: { glyph: 'folder', title: 'Folders', placeholder: 'Folder names, e.g. alpha budget', noun: 'folder' },
-  docs: { glyph: 'file-text', title: 'Markdown files', placeholder: 'File names, e.g. journal', noun: 'file' },
+  docs: { glyph: 'file-text', title: 'Documents', placeholder: 'File names, e.g. journal', noun: 'file' },
   emails: { glyph: 'mail', title: 'Emails', placeholder: 'Words, or from: to: subject: has:attachment after:', noun: 'result' },
 };
 
@@ -128,7 +128,7 @@ function renderResults() {
   const notes = S.notes.map((n) => '<li class="search-note">' + glyph('info') + '<span>' + esc(n) + '</span></li>').join('');
   let rows;
   if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Every word must match.', false);
-  else if (mode === 'docs' && !S.results.length) rows = emptyRow('file-text', q ? 'No Markdown file name matches every word.' : 'No Markdown files in the scanned roots.', !!q);
+  else if (mode === 'docs' && !S.results.length) rows = emptyRow('file-text', q ? 'No document name matches every word.' : 'No Markdown or HTML files in the scanned roots.', !!q);
   else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches every word.' : 'No emails match. Remove a filter or use fewer words.', !!q);
   else {
     const terms = q.split(/[\s;]+/).filter(Boolean);
@@ -139,7 +139,7 @@ function renderResults() {
     (more ? '<li class="results-more"><button type="button" class="button-ghost" id="moreResults" data-track="more-results">Show more</button></li>' : '');
   $('keysLine').innerHTML = keysLine(mode);
   head(S.notes.length ? [{ text: 'Some filters left out', tone: 'attention' }] : [],
-    mode === 'folders' ? plural(S.total, 'folder') : mode === 'docs' ? plural(S.total, 'Markdown file') : plural(S.total, 'email'));
+    mode === 'folders' ? plural(S.total, 'folder') : mode === 'docs' ? plural(S.total, 'document') : plural(S.total, 'email'));
 }
 
 // ------------------------------------------------------------------- search
@@ -364,7 +364,7 @@ export async function loadSearch() {
     const before = effectiveMode();
     S.status = status;
     S.saved = saved.searches;
-    // A mode that went off (Markdown switched off in Settings) hands the box to the one that runs instead.
+    // A mode that went off (Documents switched off in Settings) hands the box to the one that runs instead.
     const after = effectiveMode();
     if (before && after && before !== after) { S.q[before] = box().value; box().value = S.q[after] || ''; }
   } catch (e) {

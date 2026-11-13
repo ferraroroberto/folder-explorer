@@ -3,8 +3,8 @@
 Reads nothing from disk: the caller hands over the text and two lookups, one
 for a relative link and one for an image, each answering from the scan
 index. Raw HTML in the document stays text. A relative link to a scanned
-Markdown file becomes a ``/doc`` address by id; one that leaves the root, isn't
-scanned or isn't Markdown renders inert, with no address. An image loads only
+Markdown or HTML file becomes a ``/doc`` address by id; one that leaves the root, isn't
+scanned or isn't a document renders inert, with no address. An image loads only
 by its id (the page fetches it), never from a path or the web.
 """
 
@@ -13,7 +13,6 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from typing import Any, Optional
-from urllib.parse import urlencode
 
 from markdown_it import MarkdownIt
 from markdown_it.common.utils import escapeHtml, unescapeAll
@@ -26,6 +25,8 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
+
+from src.docs.locate import doc_address
 
 # Heading ids share the page with the app's own element ids, so each carries this prefix.
 ID_PREFIX = "doc-"
@@ -94,9 +95,7 @@ def _rewrite_links(children: list[Token], link: Lookup) -> None:
                 if target is None:
                     _inert(tok, why)
                 else:
-                    query = urlencode({"root": target["root"], "scan": target["scan_id"], "id": target["id"]})
-                    fragment = href.partition("#")[2]
-                    tok.attrs = {"href": "/doc?" + query + ("#" + fragment if fragment else ""), "data-doc-id": str(target["id"])}
+                    tok.attrs = {"href": doc_address(target, href), "data-doc-id": str(target["id"])}
         elif tok.type == "link_close" and opened:
             tok.tag = opened.pop().tag
 

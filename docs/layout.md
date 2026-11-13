@@ -25,17 +25,17 @@ folder-explorer/
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
 │       ├── state.py            # the open-index pool, its housekeeping, and the folder search the route, the sheet and the window share
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
-│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the Markdown viewer), search, emails, scans, settings,
+│       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the document viewer), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
 │                           #   parts/icon-sprite.html is the inline icon sprite, spliced into index.html where its include line stands;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
-│                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js
+│                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js (an HTML page in a sandboxed frame)
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
 │                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
-│                           #   doc-drop.js takes a Markdown file dropped on the window (drop-files.js its DOM-free request builders,
+│                           #   doc-drop.js takes a Markdown or HTML file dropped on the window (drop-files.js its DOM-free request builders,
 │                           #   doc-handoff.js hands a rendered one to the /doc window it opens in)
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
@@ -52,12 +52,13 @@ folder-explorer/
 │   ├── search_window/          # the tray's Quick search window (Tk): model (rows and states, no Tk), client (the web app's
 │   │                           #   local API, its only source), view (the widgets, the archive window's theme)
 │   ├── macro_home.py           # the macro sheet's setup: the primary checkout and the user's FOLDER_EXPLORER_HOME (read-only)
-│   ├── docs/                   # the Markdown viewer: reader (the only reader of a document's bytes, with the size,
+│   ├── docs/                   # the document viewer: reader (the only reader of a document's bytes, with the size,
 │   │                           #   link and cloud-only checks), locate (a relative link fenced to its root, then its
-│   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk)
+│   │                           #   id in the index), render (markdown-it + Pygments to HTML and an outline; no disk), html_frame (an HTML page's
+│   │                           #   sandboxed srcdoc: the files beside it inlined, links by id; no disk)
 │   │                           #   and writer (the editor's only writer: the opened file only, after its version check);
 │   │                           #   launch (the launcher's path to root, scan, folder id and name, read from the index);
-│   │                           #   listing (Search's Markdown mode: every indexed Markdown file across the roots, and the match of a dropped file by name, size and time, from the index; no disk)
+│   │                           #   listing (Search's Documents mode: every indexed Markdown and HTML file across the roots, and the match of a dropped file by name, size and time, from the index; no disk)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

@@ -1,4 +1,4 @@
-/* What a Markdown file dropped on the window sends, with no DOM so a test can hold it.
+/* What a Markdown or HTML file dropped on the window sends, with no DOM so a test can hold it.
  *
  * A browser hands the page a dropped file's bytes and name, never its path.
  * The server is told the name, size and modified time (to find the indexed
@@ -8,20 +8,21 @@
 // The viewer's size cap (src/docs/reader.py DOC_MAX_BYTES); the server checks it again.
 export const DROP_MAX_BYTES = 2 * 1024 * 1024;
 
-const MARKDOWN = /\.(md|markdown)$/i;
+// The viewer's documents (src/docs/reader.py DOC_EXTS); the server checks the name again.
+const DOCUMENT = /\.(md|markdown|html?)$/i;
 
-export const isMarkdownName = (name) => MARKDOWN.test(String(name || ''));
+export const isDocumentName = (name) => DOCUMENT.test(String(name || ''));
 
 /** Whether a drag carries files (so the overlay shows); a drag of text or a link doesn't. */
 export const dragHasFiles = (dataTransfer) => !!dataTransfer && Array.from(dataTransfer.types || []).includes('Files');
 
-/** The file to open from a drop: ``{file}``, or ``{message}`` saying why none can open. The first Markdown file wins. */
+/** The file to open from a drop: ``{file}``, or ``{message}`` saying why none can open. The first document wins. */
 export function pickDrop(files) {
   const list = Array.from(files || []);
   if (!list.length) return { message: 'Nothing was dropped' };
-  const file = list.find((f) => isMarkdownName(f.name));
-  if (!file) return { message: 'Only Markdown files (.md, .markdown) open here' };
-  if (file.size > DROP_MAX_BYTES) return { message: 'Markdown files up to 2 MB open here' };
+  const file = list.find((f) => isDocumentName(f.name));
+  if (!file) return { message: 'Only Markdown and HTML files (.md, .markdown, .html, .htm) open here' };
+  if (file.size > DROP_MAX_BYTES) return { message: 'Documents up to 2 MB open here' };
   return { file };
 }
 

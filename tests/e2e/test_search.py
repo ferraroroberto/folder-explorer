@@ -299,7 +299,7 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     page.goto(app_url + "/#search?mode=docs&q=")
     expect(markdown).to_be_visible()
     expect(markdown).to_have_attribute("aria-pressed", "true")
-    expect(segments).to_have_text(["Folders", "Markdown", "Emails"])
+    expect(segments).to_have_text(["Folders", "Documents", "Emails"])
 
     settings("true")
     for theme in ("light", "dark"):
@@ -308,7 +308,7 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
         assert_layout_clean(page, allow=BELOW_FOLD)
     switch.click()
     expect(switch).to_have_attribute("aria-checked", "false")
-    expect(page.locator("#markdownSearchNote")).to_contain_text("Markdown mode is hidden")
+    expect(page.locator("#markdownSearchNote")).to_contain_text("Documents mode is hidden")
     page.locator("#settingsDialog [data-close]").click()
 
     expect(segments).to_have_text(["Folders", "Emails"])
@@ -330,7 +330,7 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     switch.click()
     expect(switch).to_have_attribute("aria-checked", "true")
     page.locator("#settingsDialog [data-close]").click()
-    expect(segments).to_have_text(["Folders", "Markdown", "Emails"])
-    page.locator("#modeSeg .segmented-item", has_text="Markdown").click()
-    expect(page.locator("#resultsTitle")).to_contain_text("Markdown files")
+    expect(segments).to_have_text(["Folders", "Documents", "Emails"])
+    page.locator("#modeSeg .segmented-item", has_text="Documents").click()
+    expect(page.locator("#resultsTitle")).to_contain_text("Documents")
     assert errors == []

@@ -1,8 +1,8 @@
-"""The only writer of a user's file outside the email folders: a Markdown file saved from the editor.
+"""The only writer of a user's file outside the email folders: a Markdown or HTML file saved from the editor.
 
 It writes the one file it is named, never another and never a new one: the
-path is rebuilt from the scan index by the caller, it must be ``.md`` or
-``.markdown``, and it must still be listed in its folder as a plain local file
+path is rebuilt from the scan index by the caller, it must be a document
+(``.md``, ``.markdown``, ``.html`` or ``.htm``), and it must still be listed in its folder as a plain local file
 (a link, a cloud-only placeholder or a vanished file is refused before any
 byte moves). Every save reads the file again through ``src/docs/reader.py``
 and compares its version (the listing's modified time, the size and a hash of

@@ -177,6 +177,39 @@ async function createConfig() {
   }
 }
 
+/** The Markdown association row: built here, not in index.html, as it exists only for a server that reports this PC's association. */
+function buildAssocRow() {
+  const assocRow = document.createElement('div');
+  assocRow.className = 'row row-stack';
+  assocRow.id = 'mdAssocRow';
+  assocRow.hidden = true;
+  assocRow.innerHTML = '<div class="row-line"><span>Associate Markdown files with this app</span>' +
+    '<span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span></div><p class="row-note" id="mdAssocNote"></p>';
+  $('reuseExplorerSlot').closest('.row').after(assocRow);
+  assocSwitch = switchEl(false, { label: 'Associate Markdown files with this app', onToggle: saveAssoc });
+  $('mdAssocSlot').appendChild(assocSwitch);
+}
+
+/** The four folder lists: what the scan covers and skips, and the email folders and what their index leaves out. */
+function buildFolderLists() {
+  lists.roots = folderList($('rootsEditor'), {
+    name: 'roots', label: 'Add a folder to scan', empty: 'No folders yet.',
+    onSave: (roots) => saveList({ roots }, 'Folders to scan saved', onRootsChanged),
+  });
+  lists.exclude = folderList($('excludeEditor'), {
+    name: 'exclude', label: 'Add a folder to skip', empty: 'Nothing is skipped.',
+    onSave: (exclude) => saveList({ exclude }, 'Saved: the next scan leaves them out'),
+  });
+  lists.emailRoots = folderList($('emailRootsEditor'), {
+    name: 'email-roots', label: 'Add an email folder', empty: 'No email folders yet.',
+    onSave: (roots) => saveList(withEmail({ roots }), 'Email folders saved'),
+  });
+  lists.emailExclude = folderList($('emailExcludeEditor'), {
+    name: 'email-exclude', label: 'Add a folder to leave out of the email index', empty: 'Nothing is left out.',
+    onSave: (exclude) => saveList(withEmail({ exclude }), 'Saved: the next email run leaves them out'),
+  });
+}
+
 export function initSettings(opts) {
   onRootsChanged = opts.onRootsChanged;
   onSearchChanged = opts.onSearchChanged;
@@ -195,16 +228,7 @@ export function initSettings(opts) {
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
-  // Built here, not in index.html: the row exists only for a server that reports this PC's association.
-  const assocRow = document.createElement('div');
-  assocRow.className = 'row row-stack';
-  assocRow.id = 'mdAssocRow';
-  assocRow.hidden = true;
-  assocRow.innerHTML = '<div class="row-line"><span>Associate Markdown files with this app</span>' +
-    '<span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span></div><p class="row-note" id="mdAssocNote"></p>';
-  $('reuseExplorerSlot').closest('.row').after(assocRow);
-  assocSwitch = switchEl(false, { label: 'Associate Markdown files with this app', onToggle: saveAssoc });
-  $('mdAssocSlot').appendChild(assocSwitch);
+  buildAssocRow();
   categorySwitch = switchEl(false, {
     label: 'Add an Outlook category when archiving',
     onToggle: (next) => save({ outlook: { add_category: next } }),
@@ -243,22 +267,7 @@ export function initSettings(opts) {
     },
   });
   $('rootsAutoSlot').appendChild(autoSwitch);
-  lists.roots = folderList($('rootsEditor'), {
-    name: 'roots', label: 'Add a folder to scan', empty: 'No folders yet.',
-    onSave: (roots) => saveList({ roots }, 'Folders to scan saved', onRootsChanged),
-  });
-  lists.exclude = folderList($('excludeEditor'), {
-    name: 'exclude', label: 'Add a folder to skip', empty: 'Nothing is skipped.',
-    onSave: (exclude) => saveList({ exclude }, 'Saved: the next scan leaves them out'),
-  });
-  lists.emailRoots = folderList($('emailRootsEditor'), {
-    name: 'email-roots', label: 'Add an email folder', empty: 'No email folders yet.',
-    onSave: (roots) => saveList(withEmail({ roots }), 'Email folders saved'),
-  });
-  lists.emailExclude = folderList($('emailExcludeEditor'), {
-    name: 'email-exclude', label: 'Add a folder to leave out of the email index', empty: 'Nothing is left out.',
-    onSave: (exclude) => saveList(withEmail({ exclude }), 'Saved: the next email run leaves them out'),
-  });
+  buildFolderLists();
   $('emailBudget').addEventListener('change', (e) => save(withEmail({ download_budget_mb: e.target.value === '' ? null : Number(e.target.value) })));
   $('scheduleSelect').addEventListener('change', (e) => save({ schedule: e.target.value }));
   $('scheduleTime').addEventListener('change', (e) => { if (e.target.value) save({ schedule_time: e.target.value }); });

@@ -50,7 +50,7 @@ export const plain = (text) => (text || '').split(MARK_START).join('').split(MAR
 /** The modes that can run here, in :data:`MODES` order. */
 export const readyModes = () => (S.status ? MODES.filter((m) => S.status[m].ready) : MODES);
 
-// Where a chosen-but-off mode lands: Folders first (what Markdown off means), then Emails.
+// Where a chosen-but-off mode lands: Folders first (what Documents off means), then Emails.
 const FALLBACK = ['folders', 'emails', 'docs'];
 
 /** Which mode actually runs: the chosen one, or the first of :data:`FALLBACK` that is on when the chosen one is off here. */

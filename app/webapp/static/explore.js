@@ -147,7 +147,7 @@ function fileRow(f, whole, nested, i) {
   const doc = isDocument(f);
   return rowItem(f, i, '<div class="list-row' + (nested ? ' has-path' : '') + '" data-open="file" data-id="' + f.id + '"' + (doc ? ' data-doc="1"' : '') +
     ' title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes">' + glyph('file-text') +
-    '<span class="lr-name"><span>' + esc(f.name) + '</span>' + (doc ? '<span class="chip doc-badge">MD</span>' : '') + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
+    '<span class="lr-name"><span>' + esc(f.name) + '</span>' + (doc ? '<span class="chip doc-badge">' + (/^html?$/i.test(String(f.ext || '')) ? 'HTML' : 'MD') + '</span>' : '') + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
     '<span class="lr-meta' + (nested ? ' is-path' : '') + '">' + esc(meta) + '</span>' +
     '<span class="lr-type">' + (f.ext ? esc(extLabel(f.ext)) : '—') + '</span><span class="lr-date">' + fmtDate(f.mtime) + '</span><span class="lr-share">' + fmtPct(p) + '</span>' +
     '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div>');

@@ -1,6 +1,6 @@
 /* Explore's item actions: each row's menu, double-click to open on this PC, and Copy path on every device.
  * Off the PC the menu says opening works there, instead of showing Copy path alone.
- * A Markdown file opens in the app's own viewer instead, on every device: a tap
+ * A Markdown or HTML file opens in the app's own viewer instead, on every device: a tap
  * on a touch screen or a double-click, and View, Edit here or Open in new window in its menu.
  *
  * Opening asks the server, which looks the item up by its id in the scan the
@@ -23,8 +23,8 @@ const DONE = { explore: 'Opened in File Explorer', open: 'Opening', edit: 'Openi
 
 // The one line a menu opens with when this device can't open anything, so Copy path isn't alone without a reason.
 const NOT_HERE = 'Opening files and folders works on the PC';
-const DOC_EXTS = new Set(['md', 'markdown']);
-// A touch screen has no double-click, so one tap opens a Markdown row there.
+const DOC_EXTS = new Set(['md', 'markdown', 'html', 'htm']);
+// A touch screen has no double-click, so one tap opens a document row there.
 const TOUCH = window.matchMedia('(pointer: coarse)');
 
 let source = () => null;
@@ -51,7 +51,7 @@ export function initExploreActions(getContents) {
   });
 }
 
-/** True for a file the viewer reads: Markdown, by its extension. */
+/** True for a file the viewer reads: Markdown or HTML, by its extension. */
 export const isDocument = (it) => it.kind !== 'folder' && DOC_EXTS.has(String(it.ext || '').toLowerCase());
 
 const docLoc = (id) => {

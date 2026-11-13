@@ -1,4 +1,4 @@
-"""Every indexed Markdown file across the roots, newest first, narrowed by name.
+"""Every indexed document (Markdown and HTML) across the roots, newest first, narrowed by name.
 
 Reads the index only: no file is opened, listed or stat'ed, so a cloud-only
 file is listed with its online mark and nothing comes down. Each hit names its
@@ -17,7 +17,7 @@ from src.folder_match import fold
 from src.index import Index
 from src.roots import Root
 
-# The index keeps an extension lower-case and without its dot; the reader owns which ones are Markdown.
+# The index keeps an extension lower-case and without its dot; the reader owns which ones are documents.
 EXTS = tuple(sorted(e.lstrip(".") for e in reader.DOC_EXTS))
 # Hits per page: a whole page is drawn at once, and more load on a tap.
 PAGE = 100
@@ -51,7 +51,7 @@ def match_dropped(sources: Sequence[Source], name: str, size: int, modified_ms: 
 
 
 def search(sources: Sequence[Source], query: str, show_hidden: bool, offset: int = 0, limit: int = PAGE) -> dict[str, Any]:
-    """One page of the Markdown files whose name holds every word of ``query``, newest first across all ``sources``."""
+    """One page of the documents whose name holds every word of ``query``, newest first across all ``sources``."""
     words = [fold(w) for w in _WORDS.split(query) if w]
     found: list[tuple[int, dict[str, Any]]] = []
     for at, (_root, _scan, index, lock) in enumerate(sources):

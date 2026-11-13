@@ -16,6 +16,7 @@ export const DEFAULTS = {
   folder_search: { skip_levels: 0, prune_people: true, onedrive_prevails: true },
   explore: { show_hidden: false },
   search: { markdown: true },
+  docs: { block_remote_html: false },
   desktop: { reuse_explorer_window: false },
   macro: { prefer_window: true },
   tray: { left_click: 'quick_search' },

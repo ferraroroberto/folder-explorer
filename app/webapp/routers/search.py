@@ -1,4 +1,4 @@
-"""Search: folders over every root's index, Markdown files over the same indexes, emails over the email index, and one mail's preview.
+"""Search: folders over every root's index, documents (Markdown and HTML) over the same indexes, emails over the email index, and one mail's preview.
 
 Reads only, with narrow exceptions behind their own checks: "Show all"
 reads a mail's ``.msg`` (looked up by row id, never a client path, and only
@@ -69,7 +69,7 @@ def _scanned(roots: list[Root]) -> list[tuple[Root, dict[str, Any]]]:
 
 
 def _docs_part(cfg: dict[str, Any], scanned: bool) -> dict[str, Any]:
-    """The Markdown mode: off by the Settings switch, else ready once a root has a finished scan."""
+    """The Documents mode: off by the Settings switch, else ready once a root has a finished scan."""
     if not cfg["search"]["markdown"]:
         return {"ready": False, "reason": "turned off in Settings"}
     return {"ready": scanned, "reason": None if scanned else "no root has a finished scan yet"}
@@ -113,7 +113,7 @@ def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int
 
 @router.get("/search/docs")
 def search_docs(q: str = "", offset: int = Query(0, ge=0), limit: int = Query(DOC_PAGE, ge=1, le=MAX_PAGE)) -> dict[str, Any]:
-    """The Markdown files of every scanned root, newest first, whose name holds every word of ``q``; metadata only."""
+    """The documents (Markdown and HTML) of every scanned root, newest first, whose name holds every word of ``q``; metadata only."""
     return doc_hits(config.load(), q, offset, limit)
 
 

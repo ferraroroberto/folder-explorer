@@ -167,12 +167,12 @@ def test_a_blocked_pop_up_falls_back_to_the_sheet_with_a_note(page: Page, app_ur
     assert errors == []
 
 
-def test_a_file_that_is_not_markdown_is_ignored_with_a_note(page: Page, app_url: str) -> None:
+def test_a_file_that_is_not_a_document_is_ignored_with_a_note(page: Page, app_url: str) -> None:
     errors = _errors(page)
     sent = _requests(page)
     page.goto(app_url + "/")
     _drop(page, "photo.png", 12)
-    expect(page.locator("#toast")).to_contain_text("Only Markdown")
+    expect(page.locator("#toast")).to_contain_text("Only Markdown and HTML")
     expect(page.locator("#docDialog")).to_be_hidden()
     assert sent == []
     assert errors == []

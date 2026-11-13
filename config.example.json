@@ -23,6 +23,9 @@
   "search": {
     "markdown": true
   },
+  "docs": {
+    "block_remote_html": false
+  },
   "desktop": {
     "reuse_explorer_window": false
   },

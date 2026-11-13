@@ -1,4 +1,4 @@
-"""The only reader of a document's bytes: a Markdown file, or an image beside one.
+"""The only reader of a document's bytes: a Markdown or HTML file, or an image, stylesheet or script beside one.
 
 Every read is checked first, in this order, against the item's fresh listing
 (its folder read through the directory handle in ``src/winfs.py``, which
@@ -24,7 +24,10 @@ from src import winfs
 
 logger = logging.getLogger(__name__)
 
-DOC_EXTS = frozenset({".md", ".markdown"})
+HTML_EXTS = frozenset({".html", ".htm"})
+DOC_EXTS = frozenset({".md", ".markdown"}) | HTML_EXTS
+# What an HTML page loads from beside it, inlined into its frame by src/docs/html_frame.py; never a page of its own.
+ASSET_TYPES = {".css": "text/css", ".js": "text/javascript"}
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
                ".webp": "image/webp", ".svg": "image/svg+xml"}
 # A long handbook is well under 2 MB of Markdown; past that it is generated output, not something to read here.
@@ -33,7 +36,7 @@ DOC_MAX_BYTES = 2 * 1024 * 1024
 IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 REASON_MESSAGES = {
-    "not_document": "Only Markdown files and the images beside them open here",
+    "not_document": "Only Markdown and HTML files and the images beside them open here",
     "too_large": "Too large to show here",
     "cloud_only": "Only in OneDrive",
     "gone": "It is no longer there",
@@ -58,8 +61,17 @@ def is_document(name: str) -> bool:
     return os.path.splitext(name)[1].lower() in DOC_EXTS
 
 
+def is_html(name: str) -> bool:
+    """An HTML document: it renders in a sandboxed frame instead of through the Markdown renderer."""
+    return os.path.splitext(name)[1].lower() in HTML_EXTS
+
+
 def is_image(name: str) -> bool:
     return os.path.splitext(name)[1].lower() in IMAGE_TYPES
+
+
+def is_asset(name: str) -> bool:
+    return os.path.splitext(name)[1].lower() in ASSET_TYPES
 
 
 def response_headers(ext: str) -> dict[str, str]:
@@ -79,9 +91,9 @@ def _listed(path: str) -> Optional[winfs.Entry]:
 
 
 def find_document(folder: str, name: str) -> Optional[winfs.Entry]:
-    """A Markdown file called ``name`` in a fresh listing of ``folder``: what a scan missed, found without opening it.
+    """A document called ``name`` in a fresh listing of ``folder``: what a scan missed, found without opening it.
 
-    None when the folder or the file is gone, or the entry is a folder, a link or not Markdown.
+    None when the folder or the file is gone, or the entry is a folder, a link or not a document.
     """
     if not is_document(name) or name != os.path.basename(name):
         return None
@@ -160,7 +172,7 @@ def _read(path: str, cap: int, index_online: bool, download: bool) -> tuple[byte
 
 
 def read_document(path: str, index_online: bool, download: bool = False) -> bytes:
-    """A Markdown file's bytes, up to :data:`DOC_MAX_BYTES`; raises :class:`Refused`.
+    """A Markdown or HTML file's bytes, up to :data:`DOC_MAX_BYTES`; raises :class:`Refused`.
 
     ``index_online`` is the scan's cloud flag for the file; a fresh listing of
     its folder decides, since the file may have been downloaded or freed since.
@@ -170,7 +182,7 @@ def read_document(path: str, index_online: bool, download: bool = False) -> byte
 
 
 def read_document_listed(path: str, index_online: bool, download: bool = False, cap: int = DOC_MAX_BYTES) -> tuple[bytes, int]:
-    """A Markdown file's bytes and the modified time its fresh listing gave, up to ``cap`` bytes; the editor's read."""
+    """A document's bytes and the modified time its fresh listing gave, up to ``cap`` bytes; the editor's read."""
     if not is_document(path):
         raise Refused("not_document")
     return _read(path, cap, index_online, download)
@@ -181,3 +193,10 @@ def read_image(path: str, index_online: bool, download: bool = False) -> bytes:
     if not is_image(path):
         raise Refused("not_document")
     return _read(path, IMAGE_MAX_BYTES, index_online, download)[0]
+
+
+def read_asset(path: str, index_online: bool) -> bytes:
+    """A stylesheet or script beside an HTML page, up to :data:`DOC_MAX_BYTES`, under the same checks; never downloaded."""
+    if not is_asset(path):
+        raise Refused("not_document")
+    return _read(path, DOC_MAX_BYTES, index_online, False)[0]

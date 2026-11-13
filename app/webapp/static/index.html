@@ -105,7 +105,7 @@
         <div class="search-modes">
           <span class="segmented" role="group" aria-label="Search in" id="modeSeg">
             <button type="button" class="segmented-item" aria-pressed="false" data-value="folders" data-track="mode-folders"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Folders</button>
-            <button type="button" class="segmented-item" aria-pressed="false" data-value="docs" data-track="mode-docs"><svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>Markdown</button>
+            <button type="button" class="segmented-item" aria-pressed="false" data-value="docs" data-track="mode-docs"><svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>Documents</button>
             <button type="button" class="segmented-item" aria-pressed="true" data-value="emails" data-track="mode-emails"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</button>
           </span>
           <button type="button" class="icon-button kbd-only" id="keysInfo" aria-label="Keyboard shortcuts help" title="Keyboard shortcuts help" data-track="keys-info">
@@ -535,10 +535,17 @@
     </div>
     <div class="row row-stack">
       <div class="row-line">
-        <span>Markdown search</span>
+        <span>Documents search</span>
         <span class="switch-slot" id="markdownSearchSlot" data-track="markdown-search"></span>
       </div>
       <p class="row-note" id="markdownSearchNote"></p>
+    </div>
+    <div class="row row-stack">
+      <div class="row-line">
+        <span>Block remote content in HTML</span>
+        <span class="switch-slot" id="blockRemoteHtmlSlot" data-track="block-remote-html"></span>
+      </div>
+      <p class="row-note" id="blockRemoteHtmlNote"></p>
     </div>
     <div class="row row-stack">
       <div class="row-line">

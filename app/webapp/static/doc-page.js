@@ -1,4 +1,4 @@
-/* The document window (/doc?root=…&scan=…&id=…): one Markdown file in its own browser or app window.
+/* The document window (/doc?root=…&scan=…&id=…): one document (Markdown or HTML) in its own browser or app window.
  *
  * The address names the file by root, scan id and item id, so it can be
  * bookmarked and still opens after a restart; a newer scan that renumbered it

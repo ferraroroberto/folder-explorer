@@ -1,4 +1,4 @@
-/* The Markdown viewer's body, shared by Explore's document sheet and the /doc window.
+/* The document viewer's body (Markdown, or an HTML page in a sandboxed frame), shared by Explore's document sheet and the /doc window.
  *
  * A document is named by root, scan id and item id, never a path. The server
  * renders it; this module draws the HTML, fetches each image by its own id
@@ -18,23 +18,23 @@ const COPIED_MS = 1500;
 // What each refusal means for the reader, and the one action offered with it.
 const STATES = {
   cloud_only: { text: 'This file is only in OneDrive. Downloading it brings this one file to the PC.', act: 'download', label: 'Download and open' },
-  too_large: { text: 'Markdown files up to 2 MB open here. Use Open in default app on the PC for this one.' },
+  too_large: { text: 'Documents up to 2 MB open here. Use Open in default app on the PC for this one.' },
   scan_changed: { text: 'A newer scan renumbered the files, so this address no longer names it. Find it again in Explore.', act: 'explore', label: 'Open Explore' },
   not_found: { text: 'This scan has no such file. Find it again in Explore.', act: 'explore', label: 'Open Explore' },
   gone: { text: 'It was moved or deleted since the last scan.' },
-  not_document: { text: 'Only Markdown files and the images beside them open here.' },
+  not_document: { text: 'Only Markdown and HTML files and the images beside them open here.' },
   unreadable: { text: 'Windows could not read it. Try again in a moment.' },
   app_mismatch: { text: 'This usually means the app was just updated or is restarting. Reload the page in a moment.', act: 'reload', label: 'Reload' },
   app_error: { text: 'Something went wrong in the app. Try again in a moment.' },
   no_answer: { text: 'Check the connection to the PC, then try again.' },
   dropped_gone: { text: 'A dropped file is kept only by the page it was dropped on. Drop it again on the app to open it.' },
   not_utf8: { text: 'This file is not saved as UTF-8 text, so it opens read-only here.' },
-  edit_too_large: { text: 'Markdown files up to 1 MB can be edited here.' },
+  edit_too_large: { text: 'Documents up to 1 MB can be edited here.' },
 };
 
 // Shown above a dropped file the scan doesn't have: it renders from the text the page read, so it can't be saved back.
 const DROPPED_NOTE = '<p class="doc-drop-note" role="note">' + glyph('info') +
-  '<span>Dropped file, shown read-only. Editing, relative links and images need it in a scanned folder.</span></p>';
+  '<span>Dropped file, shown read-only. Editing, relative links and the files beside it need it in a scanned folder.</span></p>';
 
 const blobs = new WeakMap();
 // Each container's loaded images by id, so the editor's preview reuses them on every render instead of fetching again.
@@ -137,9 +137,28 @@ export function releaseDoc(container) {
   loaded.set(container, new Map());
 }
 
+// An HTML page runs its own scripts in an opaque origin: with no allow-same-origin it can't reach this page, its storage or
+// cookies, and the server refuses its API calls (Origin: null). Popups let its links open a normal tab; there are no forms or modals.
+export const FRAME_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
+
+function drawFrame(container, doc) {
+  container.innerHTML = doc.dropped ? DROPPED_NOTE : '';
+  const frame = document.createElement('iframe');
+  frame.className = 'doc-frame';
+  frame.setAttribute('sandbox', FRAME_SANDBOX);
+  frame.setAttribute('referrerpolicy', 'no-referrer');
+  frame.title = doc.name || 'HTML page';
+  frame.srcdoc = doc.html;
+  container.appendChild(frame);
+}
+
 /** Draw a rendered document into ``container``; ``keep`` holds on to the images it already loaded (the editor's preview). */
 export function drawDoc(container, doc, keep) {
   if (!keep || !blobs.has(container)) releaseDoc(container);
+  if (doc.kind === 'html') {
+    drawFrame(container, doc);
+    return;
+  }
   container.innerHTML = (doc.dropped ? DROPPED_NOTE : '') + '<article class="doc-prose">' + doc.html + '</article>';
   loadImages(container, { root: doc.root, scan_id: doc.scan_id });
 }

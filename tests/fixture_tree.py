@@ -120,10 +120,51 @@ Back to the [guide](../guide.md).
 JOURNAL_MD = b"# Journal\n\nFirst entry.\n"
 # One byte past the viewer's 2 MB cap.
 BIG_MD_BYTES = 2 * 1024 * 1024 + 1
+# The invented HTML pages sit in a folder of their own, so the Markdown notes' folder keeps its rows,
+# and the page's image and link into the notes cross folders.
+PAGES_FOLDER = "Pages"
+# An invented HTML page: a stylesheet and a script beside it, an image and a link in the notes, every link
+# rule, and a probe that records in its own body whether it could reach the app's page, cookies, storage or API.
+PAGE_HTML = """<!doctype html>
+<html><head><title>Invented page</title>
+<base href="https://example.invalid/">
+<link rel="stylesheet" href="page.css">
+<script src="page.js"></script>
+</head><body>
+<h1 id="top">Invented page</h1>
+<p class="styled">Styled by the stylesheet beside it.</p>
+<img alt="Bed plan" src="../Notes/diagram.png">
+<img alt="Escaped" src="../../outside.png">
+<p><a href="../Notes/guide.md">The guide</a>, <a href="missing.html">a missing page</a>,
+<a href="../../elsewhere.html">an escape</a>, <a href="https://example.invalid/x">the web</a>, <a href="#top">the top</a>.</p>
+<script>
+(async () => {
+  const b = document.body;
+  try { void parent.document.title; b.dataset.parent = 'reached'; } catch (e) { b.dataset.parent = 'blocked'; }
+  let cookie = '';
+  try { cookie = document.cookie; } catch (e) { cookie = ''; }
+  b.dataset.cookie = cookie.includes('probe=') ? 'reached' : 'blocked';
+  let stored = null;
+  try { stored = localStorage.getItem('folder-explorer.probe'); } catch (e) { stored = null; }
+  b.dataset.storage = stored ? 'reached' : 'blocked';
+  try { await fetch('/api/doc/recent?probe=' + Date.now(), { mode: 'no-cors' }); b.dataset.quiet = 'sent'; } catch (e) { b.dataset.quiet = 'failed'; }
+  try {
+    const r = await fetch('/api/doc/render', { method: 'POST', body: new Blob(['{}']) });
+    b.dataset.api = 'answered ' + r.status;
+  } catch (e) { b.dataset.api = 'blocked'; }
+})();
+</script>
+</body></html>
+"""
+PAGE_CSS = ".styled { color: rgb(0, 128, 0); }\n"
+PAGE_JS = "document.documentElement.dataset.pageJs = 'ran';\n"
+# The HTML page the editor e2e changes; nothing else reads it.
+SKETCH_HTML = b"<!doctype html>\n<h1>Sketch</h1>\n<p>First draft.</p>\n"
 
 
 def add_docs(root: Path) -> Path:
-    """Write the invented Markdown notes under ``root``: a guide, a page it links to, a journal to edit, an image and an oversize file."""
+    """Write the invented notes under ``root``: a guide, a page it links to, a journal to edit, an image, an oversize file,
+    and, in their own folder, an HTML page with its stylesheet and script plus an HTML sketch to edit."""
     folder = root / DOCS_FOLDER
     (folder / "sub").mkdir(parents=True, exist_ok=True)
     (folder / "guide.md").write_text(GUIDE_MD, encoding="utf-8")
@@ -131,4 +172,10 @@ def add_docs(root: Path) -> Path:
     (folder / "journal.md").write_bytes(JOURNAL_MD)
     (folder / "diagram.png").write_bytes(TINY_PNG)
     (folder / "big.md").write_bytes(b"#" * BIG_MD_BYTES)
+    pages = root / PAGES_FOLDER
+    pages.mkdir(exist_ok=True)
+    (pages / "page.html").write_bytes(PAGE_HTML.encode("utf-8"))
+    (pages / "page.css").write_bytes(PAGE_CSS.encode("utf-8"))
+    (pages / "page.js").write_bytes(PAGE_JS.encode("utf-8"))
+    (pages / "sketch.htm").write_bytes(SKETCH_HTML)
     return root

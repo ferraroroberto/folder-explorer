@@ -30,6 +30,8 @@ export const S = {
 
 export const WIDE = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
 export const $ = (id) => document.getElementById(id);
+/** The search box. */
+export const box = () => $('q');
 
 // The server wraps each match in these two private-use characters (src/email/search.py).
 const MARK_START = String.fromCharCode(0xe000);

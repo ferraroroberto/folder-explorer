@@ -8,12 +8,10 @@
  */
 
 import { createRowMenu } from './_vendored/row-menu/row-menu.js';
-import { esc } from './fmt.js';
+import { esc, glyph } from './fmt.js';
 
 // The row's title: a path's last folder, which a long path would otherwise cut off.
 const folderName = (p) => p.split(/[\\/]/).filter(Boolean).pop() || p;
-
-const glyph = (name) => '<svg class="icon" aria-hidden="true"><use href="#i-' + name + '"></use></svg>';
 
 /** Ask before a remove: the one confirm sheet every list shares. */
 function confirmRemove(path) {

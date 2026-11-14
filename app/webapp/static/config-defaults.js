@@ -26,7 +26,7 @@ export const DEFAULTS = {
     archive_folder: 'Archive', category: 'Archived by task-os', dismiss_category: 'Dismissed by task-os',
     self_address: null, add_category: false, move_to_archive: false,
   },
-  snap: { folder: null, hotkey: 'ctrl+shift+a', jpeg_quality: 90, copy_to_clipboard: true, file_prefix: 'snap', show_loupe: true },
+  snap: { folder: null, hotkey: 'ctrl+shift+a', jpeg_quality: 90, copy_to_clipboard: true, file_prefix: 'snap', show_loupe: true, hold_to_capture: false },
 };
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);

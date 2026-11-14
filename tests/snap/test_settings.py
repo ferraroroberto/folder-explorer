@@ -22,7 +22,7 @@ def _file(isolated: Path) -> dict:
 
 def test_no_file_means_the_defaults() -> None:
     cfg = settings.resolve(config.load()["snap"])
-    assert (cfg.hotkey, cfg.jpeg_quality, cfg.copy_to_clipboard, cfg.file_prefix, cfg.show_loupe) == ("ctrl+shift+a", 90, True, "snap", True)
+    assert (cfg.hotkey, cfg.jpeg_quality, cfg.copy_to_clipboard, cfg.file_prefix, cfg.show_loupe, cfg.hold_to_capture) == ("ctrl+shift+a", 90, True, "snap", True, False)
     assert cfg.folder == Path.home() / "Pictures" / "snaps"
 
 
@@ -42,6 +42,7 @@ def test_values_are_read_and_a_folder_expands(isolated: Path) -> None:
     ({"jpeg_quality": "90"}, "jpeg_quality"),
     ({"copy_to_clipboard": "yes"}, "copy_to_clipboard"),
     ({"show_loupe": 1}, "show_loupe"),
+    ({"hold_to_capture": "yes"}, "hold_to_capture"),
     ({"folder": ""}, "folder"),
     ({"hotkey": 5}, "hotkey"),
     ({"hotkey": "a"}, "modifier"),
@@ -76,10 +77,11 @@ def test_save_writes_one_key_and_keeps_the_rest_as_written(isolated: Path) -> No
 
 def test_each_setting_round_trips_through_the_file(isolated: Path) -> None:
     out = str(isolated / "out")
-    for key, value in (("copy_to_clipboard", False), ("jpeg_quality", 70), ("file_prefix", "report"), ("show_loupe", False), ("folder", out)):
+    for key, value in (("copy_to_clipboard", False), ("jpeg_quality", 70), ("file_prefix", "report"), ("show_loupe", False), ("hold_to_capture", True), ("folder", out)):
         assert config.save_snap({key: value})["snap"][key] == value
     final = settings.resolve(config.load()["snap"])
-    assert (final.copy_to_clipboard, final.jpeg_quality, final.file_prefix, final.show_loupe, final.folder) == (False, 70, "report", False, Path(out))
+    assert (final.copy_to_clipboard, final.jpeg_quality, final.file_prefix, final.show_loupe, final.hold_to_capture, final.folder) == (
+        False, 70, "report", False, True, Path(out))
 
 
 def test_a_bad_save_leaves_the_file_untouched(isolated: Path) -> None:
@@ -95,8 +97,13 @@ def test_save_creates_a_missing_file(isolated: Path) -> None:
     assert _file(isolated) == {"snap": {"jpeg_quality": 95}}
 
 
-def test_the_settings_api_cannot_write_the_snap_block(isolated: Path) -> None:
+def test_the_settings_api_writes_only_hold_to_capture_in_the_snap_block(isolated: Path) -> None:
+    (isolated / "config.json").write_text(json.dumps({"snap": {"folder": "~/shots", "jpeg_quality": 60}}), encoding="utf-8")
     with TestClient(app, client=LOCAL) as c:
-        refused = c.post("/api/config", json={"snap": {"folder": "X:/Invented"}})
-        assert refused.status_code == 400 and "read-only" in refused.json()["detail"]
-        assert c.get("/api/config").json()["config"]["snap"] == settings.DEFAULTS
+        for bad in ({"folder": "X:/Invented"}, {"hold_to_capture": "yes"}, {"hold_to_capture": True, "folder": "X:/Invented"}, {}):
+            refused = c.post("/api/config", json={"snap": bad})
+            assert refused.status_code == 400 and "hold_to_capture" in refused.json()["detail"]
+        assert c.get("/api/config").json()["config"]["snap"]["hold_to_capture"] is False
+        saved = c.post("/api/config", json={"snap": {"hold_to_capture": True}})
+        assert saved.status_code == 200 and saved.json()["config"]["snap"]["hold_to_capture"] is True
+    assert _file(isolated) == {"snap": {"folder": "~/shots", "jpeg_quality": 60, "hold_to_capture": True}}

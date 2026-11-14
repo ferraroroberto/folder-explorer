@@ -1,12 +1,16 @@
 # Region screenshot
 
-The tray's screenshot: press a global hotkey anywhere, drag a rectangle over the frozen screen, release, and the selection is saved as a timestamped JPEG and copied to the clipboard. No editor, no dialog. Esc or a right-click cancels and saves nothing. It runs inside the tray process (`pythonw -m app.tray`), so it is there whenever the tray is, and a second tray never starts (the tray's mutex).
+The tray's screenshot: press a global hotkey anywhere, click one corner of an area on the frozen screen, move, click again, and the selection is saved as a timestamped JPEG and copied to the clipboard. No editor, no dialog. Esc or a right-click cancels and saves nothing. It runs inside the tray process (`pythonw -m app.tray`), so it is there whenever the tray is, and a second tray never starts (the tray's mutex).
+
+## Selecting an area
+
+By default the first click anchors a corner and releasing it changes nothing; moving stretches the rectangle (the loupe follows and shows its size) and the second click saves. A second click that would crop under the minimum size keeps the overlay and the anchor. Turn on **Hold left click to capture** (Settings, or `snap.hold_to_capture`) for press, drag, release, where a release under the minimum size cancels. Esc or a right-click cancels in both modes, and the arrow keys nudge in both. The mode is read at each capture, so a change applies from the next one with no restart. The rules live in `src/snap/selection.py`, with no Tk, so both modes are unit-tested.
 
 ## Selecting precisely
 
-- **Loupe:** a 25 x 25 pixel square around the cursor, magnified 8x with nearest-neighbour so every pixel is a block, a crosshair on the centre pixel, and a label `x,y` (screen coordinates), or `x,y (w×h)` while dragging. It is drawn from the frame already captured, reads physical pixels, and flips to the other side of the cursor near the right and bottom edge of the monitor under it.
+- **Loupe:** a 25 x 25 pixel square around the cursor, magnified 8x with nearest-neighbour so every pixel is a block, a crosshair on the centre pixel, and a label `x,y` (screen coordinates), or `x,y (w×h)` once a corner is anchored. It is drawn from the frame already captured, reads physical pixels, and flips to the other side of the cursor near the right and bottom edge of the monitor under it.
 - **F6** shows or hides the loupe and saves the choice as `snap.show_loupe`.
-- **Arrow keys** move the cursor one pixel, **Shift+arrow** ten, before or during a drag, so an edge can be placed exactly.
+- **Arrow keys** move the cursor one pixel, **Shift+arrow** ten, before or after the first click, so an edge can be placed exactly.
 
 ## Tray menu
 
@@ -22,8 +26,9 @@ The tray's screenshot: press a global hotkey anywhere, drag a rectangle over the
 | `copy_to_clipboard` | `true` | Also put the capture on the clipboard |
 | `file_prefix` | `snap` | Start of every file name |
 | `show_loupe` | `true` | Whether the loupe is shown |
+| `hold_to_capture` | `false` | `false`: click, move, click; `true`: press, drag, release |
 
-A value that cannot be used is logged and takes its default. The web app's settings route refuses the block (it is not a Settings control), so a phone can never change where the PC saves files.
+A value that cannot be used is logged and takes its default. The web app's settings route accepts only `hold_to_capture` in this block and refuses the rest, so a phone can never change where the PC saves files.
 
 ## Files and rules
 
@@ -43,4 +48,4 @@ A monitor whose part of the grab is pure black is a capture Windows refused, not
 
 ## Tests
 
-`tests/snap/` covers naming, crop maths with monitor offsets, loupe placement (edge flipping, monitor seams, scaled displays), arrow nudging, prefix validation, hotkey parsing and the settings' round trip through `config.json`. The overlay and the hotkey need a real desktop and are checked by hand.
+`tests/snap/` covers naming, crop maths with monitor offsets, loupe placement (edge flipping, monitor seams, scaled displays), arrow nudging, the selection state machine of both modes, prefix validation, hotkey parsing and the settings' round trip through `config.json`. The overlay and the hotkey need a real desktop and are checked by hand.

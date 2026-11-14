@@ -1,4 +1,4 @@
-/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, how the screenshot selects, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -17,6 +17,7 @@ let assocSwitch = null;
 let categorySwitch = null;
 let moveSwitch = null;
 let traySwitch = null;
+let snapHoldSwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
 let onSearchChanged = () => {};
@@ -60,6 +61,10 @@ function render(body) {
   $('trayClickNote').textContent = quick
     ? 'On: a left click on the tray icon opens the small Quick search window for folders and email. Open in the tray menu still opens this app.'
     : 'Off: a left click on the tray icon opens this app. Quick search stays in the tray menu.';
+  setSwitch(snapHoldSwitch, cfg.snap.hold_to_capture);
+  $('snapHoldNote').textContent = cfg.snap.hold_to_capture
+    ? 'On: the screenshot selects by pressing, dragging and releasing the left button.'
+    : 'Off: the screenshot selects with a click to start, a move, and a click to finish; no button is held. Applies from the next capture.';
   setSwitch(remoteSwitch, cfg.remote_access);
   remoteSwitch.setAttribute('aria-label', 'Remote access');
   let note = REMOTE_TEXT[remote.running] || '';
@@ -248,6 +253,11 @@ export function initSettings(opts) {
     },
   });
   $('trayClickSlot').appendChild(traySwitch);
+  snapHoldSwitch = switchEl(false, {
+    label: 'Hold left click to capture',
+    onToggle: (next) => save({ snap: { hold_to_capture: next } }),
+  });
+  $('snapHoldSlot').appendChild(snapHoldSwitch);
   $('createConfig').addEventListener('click', createConfig);
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);

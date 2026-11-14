@@ -25,6 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "copy_to_clipboard": True,
     "file_prefix": "snap",
     "show_loupe": True,
+    # false: click to anchor a corner, move, click again to save; true: press, drag, release.
+    "hold_to_capture": False,
 }
 
 
@@ -38,6 +40,7 @@ class SnapConfig:
     copy_to_clipboard: bool
     file_prefix: str
     show_loupe: bool
+    hold_to_capture: bool
 
 
 def _folder(value: Any) -> Any:
@@ -83,6 +86,7 @@ _CHECKS = {
     "copy_to_clipboard": _flag("copy_to_clipboard"),
     "file_prefix": _prefix,
     "show_loupe": _flag("show_loupe"),
+    "hold_to_capture": _flag("hold_to_capture"),
 }
 
 
@@ -118,4 +122,5 @@ def resolve(block: Mapping[str, Any]) -> SnapConfig:
         copy_to_clipboard=block["copy_to_clipboard"],
         file_prefix=block["file_prefix"],
         show_loupe=block["show_loupe"],
+        hold_to_capture=block["hold_to_capture"],
     )

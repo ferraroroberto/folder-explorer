@@ -518,132 +518,150 @@
         <button type="button" class="button-tint" id="createConfig" data-track="create-config">Create config.json</button>
       </div>
     </div>
-    <div class="row">
-      <span>Text size</span>
-      <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
-        <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small" data-track="textsize-small">Small</button>
-        <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default" data-track="textsize-default">Default</button>
-        <button type="button" class="segmented-item" aria-pressed="false" data-textsize="large" data-track="textsize-large">Large</button>
+    <h3 class="settings-overline">Display</h3>
+    <div class="card settings-group">
+      <div class="row">
+        <span>Text size</span>
+        <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
+          <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small" data-track="textsize-small">Small</button>
+          <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default" data-track="textsize-default">Default</button>
+          <button type="button" class="segmented-item" aria-pressed="false" data-textsize="large" data-track="textsize-large">Large</button>
+        </div>
+      </div>
+      <div class="row">
+        <span>Open with totals by</span>
+        <div class="segmented" id="defaultBasisSeg" role="group" aria-label="Default totals">
+          <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="default-basis-size">Size</button>
+          <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="default-basis-disk">On disk</button>
+        </div>
       </div>
     </div>
-    <div class="row">
-      <span>Open with totals by</span>
-      <div class="segmented" id="defaultBasisSeg" role="group" aria-label="Default totals">
-        <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="default-basis-size">Size</button>
-        <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="default-basis-disk">On disk</button>
+    <h3 class="settings-overline">Scanning</h3>
+    <div class="card settings-group">
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Scan schedule</span>
+          <span class="row-controls">
+            <select class="select-native" id="scheduleSelect" data-track="schedule-select" aria-label="Scan schedule">
+              <option value="off">Off</option>
+              <option value="nightly">Every night</option>
+              <option value="hourly">Every hour</option>
+            </select>
+            <input class="input-native" type="time" id="scheduleTime" data-track="schedule-time" aria-label="Nightly scan time">
+          </span>
+        </div>
+        <p class="row-note" id="scheduleNote"></p>
+      </div>
+      <div class="row row-stack folder-section" id="scanFolders">
+        <span>Folders to scan</span>
+        <div class="row-line">
+          <span>Every local drive and OneDrive</span>
+          <span class="switch-slot" id="rootsAutoSlot" data-track="roots-auto"></span>
+        </div>
+        <div id="rootsEditor" hidden></div>
+        <p class="row-note" id="rootsNote"></p>
+        <p class="sub-head">Skip these folders</p>
+        <p class="row-note">The disk scan, folder search and the email index all leave them out. Each sits inside a folder to scan.</p>
+        <div id="excludeEditor"></div>
+      </div>
+      <div class="row">
+        <span>Index size</span>
+        <span class="row-value" id="indexSize"></span>
       </div>
     </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Documents search</span>
-        <span class="switch-slot" id="markdownSearchSlot" data-track="markdown-search"></span>
-      </div>
-      <p class="row-note" id="markdownSearchNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Block remote content in HTML</span>
-        <span class="switch-slot" id="blockRemoteHtmlSlot" data-track="block-remote-html"></span>
-      </div>
-      <p class="row-note" id="blockRemoteHtmlNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Reuse an open Explorer window</span>
-        <span class="switch-slot" id="reuseExplorerSlot" data-track="reuse-explorer"></span>
-      </div>
-      <p class="row-note" id="reuseExplorerNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Add an Outlook category when archiving</span>
-        <span class="switch-slot" id="archiveCategorySlot" data-track="archive-category-switch"></span>
-      </div>
-      <p class="row-note" id="archiveCategoryNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Move to the Outlook archive folder when archiving</span>
-        <span class="switch-slot" id="archiveMoveSlot" data-track="archive-move-switch"></span>
-      </div>
-      <p class="row-note" id="archiveMoveNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Tray click opens Quick search</span>
-        <span class="switch-slot" id="trayClickSlot" data-track="tray-left-click"></span>
-      </div>
-      <p class="row-note" id="trayClickNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Hold left click to capture</span>
-        <span class="switch-slot" id="snapHoldSlot" data-track="snap-hold-to-capture"></span>
-      </div>
-      <p class="row-note" id="snapHoldNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Remote access</span>
-        <span class="switch-slot" id="remoteSwitchSlot" data-track="remote-access"></span>
-      </div>
-      <p class="row-note" id="remoteNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Scan schedule</span>
-        <span class="row-controls">
-          <select class="select-native" id="scheduleSelect" data-track="schedule-select" aria-label="Scan schedule">
-            <option value="off">Off</option>
-            <option value="nightly">Every night</option>
-            <option value="hourly">Every hour</option>
+    <h3 class="settings-overline">Email</h3>
+    <div class="card settings-group">
+      <div class="row row-stack folder-section" id="emailFolders">
+        <span>Email folders</span>
+        <p class="row-note">The email index reads the .msg files in these folders. Each sits inside a folder to scan.</p>
+        <div id="emailRootsEditor"></div>
+        <p class="sub-head">Leave out of the email index</p>
+        <p class="row-note">Folders inside an email folder that only the email index skips.</p>
+        <div id="emailExcludeEditor"></div>
+        <div class="row-line folder-budget">
+          <span>OneDrive downloads per run</span>
+          <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
+            <option value="">No limit (recommended)</option>
+            <option value="0">None (local only)</option>
+            <option value="512">512 MB</option>
+            <option value="2048">2 GB</option>
+            <option value="5120">5 GB</option>
           </select>
-          <input class="input-native" type="time" id="scheduleTime" data-track="schedule-time" aria-label="Nightly scan time">
-        </span>
+        </div>
+        <p class="row-note" id="emailBudgetNote"></p>
       </div>
-      <p class="row-note" id="scheduleNote"></p>
-    </div>
-    <div class="row row-stack folder-section" id="scanFolders">
-      <span>Folders to scan</span>
-      <div class="row-line">
-        <span>Every local drive and OneDrive</span>
-        <span class="switch-slot" id="rootsAutoSlot" data-track="roots-auto"></span>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Add an Outlook category when archiving</span>
+          <span class="switch-slot" id="archiveCategorySlot" data-track="archive-category-switch"></span>
+        </div>
+        <p class="row-note" id="archiveCategoryNote"></p>
       </div>
-      <div id="rootsEditor" hidden></div>
-      <p class="row-note" id="rootsNote"></p>
-      <p class="sub-head">Skip these folders</p>
-      <p class="row-note">The disk scan, folder search and the email index all leave them out. Each sits inside a folder to scan.</p>
-      <div id="excludeEditor"></div>
-    </div>
-    <div class="row row-stack folder-section" id="emailFolders">
-      <span>Email folders</span>
-      <p class="row-note">The email index reads the .msg files in these folders. Each sits inside a folder to scan.</p>
-      <div id="emailRootsEditor"></div>
-      <p class="sub-head">Leave out of the email index</p>
-      <p class="row-note">Folders inside an email folder that only the email index skips.</p>
-      <div id="emailExcludeEditor"></div>
-      <div class="row-line folder-budget">
-        <span>OneDrive downloads per run</span>
-        <select class="select-native" id="emailBudget" aria-label="OneDrive downloads per run" data-track="email-budget">
-          <option value="">No limit (recommended)</option>
-          <option value="0">None (local only)</option>
-          <option value="512">512 MB</option>
-          <option value="2048">2 GB</option>
-          <option value="5120">5 GB</option>
-        </select>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Move to the Outlook archive folder when archiving</span>
+          <span class="switch-slot" id="archiveMoveSlot" data-track="archive-move-switch"></span>
+        </div>
+        <p class="row-note" id="archiveMoveNote"></p>
       </div>
-      <p class="row-note" id="emailBudgetNote"></p>
-    </div>
-    <div class="row row-stack">
-      <div class="row-line">
-        <span>Outlook macro</span>
-        <button type="button" class="button-surface" id="showMacro" data-track="show-macro">Show macro</button>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Outlook macro</span>
+          <button type="button" class="button-surface" id="showMacro" data-track="show-macro">Show macro</button>
+        </div>
+        <p class="row-note" id="outlookNote"></p>
       </div>
-      <p class="row-note" id="outlookNote"></p>
     </div>
-    <div class="row">
-      <span>Index size</span>
-      <span class="row-value" id="indexSize"></span>
+    <h3 class="settings-overline">Files and documents</h3>
+    <div class="card settings-group">
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Documents search</span>
+          <span class="switch-slot" id="markdownSearchSlot" data-track="markdown-search"></span>
+        </div>
+        <p class="row-note" id="markdownSearchNote"></p>
+      </div>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Block remote content in HTML</span>
+          <span class="switch-slot" id="blockRemoteHtmlSlot" data-track="block-remote-html"></span>
+        </div>
+        <p class="row-note" id="blockRemoteHtmlNote"></p>
+      </div>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Reuse an open Explorer window</span>
+          <span class="switch-slot" id="reuseExplorerSlot" data-track="reuse-explorer"></span>
+        </div>
+        <p class="row-note" id="reuseExplorerNote"></p>
+      </div>
+    </div>
+    <h3 class="settings-overline">Tray and screenshot</h3>
+    <div class="card settings-group">
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Tray click opens Quick search</span>
+          <span class="switch-slot" id="trayClickSlot" data-track="tray-left-click"></span>
+        </div>
+        <p class="row-note" id="trayClickNote"></p>
+      </div>
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Hold left click to capture</span>
+          <span class="switch-slot" id="snapHoldSlot" data-track="snap-hold-to-capture"></span>
+        </div>
+        <p class="row-note" id="snapHoldNote"></p>
+      </div>
+    </div>
+    <h3 class="settings-overline">Remote access</h3>
+    <div class="card settings-group">
+      <div class="row row-stack">
+        <div class="row-line">
+          <span>Remote access</span>
+          <span class="switch-slot" id="remoteSwitchSlot" data-track="remote-access"></span>
+        </div>
+        <p class="row-note" id="remoteNote"></p>
+      </div>
     </div>
   </div>
 </dialog>

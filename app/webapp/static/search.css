@@ -37,7 +37,8 @@ kbd {
 /* ------------------------------------------------------------- search card */
 .search-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--gap); }
 .search-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 14px; }
-.search-modes { display: flex; align-items: center; gap: var(--space-sm); }
+/* The shortcut button sits a full spacing step from the last tab so it never reads as a fourth segment. */
+.search-modes { display: flex; align-items: center; gap: var(--space-md); }
 .search-modes .segmented { flex: 1; max-width: 320px; }
 .search-modes .icon-button { margin-left: auto; }
 .search-field {
@@ -306,7 +307,7 @@ kbd {
   }
   .search-card { grid-area: box; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--gap); }
   .search-card > .search-modes { grid-column: 1; }
-  .search-card > .search-modes .segmented { width: 300px; }
+  .search-card > .search-modes .segmented { width: 340px; }
   .search-card > .search-field { grid-column: 2; }
   .search-card > .query-chips, .search-card > .saved-row, .search-card > .recent-list { grid-column: 1 / -1; }
   .search-side { grid-area: side; min-height: 0; overflow: auto; display: grid; align-content: start; gap: var(--gap); }
@@ -329,7 +330,10 @@ kbd {
 .search-note { display: flex; gap: var(--space-sm); align-items: flex-start; padding: 8px; font-size: var(--font-body-sm); color: var(--attention-text); }
 .search-note .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; margin-top: 2px; }
 .results-more { display: flex; justify-content: center; padding: var(--space-sm) 0; border-top: 1px solid var(--line-muted); }
-.search-modes .segmented-item .icon { width: var(--icon-inline); height: var(--icon-inline); margin-right: 6px; vertical-align: -3px; }
+/* Inner padding keeps each label clear of its pill's edge; the icon-to-label gap is the segment's own flex gap. */
+.search-modes .segmented { grid-auto-columns: minmax(max-content, 1fr); }
+.search-modes .segmented-item { padding: 0 var(--space-sm); }
+.search-modes .segmented-item .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
 .detail-card .ff-col { display: grid; gap: 6px; margin-top: var(--space-sm); }
 .detail-card .ff-col .input-native { width: 100%; box-sizing: border-box; }
 /* A folder pill in the preview wraps instead of cutting the name; the full path is shown below. */

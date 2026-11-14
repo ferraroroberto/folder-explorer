@@ -336,3 +336,22 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     page.locator("#modeSeg .segmented-item", has_text="Documents").click()
     expect(page.locator("#resultsTitle")).to_contain_text("Documents")
     assert errors == []
+
+
+def test_the_mode_tabs_keep_their_labels_clear_of_the_pill_and_the_shortcut_button_apart(page: Page, app_url: str) -> None:
+    page.goto(app_url + "/#search?mode=folders&q=")
+    expect(page.locator("#modeSeg .segmented-item:visible")).to_have_count(3)
+    for theme in ("light", "dark"):
+        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        edges = page.evaluate("""() => [...document.querySelectorAll('#modeSeg .segmented-item')].map(item => {
+            const range = document.createRange();
+            range.selectNodeContents(item);
+            const inner = range.getBoundingClientRect(), box = item.getBoundingClientRect();
+            return [inner.left - box.left, box.right - inner.right];
+        })""")
+        # Each label sits a spacing step (8px) inside its own pill, so the selected pill never touches a neighbour's label.
+        assert all(min(pair) >= 7.9 for pair in edges), edges
+    keys = page.locator("#keysInfo")
+    if keys.is_visible():
+        gap = page.evaluate("document.querySelector('#keysInfo').getBoundingClientRect().left - document.querySelector('#modeSeg').getBoundingClientRect().right")
+        assert gap >= 15.9, gap

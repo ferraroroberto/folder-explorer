@@ -14,7 +14,15 @@ By default the first click anchors a corner and releasing it changes nothing; mo
 
 ## Tray menu
 
-**Screenshot** in the tray menu shows the hotkey in its title and holds **Copy to clipboard on save**, **Show loupe (F6)**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix...** (a dialog; a character Windows refuses in a filename, an empty value or more than 40 characters is refused), **Open folder** and **Change folder...**. Each is written to the `snap` block of `config.json` (only that key changes) and applies from the next capture. A hotkey another application already owns is shown first in the submenu ("Not running: ...") and logged, and the rest of the tray is unaffected.
+**Screenshot** in the tray menu shows the hotkey in its title and holds **Copy to clipboard on save**, **Show loupe (F6)**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix...** (a dialog; a character Windows refuses in a filename, an empty value or more than 40 characters is refused), **Open folder** and **Change folder...**. Each is also a row of Settings (below). Each is written to the `snap` block of `config.json` (only that key changes) and applies from the next capture. While the tray runs, it looks at `config.json` every two seconds and redraws the menu when the file changes, so a setting changed in Settings shows its check here too. A hotkey another application already owns is shown first in the submenu ("Not running: ...") and logged, and the rest of the tray is unaffected.
+
+## Settings
+
+The **Tray and screenshot** section of Settings holds every setting the tray menu does, plus the hotkey: **Hold left click to capture**, **Copy to clipboard on save**, **Show loupe**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix**, **Hotkey** and **Save folder**. A switch or a menu saves at once; a text field saves when you leave it or press Enter. Each goes through `POST /api/config` into `snap_settings.validate()`, so Settings and the tray refuse the same values with the same sentence, and a refused value leaves `config.json` untouched and puts the saved one back in the field. Only the changed key is written.
+
+- **Hotkey:** read once when the tray starts, so a new combo applies the next time the tray starts; the row says so. A combo another application owns is reported where it always was, as "Not running: ..." at the top of the tray's Screenshot menu and in `tray.log`; Settings does not probe it, because the tray holds the registration.
+- **Save folder:** shown, never edited, so a phone can never change where the PC writes files. **Open folder** (`POST /api/snap/open-folder`, this PC only) shows the configured folder in File Explorer through `src/desktop.py`, making it first when no capture has yet; the page names no path. Change it from the tray's **Change folder...** or in `config.json`.
+- **Both ways:** Settings reads `config.json` each time it opens, and the tray redraws its menu when the file changes.
 
 ## Config (`snap` in `config.json`)
 
@@ -28,7 +36,7 @@ By default the first click anchors a corner and releasing it changes nothing; mo
 | `show_loupe` | `true` | Whether the loupe is shown |
 | `hold_to_capture` | `false` | `false`: click, move, click; `true`: press, drag, release |
 
-A value that cannot be used is logged and takes its default. The web app's settings route accepts only `hold_to_capture` in this block and refuses the rest, so a phone can never change where the PC saves files.
+A value that cannot be used is logged and takes its default. The web app's settings route accepts every key in this block but `folder` and refuses that one, so a phone can never change where the PC saves files.
 
 ## Files and rules
 
@@ -48,4 +56,4 @@ A monitor whose part of the grab is pure black is a capture Windows refused, not
 
 ## Tests
 
-`tests/snap/` covers naming, crop maths with monitor offsets, loupe placement (edge flipping, monitor seams, scaled displays), arrow nudging, the selection state machine of both modes, prefix validation, hotkey parsing and the settings' round trip through `config.json`. The overlay and the hotkey need a real desktop and are checked by hand.
+`tests/snap/` covers naming, crop maths with monitor offsets, loupe placement (edge flipping, monitor seams, scaled displays), arrow nudging, the selection state machine of both modes, prefix validation, hotkey parsing, the settings' round trip through `config.json`, the Settings API (every key but the folder, the validator's refusals, Open folder for this PC only) and the tray's menu refresh. The overlay and the hotkey need a real desktop and are checked by hand.

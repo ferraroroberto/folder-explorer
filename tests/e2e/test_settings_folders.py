@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Iterator
 
 import pytest
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Locator, Page, Response, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e.conftest import LIVE_PORT
@@ -134,6 +134,54 @@ def test_the_hold_to_capture_switch_is_off_by_default_and_saves(page: Page, app_
         assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["hold_to_capture"] is True
     finally:
         page.request.post(app_url + "/api/config", data={"snap": {"hold_to_capture": False}})
+
+
+def _saved(response: Response) -> bool:
+    return response.url.endswith("/api/config") and response.request.method == "POST"
+
+
+def test_every_screenshot_setting_is_in_settings_and_a_refusal_puts_the_saved_value_back(page: Page, app_url: str) -> None:
+    if app_url.endswith(":%d" % LIVE_PORT):
+        pytest.skip("the rows write the settings: never on the live app")
+    page.goto(app_url + "/")
+    page.locator("#paneSearch .home-settings").click()
+    sheet = page.locator("#settingsDialog")
+    expect(sheet).to_be_visible()
+    clipboard = sheet.locator("#snapClipboardSlot [role=switch]")
+    expect(clipboard).to_have_attribute("aria-checked", "true")
+    expect(sheet.locator("#snapLoupeSlot [role=switch]")).to_have_attribute("aria-checked", "true")
+    expect(sheet.locator("#snapQuality")).to_have_value("90")
+    expect(sheet.locator("#snapPrefix")).to_have_value("snap")
+    expect(sheet.locator("#snapHotkey")).to_have_value("ctrl+shift+a")
+    expect(sheet.locator("#snapFolderPath")).not_to_be_empty()
+    expect(sheet.locator("#snapHotkeyNote")).to_contain_text("next time the tray starts")
+    try:
+        with page.expect_response(_saved):
+            sheet.locator("#snapQuality").select_option("95")
+        assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["jpeg_quality"] == 95
+        with page.expect_response(_saved):
+            clipboard.click()
+        expect(clipboard).to_have_attribute("aria-checked", "false")
+        expect(sheet.locator("#snapClipboardNote")).to_contain_text("only saved as a file")
+        assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["copy_to_clipboard"] is False
+        sheet.locator("#snapPrefix").fill("shot")
+        with page.expect_response(_saved):
+            sheet.locator("#snapPrefix").press("Enter")
+        expect(sheet.locator("#snapPrefixNote")).to_contain_text("shot_date_time.jpg")
+        sheet.locator("#snapPrefix").fill("bad:name")
+        with page.expect_response(_saved):
+            sheet.locator("#snapPrefix").press("Enter")
+        expect(page.locator(".toast").last).to_contain_text("prefix")
+        expect(sheet.locator("#snapPrefix")).to_have_value("shot")
+        sheet.locator("#snapHotkey").fill("ctrl+shift")
+        with page.expect_response(_saved):
+            sheet.locator("#snapHotkey").press("Enter")
+        expect(sheet.locator("#snapHotkey")).to_have_value("ctrl+shift+a")
+        assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["file_prefix"] == "shot"
+        sheet.locator("#snapOpenFolder").click()
+        expect(page.locator(".toast").last).to_contain_text("Could not open the folder")
+    finally:
+        page.request.post(app_url + "/api/config", data={"snap": {"jpeg_quality": 90, "copy_to_clipboard": True, "file_prefix": "snap"}})
 
 
 def test_the_archive_category_switch_is_off_by_default_and_saves(page: Page, app_url: str) -> None:

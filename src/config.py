@@ -349,8 +349,7 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
         if key == "snap":
-            if not (isinstance(value, dict) and set(value) == {"hold_to_capture"} and isinstance(value["hold_to_capture"], bool)):
-                raise ValueError("snap takes hold_to_capture, true or false")
+            value = _validate_snap(value)
         if key == "quick_search":
             if not (isinstance(value, dict) and set(value) == {"open_folder"} and isinstance(value["open_folder"], bool)):
                 raise ValueError("quick_search takes open_folder, true or false")
@@ -360,6 +359,18 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError("outlook takes " + " and ".join(OUTLOOK_SWITCHES) + ", true or false")
         out[key] = value
     return out
+
+
+# The snap keys a page may change; the save folder stays the PC's own (a phone must not choose where the PC writes files).
+SNAP_WEB_KEYS = frozenset(snap_settings.DEFAULTS) - {"folder"}
+
+
+def _validate_snap(value: Any) -> dict[str, Any]:
+    if not (isinstance(value, dict) and value):
+        raise ValueError("snap takes " + ", ".join(sorted(SNAP_WEB_KEYS)))
+    if "folder" in value:
+        raise ValueError("The save folder is changed from the tray menu or config.json on this PC, never from a page")
+    return snap_settings.validate(value)
 
 
 def _validate_email(value: Any) -> dict[str, Any]:
@@ -419,7 +430,7 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
 def save_snap(updates: dict[str, Any]) -> dict[str, Any]:
     """Merge checked region-screenshot settings into the file's ``snap`` block (the other keys stay as written) and return the new settings.
 
-    The tray menu writes this block; Settings reaches only ``hold_to_capture``, through :func:`save`. A bad value raises ``ValueError`` before anything is written.
+    The tray menu writes this block; Settings reaches every key but ``folder``, through :func:`save`. A bad value raises ``ValueError`` before anything is written.
     """
     clean = snap_settings.validate(updates)
     current = _current_file()

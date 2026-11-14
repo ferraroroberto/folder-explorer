@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 from pathlib import Path
 
@@ -97,3 +98,30 @@ def test_stored_hash_replaces_the_legacy_password(clock: FakeClock, tmp_path: Pa
     with TestClient(app, client=PHONE) as c:
         assert c.post("/api/login", json={"password": "4321"}).json() == {"token": TOKEN}
         assert c.post("/api/login", json={"password": PASSWORD}).status_code == 401
+
+
+class _Outcome(logging.Handler):
+    """Sets ``seen`` when the alert thread logs its outcome."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.seen = threading.Event()
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+        self.seen.set()
+
+
+def test_no_alert_channel_is_reported_unconfigured(clock: FakeClock) -> None:
+    outcome = _Outcome()
+    alert_log = logging.getLogger("src.login_alert")
+    alert_log.addHandler(outcome)
+    try:
+        with TestClient(app, client=PHONE) as c:
+            for _ in range(3):
+                _wrong(c)
+        assert outcome.seen.wait(5)
+    finally:
+        alert_log.removeHandler(outcome)
+    assert "unconfigured" in outcome.messages[0] and "3 wrong passwords" in outcome.messages[0]

@@ -90,9 +90,8 @@ folder-explorer/
 │   ├── runtime_files.py        # mkdir, lock-file open and SQLite connects for a path a caller names; raises on a path under a code folder
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison
-│   ├── login_alert.py          # the guessing alert's text and Telegram notifier
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL; splices a page's `<!--include x.html-->` fragments
-│   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, password, pooled_http, runtime_data, usage_log
+│   └── (vendored)              # build_info, compression, login_alert, login_lockout, no_window, notify/, password, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)

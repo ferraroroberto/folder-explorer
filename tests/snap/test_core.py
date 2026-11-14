@@ -7,6 +7,8 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
+from PIL import Image
+
 from src.snap.core import (
     ARROW_KEYS,
     LOUPE_CELLS,
@@ -19,6 +21,7 @@ from src.snap.core import (
     NUDGE_STEP_FAST,
     ConfigError,
     Rect,
+    blank_monitors,
     loupe_label,
     loupe_source_box,
     monitor_for,
@@ -103,9 +106,37 @@ class CropMathsTests(unittest.TestCase):
         self.assertEqual(screen_to_image(2400, 1350, (0, 0)), (2400, 1350))
         self.assertEqual(selection_rect((0, 0), (2400, 1350), (2880, 1620)), Rect(0, 0, 2400, 1350))
 
-    def test_window_geometry_signs_negative_and_positive_origins(self):
-        self.assertEqual(window_geometry(-1920, 0, 3840, 1080), "3840x1080-1920+0")
-        self.assertEqual(window_geometry(0, -1080, 1920, 2160), "1920x2160+0-1080")
+    def test_window_geometry_puts_the_top_left_corner_at_a_negative_origin(self):
+        # In a Tk geometry string "-N" measures the right/bottom edge in from the screen's edge, so a
+        # negative origin must follow a "+" to place the window's top-left corner there.
+        self.assertEqual(window_geometry(-1920, 0, 3840, 1080), "3840x1080+-1920+0")
+        self.assertEqual(window_geometry(0, -1080, 3840, 2160), "3840x2160+0+-1080")
+        self.assertEqual(window_geometry(0, 0, 1920, 1080), "1920x1080+0+0")
+
+
+class BlankMonitorTests(unittest.TestCase):
+    MONITORS = [Rect(0, 1080, 1920, 2160), Rect(1920, 1080, 3840, 2160), Rect(0, 0, 1920, 1080)]
+
+    def _frame(self) -> Image.Image:
+        frame = Image.new("RGB", (3840, 2160))
+        frame.paste((30, 120, 200), (0, 1080, 3840, 2160))
+        return frame
+
+    def test_a_monitor_captured_as_pure_black_is_reported(self):
+        self.assertEqual(blank_monitors(self._frame(), self.MONITORS), [2])
+
+    def test_one_lit_pixel_makes_a_monitor_not_blank(self):
+        frame = self._frame()
+        frame.putpixel((960, 540), (255, 255, 255))
+        self.assertEqual(blank_monitors(frame, self.MONITORS), [])
+
+    def test_an_all_black_grab_reports_every_monitor(self):
+        self.assertEqual(blank_monitors(Image.new("RGB", (3840, 2160)), self.MONITORS), [0, 1, 2])
+
+    def test_the_gap_outside_every_monitor_is_not_counted(self):
+        frame = self._frame()
+        frame.paste((10, 10, 10), (0, 0, 1920, 1080))
+        self.assertEqual(blank_monitors(frame, self.MONITORS), [])
 
 
 class LoupeGeometryTests(unittest.TestCase):

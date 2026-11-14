@@ -13,7 +13,7 @@ from app.webapp.auth import is_pc_itself
 from app.webapp.bind import resolve_bind
 from app.webapp.build import BUILD_INFO
 from app.webapp.routers.archive import archive_status
-from src import config, file_assoc, folder_lists, store
+from src import config, file_assoc, folder_lists, password, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def settings_body(pc: bool) -> dict[str, Any]:
             "running": running,
             "would_be": wanted.state,
             "restart_needed": running != wanted.state,
-            "password_set": bool(get_secret(PASSWORD_VAR) and get_secret(TOKEN_VAR)),
+            "password_set": bool(password.is_configured(legacy=get_secret(PASSWORD_VAR)) and get_secret(TOKEN_VAR)),
         },
         "index_bytes": _index_bytes(),
         "archive": archive_status(cfg, pc),

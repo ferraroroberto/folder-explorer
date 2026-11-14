@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from src import password
 from src.login_alert import alert_notifier, alert_text
 from src.login_lockout import LockoutAlert, LoginLockout, retry_after_header
 from src.notify import NotifierError
@@ -137,9 +138,9 @@ _lockout = make_lockout()
 @router.post("/api/login")
 async def login(request: Request) -> Any:
     client = _client(request) or "?"
-    password, token = get_secret(PASSWORD_VAR), get_secret(TOKEN_VAR)
-    if not password or not token:
-        logger.info("ℹ️ sign-in attempt from %s, but no password is set (scripts/set_password.py)", client)
+    legacy, token = get_secret(PASSWORD_VAR), get_secret(TOKEN_VAR)
+    if not password.is_configured(legacy=legacy) or not token:
+        logger.info("ℹ️ sign-in attempt from %s, but no password or token is set", client)
         raise HTTPException(status_code=503, detail="password sign-in is not set up")
     exempt = is_pc_itself(request)
     wait = 0.0 if exempt else _lockout.retry_after(client)
@@ -150,7 +151,7 @@ async def login(request: Request) -> Any:
     except ValueError:
         body = {}
     presented = str(body.get("password") or "") if isinstance(body, dict) else ""
-    if not secrets_equal(presented, password):
+    if not password.check_password(presented, legacy=legacy):
         if not exempt:
             _lockout.record_failure(client)
         logger.warning("⚠️ failed sign-in from %s", client)

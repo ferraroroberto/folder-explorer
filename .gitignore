@@ -17,3 +17,6 @@ mailboxes.json
 test-results/
 # Local visual proof pages (never committed)
 .proof/
+
+# The app password hash (src/password.py)
+config/app_password.json

@@ -1,7 +1,8 @@
 """The sign-in secrets: the password and the bearer token it is exchanged for.
 
-Both live in ``.env`` at the repo root (gitignored), written by
-``scripts/set_password.py``. A process environment variable of the same name
+Both live in ``.env`` at the repo root (gitignored); the token is written by
+``scripts/gen_token.py``. The password variable is the legacy value
+``src/password.py`` checks until its own hash is stored. A process environment variable of the same name
 wins, which is how tests inject their own. Nothing here ever logs a value.
 """
 

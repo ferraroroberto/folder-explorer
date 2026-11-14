@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.webapp import auth
 from app.webapp.server import app
+from src import password
 
 LOCAL = ("127.0.0.1", 50000)
 PHONE = ("100.64.0.99", 50000)
@@ -88,3 +89,11 @@ def test_the_pc_itself_is_never_locked_out(notifier: FakeNotifier) -> None:
         assert [_wrong(c) for _ in range(10)] == [401] * 10
         assert c.post("/api/login", json={"password": PASSWORD}).status_code == 200
     assert notifier.messages == []
+
+
+def test_stored_hash_replaces_the_legacy_password(clock: FakeClock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(password.ENV_VAR, str(tmp_path / "app_password.json"))
+    password.set_password("4321")
+    with TestClient(app, client=PHONE) as c:
+        assert c.post("/api/login", json={"password": "4321"}).json() == {"token": TOKEN}
+        assert c.post("/api/login", json={"password": PASSWORD}).status_code == 401

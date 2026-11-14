@@ -16,10 +16,10 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog
 from typing import Any, Callable, Optional
 
-from src import config, desktop
-from src.runtime_files import make_dirs
+from src import config
 from src.snap import settings
 from src.snap.core import ConfigError, validate_prefix
+from src.snap.folder import open_save_folder
 from src.snap.hotkey import HotkeyThread, make_thread_dpi_aware
 from src.snap.overlay import CaptureOverlay
 
@@ -82,8 +82,7 @@ class SnapService:
         """Show the save folder in File Explorer, making it first when no capture has yet."""
         folder = self.current().folder
         try:
-            make_dirs(folder)
-            desktop.open_in_explorer(str(folder))
+            open_save_folder(folder)
         except (OSError, ValueError) as exc:
             logger.error("❌ snap: could not open %s: %s", folder, exc)
 

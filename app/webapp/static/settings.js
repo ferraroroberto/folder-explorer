@@ -1,4 +1,4 @@
-/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, how the screenshot selects, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, every screenshot setting, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -18,12 +18,16 @@ let categorySwitch = null;
 let moveSwitch = null;
 let traySwitch = null;
 let snapHoldSwitch = null;
+let snapClipboardSwitch = null;
+let snapLoupeSwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
 let onSearchChanged = () => {};
 // The four folder lists, built once in initSettings.
 const lists = {};
 let config = null;
+// The last settings body shown, so a refused save puts the server's values back in the fields.
+let shown = null;
 
 const REMOTE_TEXT = {
   on: 'On: your devices reach it on the tailnet over HTTPS, after signing in.',
@@ -32,6 +36,7 @@ const REMOTE_TEXT = {
 };
 
 function render(body) {
+  shown = body;
   const cfg = body.config;
   const remote = body.remote;
   $('setupCard').hidden = body.config_file.exists;
@@ -65,6 +70,7 @@ function render(body) {
   $('snapHoldNote').textContent = cfg.snap.hold_to_capture
     ? 'On: the screenshot selects by pressing, dragging and releasing the left button.'
     : 'Off: the screenshot selects with a click to start, a move, and a click to finish; no button is held. Applies from the next capture.';
+  renderSnap(cfg.snap, body.snap_folder);
   setSwitch(remoteSwitch, cfg.remote_access);
   remoteSwitch.setAttribute('aria-label', 'Remote access');
   let note = REMOTE_TEXT[remote.running] || '';
@@ -95,6 +101,45 @@ function render(body) {
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
   setBasis(readPref('basis', 'size'));
+}
+
+/** The screenshot rows: each shows what the tray's Screenshot menu holds, read from the same config.json block. */
+function renderSnap(snap, folder) {
+  setSwitch(snapClipboardSwitch, snap.copy_to_clipboard);
+  $('snapClipboardNote').textContent = snap.copy_to_clipboard
+    ? 'On: a saved screenshot is also put on the clipboard, ready to paste.'
+    : 'Off: a screenshot is only saved as a file.';
+  setSwitch(snapLoupeSwitch, snap.show_loupe);
+  $('snapLoupeNote').textContent = snap.show_loupe
+    ? 'On: a magnifier follows the cursor while you select. F6 shows or hides it.'
+    : 'Off: no magnifier while you select. F6 shows it again.';
+  const quality = $('snapQuality');
+  // A quality set in config.json to a value the menu doesn't offer still shows as itself.
+  if (![...quality.options].some((o) => o.value === String(snap.jpeg_quality))) quality.add(new Option(String(snap.jpeg_quality), String(snap.jpeg_quality)));
+  quality.value = String(snap.jpeg_quality);
+  $('snapQualityNote').textContent = 'Higher keeps more detail and makes a bigger file. Applies from the next capture.';
+  $('snapPrefix').value = snap.file_prefix;
+  $('snapPrefixNote').textContent = 'Every file name starts with it, as ' + snap.file_prefix + '_date_time.jpg. Applies from the next capture.';
+  $('snapHotkey').value = snap.hotkey;
+  $('snapHotkeyNote').textContent = 'Ctrl, Shift, Alt or Win, then a letter, a digit, F1 to F24, PrintScreen or Space. Applies the next time the tray starts; if another app already owns the combo, the Screenshot menu in the tray says it is not running.';
+  $('snapFolderPath').textContent = folder.path;
+  $('snapOpenFolder').hidden = !folder.can_open;
+  $('snapFolderNote').textContent = 'Where screenshots are saved. It is changed from the tray menu or config.json on this PC, never from this page.';
+}
+
+async function openSnapFolder() {
+  try {
+    await postJSON('/api/snap/open-folder', {});
+  } catch (e) {
+    showToast('Could not open the folder: ' + serverSentence(e), 'error');
+  }
+}
+
+/** Save one screenshot setting; a refusal shows the validator's sentence and puts the saved value back. */
+async function saveSnap(change) {
+  const body = await save({ snap: change });
+  if (!body && shown) renderSnap(shown.config.snap, shown.snap_folder);
+  return body;
 }
 
 const ASSOC_TEXT = {
@@ -255,9 +300,23 @@ export function initSettings(opts) {
   $('trayClickSlot').appendChild(traySwitch);
   snapHoldSwitch = switchEl(false, {
     label: 'Hold left click to capture',
-    onToggle: (next) => save({ snap: { hold_to_capture: next } }),
+    onToggle: (next) => saveSnap({ hold_to_capture: next }),
   });
   $('snapHoldSlot').appendChild(snapHoldSwitch);
+  snapClipboardSwitch = switchEl(true, {
+    label: 'Copy to clipboard on save',
+    onToggle: (next) => saveSnap({ copy_to_clipboard: next }),
+  });
+  $('snapClipboardSlot').appendChild(snapClipboardSwitch);
+  snapLoupeSwitch = switchEl(true, {
+    label: 'Show loupe',
+    onToggle: (next) => saveSnap({ show_loupe: next }),
+  });
+  $('snapLoupeSlot').appendChild(snapLoupeSwitch);
+  $('snapQuality').addEventListener('change', (e) => saveSnap({ jpeg_quality: Number(e.target.value) }));
+  $('snapPrefix').addEventListener('change', (e) => saveSnap({ file_prefix: e.target.value }));
+  $('snapHotkey').addEventListener('change', (e) => saveSnap({ hotkey: e.target.value }));
+  $('snapOpenFolder').addEventListener('click', openSnapFolder);
   $('createConfig').addEventListener('click', createConfig);
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);

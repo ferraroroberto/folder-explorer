@@ -32,7 +32,7 @@ import pystray  # noqa: E402 -- after the stream rebind above
 from PIL import Image  # noqa: E402
 
 from app.tray.single_instance import SingleInstance  # noqa: E402
-from app.tray.snap_menu import snap_menu_item  # noqa: E402
+from app.tray.snap_menu import refresh_when_config_changes, snap_menu_item  # noqa: E402
 from app.tray.watchdog import BreadcrumbLog, HealthWatchdog, retry_with_backoff  # noqa: E402
 from app.webapp.bind import resolve_bind  # noqa: E402
 from app.webapp.manager import WebappManager  # noqa: E402
@@ -141,6 +141,7 @@ def main() -> int:
         ),
     )
     snap.on_change = icon.update_menu
+    threading.Thread(target=refresh_when_config_changes, args=(icon.update_menu, stop), name="snap-menu-watch", daemon=True).start()
     icon.run()
     guard.release()
     return 0

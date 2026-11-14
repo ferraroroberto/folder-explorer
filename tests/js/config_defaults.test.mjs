@@ -45,6 +45,12 @@ test('an older body without remote, archive, index size or config_file still rea
   assert.equal(body.created, false);
 });
 
+test('the screenshot folder is empty and not openable unless the server reports it', () => {
+  assert.deepEqual(settingsBody({ config: {} }).snap_folder, { path: '', can_open: false });
+  assert.deepEqual(settingsBody({ config: {}, snap_folder: { path: 'C:/Invented', can_open: true } }).snap_folder, { path: 'C:/Invented', can_open: true });
+  assert.deepEqual(settingsBody({ config: {}, snap_folder: { path: 3, can_open: 'yes' } }).snap_folder, { path: '', can_open: false });
+});
+
 test('only an explicit missing file asks for the setup card', () => {
   assert.equal(settingsBody({ config: {}, config_file: { exists: false } }).config_file.exists, false);
   assert.equal(settingsBody({ config: {}, config_file: { exists: true } }).config_file.exists, true);

@@ -50,6 +50,11 @@ export function settingsBody(raw) {
     config: configWithDefaults(raw.config),
     remote: { configured: true, running: 'off', would_be: 'off', restart_needed: false, password_set: false, ...(isObject(raw.remote) ? raw.remote : {}) },
     archive: { ready: false, reason: 'This server does not report it', ...(isObject(raw.archive) ? raw.archive : {}) },
+    // Where screenshots go, and whether this device may open it (this PC only); an older server reports neither.
+    snap_folder: {
+      path: isObject(raw.snap_folder) && typeof raw.snap_folder.path === 'string' ? raw.snap_folder.path : '',
+      can_open: isObject(raw.snap_folder) && raw.snap_folder.can_open === true,
+    },
     index_bytes: typeof raw.index_bytes === 'number' ? raw.index_bytes : 0,
     // Only a server that says the file is missing gets the setup card; an older one says nothing.
     config_file: { exists: !(isObject(raw.config_file) && raw.config_file.exists === false) },

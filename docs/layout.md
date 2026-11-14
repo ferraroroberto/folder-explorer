@@ -16,7 +16,7 @@ folder-explorer/
 │   │   ├── tray.py             # menu (left click: Quick search or Open), adopt-or-spawn, watchdog, breadcrumbs
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
 │   │   ├── watchdog.py         # vendored: retry-with-backoff, health watchdog, breadcrumb log
-│   │   └── snap_menu.py        # the tray's Screenshot submenu over a SnapService
+│   │   └── snap_menu.py        # the tray's Screenshot submenu over a SnapService, and its redraw when config.json changes
 │   └── webapp/
 │       ├── __main__.py         # `python -m app.webapp`: bind from remote_access, cert renewal, serve.run
 │       ├── server.py           # FastAPI app: routers, sign-in gate, gzip, cache-busted static mount
@@ -62,7 +62,7 @@ folder-explorer/
 │   │                           #   listing (Search's Documents mode: every indexed Markdown and HTML file across the roots, and the match of a dropped file by name, size and time, from the index; no disk),
 │   │                           #   dropmatch (the file a dropped one is when the scan lacks it exactly: edited or new, found by its SHA-256 through the reader, one time and folder budget)
 │   ├── snap/                   # the tray's region screenshot (docs/snap.md): core (geometry, hotkey and filename rules, no Tk), settings (the snap block of
-│   │                           #   config.json), hotkey (RegisterHotKey thread, DPI context), selection (the click-click and press-drag-release state machine, no Tk), overlay (the Tk overlay, loupe and save), clipboard, service (the Tk thread the tray starts)
+│   │                           #   config.json), hotkey (RegisterHotKey thread, DPI context), selection (the click-click and press-drag-release state machine, no Tk), overlay (the Tk overlay, loupe and save), clipboard, folder (show the save folder in File Explorer: the tray menu and Settings), service (the Tk thread the tray starts)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

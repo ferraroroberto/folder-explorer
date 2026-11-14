@@ -425,6 +425,9 @@ button.list-row .lr-name { font-weight: 600; }
 .detail-card .row .row-controls .select-native { min-width: 0; }
 .detail-card .row .row-controls .input-native { min-width: 0; width: 7.5em; }
 .row-controls .input-native[hidden] { display: none; }
+.row-line > label { color: var(--ink); font-weight: 600; }
+.detail-card .row .row-line .input-text { width: 11em; min-width: 0; }
+.row-note.snap-folder-path { overflow-wrap: anywhere; color: var(--ink); }
 .row-note { margin: 0; font-size: var(--font-body-sm); color: var(--muted); }
 .row-note:empty { display: none; }
 /* The folder lists (folder-list.js): a section title, rows of paths with a kebab, and an add row. */

@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Body, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
@@ -15,6 +15,8 @@ from app.webapp.build import BUILD_INFO
 from app.webapp.routers.archive import archive_status
 from src import config, file_assoc, folder_lists, password, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
+from src.snap import settings as snap_settings
+from src.snap.folder import open_save_folder
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,8 @@ def settings_body(pc: bool) -> dict[str, Any]:
     running = effective_state()
     return {
         "config": cfg,
+        # Where captures go once ~ and %VARS% expand, for the Screenshot rows; null in config.json means the Pictures folder.
+        "snap_folder": {"path": str(snap_settings.resolve(cfg["snap"]).folder), "can_open": pc},
         "remote": {
             "configured": cfg["remote_access"],
             "running": running,
@@ -94,6 +98,21 @@ def create_config(request: Request) -> JSONResponse:
         return JSONResponse({"detail": "config.json could not be created: " + (exc.strerror or "the file system refused")},
                             status_code=500)
     return JSONResponse({**settings_body(is_pc_itself(request)), "created": created})
+
+
+@router.post("/api/snap/open-folder")
+def post_snap_open_folder(request: Request) -> dict[str, str]:
+    """Settings' Open folder for the screenshot save folder: File Explorer on this PC only, the folder named by config, never by the page."""
+    if not is_pc_itself(request):
+        raise HTTPException(status_code=403, detail="this works on the PC only")
+    try:
+        open_save_folder(snap_settings.resolve(config.load()["snap"]).folder)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (OSError, ValueError) as exc:
+        logger.warning("⚠️ snap: could not open the save folder: %s", exc)
+        raise HTTPException(status_code=422, detail="The save folder could not be opened: " + str(exc)) from exc
+    return {"status": "opened"}
 
 
 @router.post("/api/md-assoc")

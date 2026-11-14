@@ -9,11 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.webapp.server import app
-from src import config
+from src import config, desktop
 from src.snap import settings
 from src.snap.core import QUALITY_CHOICES, ConfigError
 
 LOCAL = ("127.0.0.1", 50000)
+REMOTE = ("100.64.0.9", 50000)
 
 
 def _file(isolated: Path) -> dict:
@@ -97,13 +98,73 @@ def test_save_creates_a_missing_file(isolated: Path) -> None:
     assert _file(isolated) == {"snap": {"jpeg_quality": 95}}
 
 
-def test_the_settings_api_writes_only_hold_to_capture_in_the_snap_block(isolated: Path) -> None:
+def test_the_settings_api_writes_every_snap_setting_but_the_folder(isolated: Path) -> None:
     (isolated / "config.json").write_text(json.dumps({"snap": {"folder": "~/shots", "jpeg_quality": 60}}), encoding="utf-8")
+    changes = {"copy_to_clipboard": False, "show_loupe": False, "jpeg_quality": 95, "file_prefix": "report", "hotkey": "Ctrl+Alt+S", "hold_to_capture": True}
     with TestClient(app, client=LOCAL) as c:
-        for bad in ({"folder": "X:/Invented"}, {"hold_to_capture": "yes"}, {"hold_to_capture": True, "folder": "X:/Invented"}, {}):
-            refused = c.post("/api/config", json={"snap": bad})
-            assert refused.status_code == 400 and "hold_to_capture" in refused.json()["detail"]
-        assert c.get("/api/config").json()["config"]["snap"]["hold_to_capture"] is False
-        saved = c.post("/api/config", json={"snap": {"hold_to_capture": True}})
-        assert saved.status_code == 200 and saved.json()["config"]["snap"]["hold_to_capture"] is True
-    assert _file(isolated) == {"snap": {"folder": "~/shots", "jpeg_quality": 60, "hold_to_capture": True}}
+        for key, value in changes.items():
+            saved = c.post("/api/config", json={"snap": {key: value}})
+            assert saved.status_code == 200, saved.text
+        block = c.get("/api/config").json()["config"]["snap"]
+    assert block == {**changes, "folder": "~/shots", "hotkey": "ctrl+alt+s"}
+    assert _file(isolated)["snap"] == {**changes, "folder": "~/shots", "hotkey": "ctrl+alt+s"}
+
+
+@pytest.mark.parametrize("bad, word", [
+    ({"folder": "X:/Invented"}, "save folder"),
+    ({"jpeg_quality": 101}, "jpeg_quality"),
+    ({"jpeg_quality": "90"}, "jpeg_quality"),
+    ({"file_prefix": "bad:name"}, "prefix"),
+    ({"file_prefix": "  "}, "empty"),
+    ({"hotkey": "ctrl+shift"}, "hotkey"),
+    ({"copy_to_clipboard": "yes"}, "copy_to_clipboard"),
+    ({"hold_to_capture": 1}, "hold_to_capture"),
+    ({"colour": "red"}, "unknown"),
+    ({"hold_to_capture": True, "folder": "X:/Invented"}, "save folder"),
+    ({}, "snap takes"),
+])
+def test_the_settings_api_refuses_a_bad_snap_value_with_the_validators_message_and_writes_nothing(isolated: Path, bad: dict, word: str) -> None:
+    start = {"snap": {"folder": "~/shots", "jpeg_quality": 60}}
+    (isolated / "config.json").write_text(json.dumps(start), encoding="utf-8")
+    with TestClient(app, client=LOCAL) as c:
+        refused = c.post("/api/config", json={"snap": bad})
+    assert refused.status_code == 400 and word in refused.json()["detail"]
+    assert _file(isolated) == start
+
+
+def test_the_settings_body_names_the_save_folder_and_whether_this_caller_may_open_it(isolated: Path) -> None:
+    (isolated / "config.json").write_text(json.dumps({"snap": {"folder": "X:/Invented/shots"}}), encoding="utf-8")
+    with TestClient(app, client=LOCAL) as c:
+        assert c.get("/api/config").json()["snap_folder"] == {"path": str(Path("X:/Invented/shots")), "can_open": True}
+    (isolated / "config.json").write_text("{}", encoding="utf-8")
+    with TestClient(app, client=LOCAL) as c:
+        assert c.get("/api/config").json()["snap_folder"]["path"] == str(Path.home() / "Pictures" / "snaps")
+
+
+def test_open_folder_shows_the_configured_folder_for_this_pc_only(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    shots = isolated / "shots"
+    (isolated / "config.json").write_text(json.dumps({"snap": {"folder": str(shots)}}), encoding="utf-8")
+    shown: list[str] = []
+    monkeypatch.setattr(desktop, "open_in_explorer", lambda folder, started=None: shown.append(folder))
+    monkeypatch.setenv("FOLDER_EXPLORER_PASSWORD", "invented-password")
+    monkeypatch.setenv("FOLDER_EXPLORER_TOKEN", "invented-token")
+    with TestClient(app, client=REMOTE) as c:
+        refused = c.post("/api/snap/open-folder", json={"folder": "X:/Elsewhere"}, headers={"Authorization": "Bearer invented-token"})
+        assert refused.status_code == 403
+        assert c.get("/api/config", headers={"Authorization": "Bearer invented-token"}).json()["snap_folder"]["can_open"] is False
+    assert shown == []
+    with TestClient(app, client=LOCAL) as c:
+        opened = c.post("/api/snap/open-folder", json={"folder": "X:/Elsewhere"})
+    assert opened.status_code == 200 and shown == [str(shots)] and shots.is_dir()
+
+
+def test_open_folder_says_why_nothing_opened(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (isolated / "config.json").write_text(json.dumps({"snap": {"folder": str(isolated / "shots")}}), encoding="utf-8")
+
+    def off(folder: str, started: float | None = None) -> None:
+        raise FileNotFoundError("opening is switched off here")
+
+    monkeypatch.setattr(desktop, "open_in_explorer", off)
+    with TestClient(app, client=LOCAL) as c:
+        answer = c.post("/api/snap/open-folder")
+    assert answer.status_code == 503 and "switched off" in answer.json()["detail"]

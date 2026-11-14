@@ -4,7 +4,7 @@
 layer       = "working-web"
 icon        = "🗂️"
 port        = ":8453"
-description = "Disk-space explorer and search: folder tree, largest files, file types, folder and mail search."
+description = "Disk-space explorer and search: folder tree, largest files, file types, folder and mail search, and a tray region screenshot."
 depends_on  = ["project-scaffolding"]
 shape       = "webapp-tray"
 extra_roots = []

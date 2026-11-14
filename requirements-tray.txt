@@ -1,2 +1,4 @@
 pystray>=0.19
 pillow>=10.0
+pywin32>=306
+mss>=10.2.0

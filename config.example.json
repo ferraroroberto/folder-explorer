@@ -51,5 +51,13 @@
     "self_address": null,
     "add_category": false,
     "move_to_archive": false
+  },
+  "snap": {
+    "folder": null,
+    "hotkey": "ctrl+shift+a",
+    "jpeg_quality": 90,
+    "copy_to_clipboard": true,
+    "file_prefix": "snap",
+    "show_loupe": true
   }
 }

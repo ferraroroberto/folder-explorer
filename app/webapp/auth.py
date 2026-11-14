@@ -15,7 +15,6 @@ on), and the loopback exemption must not hand it the API.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections.abc import Callable
 from typing import Any, Optional
@@ -25,11 +24,17 @@ from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src import password
-from src.login_alert import alert_notifier, alert_text
-from src.login_lockout import LockoutAlert, LoginLockout, retry_after_header
-from src.notify import NotifierError
+from src.login_alert import build_login_alert
+from src.login_lockout import LoginLockout, retry_after_header
+from src.notify import Notifier, TelegramConfig, build_notifier
 from src.secret_compare import secrets_equal
-from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
+from src.secrets_env import (
+    PASSWORD_VAR,
+    TELEGRAM_CHAT_VAR,
+    TELEGRAM_TOKEN_VAR,
+    TOKEN_VAR,
+    get_secret,
+)
 from src.this_pc import is_local_address
 
 logger = logging.getLogger(__name__)
@@ -112,24 +117,20 @@ class SignInMiddleware:
         return auth.lower().startswith("bearer ") and token_ok(auth[7:].strip())
 
 
-def _alert_owner(alert: LockoutAlert) -> None:
-    """Send the guessing alert from a thread, so the login never waits on Telegram."""
-    notifier = alert_notifier()
-    if notifier is None:
-        return
-    text = alert_text(alert)
+APP_NAME = "folder-explorer"
 
-    def send() -> None:
-        try:
-            notifier.send_text(text)
-        except NotifierError as exc:
-            logger.warning("⚠️ login alert not delivered: %s", type(exc).__name__)
 
-    threading.Thread(target=send, daemon=True, name="login-alert").start()
+def alert_notifier() -> Notifier | None:
+    """The ``coding alerts`` Telegram notifier from ``.env``, or None when the bot or the chat is not set."""
+    token, chat = get_secret(TELEGRAM_TOKEN_VAR), get_secret(TELEGRAM_CHAT_VAR)
+    if not (token and chat):
+        return None
+    return build_notifier("telegram", TelegramConfig(token, chat))
 
 
 def make_lockout(clock: Callable[[], float] = time.monotonic) -> LoginLockout:
-    return LoginLockout(on_alert=_alert_owner, clock=clock)
+    # Late-bound, so a test can replace alert_notifier; .env is read per alert either way.
+    return LoginLockout(on_alert=build_login_alert(APP_NAME, lambda: alert_notifier()), clock=clock)
 
 
 _lockout = make_lockout()

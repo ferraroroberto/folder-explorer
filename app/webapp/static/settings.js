@@ -69,7 +69,7 @@ function render(body) {
   remoteSwitch.setAttribute('aria-label', 'Remote access');
   let note = REMOTE_TEXT[remote.running] || '';
   if (remote.restart_needed) note += ' Changed: restart the app to apply it (tray icon, Restart web app).';
-  if (cfg.remote_access && !remote.password_set) note += ' No password is set yet: run scripts/set_password.py on this PC.';
+  if (cfg.remote_access && !remote.password_set) note += ' No password is set yet: run python -m src.password set and scripts/gen_token.py on this PC.';
   $('remoteNote').textContent = note;
 
   $('scheduleSelect').value = cfg.schedule;

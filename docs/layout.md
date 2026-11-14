@@ -92,11 +92,11 @@ folder-explorer/
 │   ├── secret_compare.py       # the one constant-time secret comparison
 │   ├── login_alert.py          # the guessing alert's text and Telegram notifier
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL; splices a page's `<!--include x.html-->` fragments
-│   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, pooled_http, runtime_data, usage_log
+│   └── (vendored)              # build_info, compression, login_lockout, no_window, notify/, password, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
-├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, set_password
+├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, gen_token
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
 └── docs/                       # this file, scanning.md, service-api.md (the v1 search and archive API), and design/ (the search study and the app mock-up, invented data)

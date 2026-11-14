@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from src.atomic_write import atomic_write_text
+from src.snap import settings as snap_settings
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,10 @@ DEFAULTS: dict[str, Any] = {
     "outlook": {"archive_folder": "Archive", "category": "Archived by task-os",
                 "dismiss_category": "Dismissed by task-os", "self_address": None,
                 "add_category": False, "move_to_archive": False},
+    # The tray's region screenshot: its hotkey, the folder it saves into (null: Pictures\snaps), the JPEG quality,
+    # the filename prefix and whether it copies to the clipboard and shows the loupe. The tray menu writes them
+    # (no Settings control does), and each applies from the next capture, except the hotkey, which applies at the next tray start.
+    "snap": dict(snap_settings.DEFAULTS),
 }
 
 # The outlook keys the Settings screen switches; the rest of the block is edited in config.json.
@@ -101,7 +106,7 @@ _EMAIL_KEYS = {"index_path", "roots", "exclude", "download_budget_mb"}
 # The longest path the archiver may be told to write; Windows' own limit is 260.
 MAX_PATH_LENGTH = 260
 # Settings only config.json sets: no Settings control writes them.
-READ_ONLY = ("port", "server", "archive")
+READ_ONLY = ("port", "server", "archive", "snap")
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -160,6 +165,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["quick_search"] = _clean_quick_search(raw.get("quick_search"))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
+    cfg["snap"] = snap_settings.clean(raw.get("snap"))
     return cfg
 
 
@@ -382,22 +388,39 @@ def _validate_folder_search(value: Any) -> dict[str, Any]:
     return _clean_folder_search(value)
 
 
+def _current_file() -> dict[str, Any]:
+    """The file's own object as written, or an empty one when it is missing or unreadable."""
+    try:
+        current = json.loads(config_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return current if isinstance(current, dict) else {}
+
+
 def save(updates: dict[str, Any]) -> dict[str, Any]:
     """Merge valid ``updates`` into the file and return the new effective settings."""
     clean = validate_update(updates)
-    path = config_path()
-    try:
-        current = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(current, dict):
-            current = {}
-    except (OSError, ValueError):
-        current = {}
+    current = _current_file()
     for key, value in clean.items():
         # Settings sets one outlook key; the folder and category names the file holds stay as they are.
         if key == "outlook":
             held = current.get("outlook")
             value = {**(held if isinstance(held, dict) else {}), **value}
         current[key] = value
-    atomic_write_text(path, json.dumps(current, indent=2) + "\n")
+    atomic_write_text(config_path(), json.dumps(current, indent=2) + "\n")
     logger.info("ℹ️ settings saved: %s", ", ".join(sorted(clean)))
+    return load()
+
+
+def save_snap(updates: dict[str, Any]) -> dict[str, Any]:
+    """Merge checked region-screenshot settings into the file's ``snap`` block (the other keys stay as written) and return the new settings.
+
+    Only the tray writes this block, so no Settings route reaches it; a bad value raises ``ValueError`` before anything is written.
+    """
+    clean = snap_settings.validate(updates)
+    current = _current_file()
+    held = current.get("snap")
+    current["snap"] = {**(held if isinstance(held, dict) else {}), **clean}
+    atomic_write_text(config_path(), json.dumps(current, indent=2) + "\n")
+    logger.info("ℹ️ snap settings saved: %s", ", ".join(sorted(clean)))
     return load()

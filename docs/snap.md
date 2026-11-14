@@ -35,7 +35,11 @@ The Tk thread does its start-up work once: `RegisterHotKey` runs on its own mess
 
 ## DPI and monitors
 
-Screen, capture and crop must all be physical pixels on a scaled display. The Tk thread opts into per-monitor DPI awareness for itself only (`SetThreadDpiAwarenessContext`), and the process default is first fixed as unaware: the screen grabber switches the whole process to DPI aware on first use, which would resize the Quick search window. The capture spans every monitor; a monitor left of or above the primary has a negative origin, handled in `src/snap/core.py` and tested there.
+Screen, capture and crop must all be physical pixels on a scaled display. The Tk thread opts into per-monitor DPI awareness for itself only (`SetThreadDpiAwarenessContext`), and the process default is first fixed as unaware: the screen grabber switches the whole process to DPI aware on first use, which would resize the Quick search window. The capture spans every monitor; a monitor left of or above the primary has a negative origin, handled in `src/snap/core.py` and tested there. The overlay's Tk geometry writes every offset after a `+` (`+0+-1080`), because Tk reads `-1080` as the bottom edge 1080 pixels up from the screen's bottom, which would leave the lower monitors uncovered and the picture shifted; an overlay that still lands off the virtual screen's origin is logged.
+
+## A black grab
+
+A monitor whose part of the grab is pure black is a capture Windows refused, not a dark screen. One such monitor is logged as a warning naming it and the overlay still opens; when every monitor comes back black, the warning says so and no overlay is shown, so the next press tries again.
 
 ## Tests
 

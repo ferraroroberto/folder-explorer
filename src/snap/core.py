@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple, Optional, Sequence, Tuple
+from typing import Any, List, NamedTuple, Optional, Sequence, Tuple
 
 DEFAULT_FILE_PREFIX = "snap"
 #: The tray's quality menu offers these; the config file accepts any 1-100.
@@ -112,8 +112,23 @@ def unique_path(folder: Path, moment: datetime, prefix: str = DEFAULT_FILE_PREFI
 
 
 def window_geometry(left: int, top: int, width: int, height: int) -> str:
-    """Tk geometry string for a window at a screen position; monitors left of or above the primary have negative origins."""
-    return f"{width}x{height}{left:+d}{top:+d}"
+    """Tk geometry string putting a window's top-left corner at a screen position, negative for a monitor left of or above the primary.
+
+    Tk reads ``-N`` as the right or bottom edge N pixels in from the screen's edge, so every offset
+    follows a ``+`` (``+-1080``); ``-1080`` would push a virtual-screen window off the lower monitors.
+    """
+    return f"{width}x{height}+{left}+{top}"
+
+
+def blank_monitors(frame: Any, monitors: Sequence[Rect]) -> List[int]:
+    """Indexes of ``monitors`` (image pixels) whose part of ``frame`` is pure black: a grab Windows refused, not a dark screen, since a lit desktop always has some non-zero pixel."""
+    blank = []
+    for index, rect in enumerate(monitors):
+        extrema = frame.crop(tuple(rect)).getextrema()
+        bands = extrema if isinstance(extrema[0], tuple) else (extrema,)
+        if all(high == 0 for _low, high in bands):
+            blank.append(index)
+    return blank
 
 
 def screen_to_image(x: int, y: int, origin: Tuple[int, int]) -> Tuple[int, int]:

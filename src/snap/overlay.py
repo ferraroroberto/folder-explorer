@@ -29,6 +29,7 @@ from src.snap.core import (
     LOUPE_TEXT_HEIGHT,
     LOUPE_ZOOM,
     Rect,
+    blank_monitors,
     loupe_label,
     loupe_source_box,
     monitor_for,
@@ -140,9 +141,7 @@ class CaptureOverlay:
                 screens = grabber.monitors[1:] or [virtual]
             t_grab = time.perf_counter()
             frozen = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
-            self._frozen = frozen
-            self._origin = (virtual["left"], virtual["top"])
-            self._monitors = [
+            monitors = [
                 Rect(
                     screen["left"] - virtual["left"],
                     screen["top"] - virtual["top"],
@@ -151,6 +150,12 @@ class CaptureOverlay:
                 )
                 for screen in screens
             ]
+            if not self._grab_usable(frozen, monitors, screens):
+                self.in_use = False
+                return
+            self._frozen = frozen
+            self._origin = (virtual["left"], virtual["top"])
+            self._monitors = monitors
             self._photo = ImageTk.PhotoImage(frozen)
             self.canvas.itemconfigure(self._image_item, image=self._photo)
             for item in self._rect_items:
@@ -172,7 +177,7 @@ class CaptureOverlay:
         )
         if (self.overlay.winfo_rootx(), self.overlay.winfo_rooty()) != self._origin:
             logger.warning(
-                "⚠️ snap: overlay sits at %d,%d instead of %s; the crop follows screen coordinates, so it stays correct",
+                "⚠️ snap: overlay sits at %d,%d instead of %s, so the frozen picture is shifted against the real screen",
                 self.overlay.winfo_rootx(), self.overlay.winfo_rooty(), self._origin,
             )
         # The settings are read and the loupe painted after the hotkey-to-overlay time is taken, so neither adds to the logged figure.
@@ -180,6 +185,21 @@ class CaptureOverlay:
         t_loupe = time.perf_counter()
         self._pointer_moved(*self.overlay.winfo_pointerxy())
         logger.info("ℹ️ snap: first loupe paint %.1f ms after the overlay", (time.perf_counter() - t_loupe) * 1000)
+
+    @staticmethod
+    def _grab_usable(frozen: Image.Image, monitors: List[Rect], screens: List[dict]) -> bool:
+        """False when every monitor came back pure black, so no black overlay is shown; a single black monitor is only logged."""
+        blank = blank_monitors(frozen, monitors)
+        if not blank:
+            return True
+        names = ", ".join(
+            f"{screens[i]['width']}x{screens[i]['height']} at {screens[i]['left']:+d}{screens[i]['top']:+d}" for i in blank
+        )
+        if len(blank) == len(monitors):
+            logger.warning("⚠️ snap: the screen grab came back black on every monitor (%s); overlay not shown", names)
+            return False
+        logger.warning("⚠️ snap: the screen grab came back black on %d of %d monitors (%s)", len(blank), len(monitors), names)
+        return True
 
     def _image_point(self, event: tk.Event) -> Tuple[int, int]:
         return screen_to_image(event.x_root, event.y_root, self._origin)

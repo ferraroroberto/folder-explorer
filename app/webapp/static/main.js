@@ -21,6 +21,7 @@ import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { emptyStateEl } from './_vendored/empty-state/empty-state.js';
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
+import { initBuildWatch } from './_vendored/build-watch/build-watch.js';
 
 const $ = (id) => document.getElementById(id);
 const PANES = { search: 'paneSearch', explore: 'paneExplore', largest: 'paneLargest', types: 'paneTypes', scans: 'paneScans' };
@@ -334,4 +335,5 @@ async function boot() {
   window.addEventListener('pageshow', (e) => { if (e.persisted) refreshRoots().catch(fail); });
 }
 
+initBuildWatch({ fetchJson: getJSON });
 boot();

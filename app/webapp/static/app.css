@@ -409,6 +409,12 @@ button.list-row .lr-name { font-weight: 600; }
 .scans-note:empty { display: none; }
 
 /* --------------------------------------------------------- settings rows */
+/* Inset groups (the app-launcher Settings pattern): an overline heading over a card of rows, label left and control right. The card owns the inset, so its rows drop the sheet's own row padding and keep a muted divider between them. */
+.settings-overline { margin: var(--space-md) 2px var(--space-sm); font-size: var(--font-caption); font-weight: 600; line-height: 1.1; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.detail-header + .settings-overline, #setupCard + .settings-overline { margin-top: var(--space-sm); }
+.card.settings-group { padding: 0; overflow: hidden; }
+.detail-card .settings-group > .row { padding: 12px 14px; border-top: 1px solid var(--line-muted); }
+.detail-card .settings-group > .row:first-child { border-top: 0; }
 .detail-card .row.row-stack { flex-direction: column; align-items: stretch; gap: var(--space-sm); }
 .detail-card .row.row-stack[hidden] { display: none; }
 /* A switch's hit area reaches 9px past its track, so a field under it sits a little further down. */

@@ -21,6 +21,12 @@ os.environ["FOLDER_EXPLORER_CONFIG"] = str(_SESSION_DIR / "config.json")
 os.environ.pop("FOLDER_EXPLORER_PASSWORD", None)
 os.environ.pop("FOLDER_EXPLORER_TOKEN", None)
 
+# The login password hash (src/password.py) is read on every login, so a run
+# must never see the live config/app_password.json: point it at a file that
+# does not exist. Assigned, not defaulted, so no outer value reaches the live
+# file; servers the suite spawns inherit it.
+os.environ["APP_PASSWORD_FILE"] = str(Path(tempfile.mkdtemp(prefix="folder-explorer-password-")) / "app_password.json")
+
 
 @pytest.fixture()
 def isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:

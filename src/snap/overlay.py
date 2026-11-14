@@ -1,4 +1,4 @@
-"""The selection overlay: a frozen copy of the screen, a drag rectangle, the loupe, and the save.
+"""The selection overlay: a frozen copy of the screen, a selection rectangle, the loupe, and the save.
 
 Everything here runs on the Tk thread of :class:`src.snap.service.SnapService`. The overlay window is
 built once, borderless and top-most, so a hotkey only grabs the virtual screen with ``mss`` and paints
@@ -36,11 +36,11 @@ from src.snap.core import (
     nudge_point,
     place_loupe,
     screen_to_image,
-    selection_rect,
     selection_size,
     unique_path,
     window_geometry,
 )
+from src.snap.selection import Outcome, Selection
 from src.snap.settings import SnapConfig
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class Loupe:
 
 
 class CaptureOverlay:
-    """One capture at a time: ``begin`` freezes the screen and shows the overlay, a release saves, Esc or a right-click cancels."""
+    """One capture at a time: ``begin`` freezes the screen and shows the overlay, a click pair (or a drag, with ``hold_to_capture``) saves, Esc or a right-click cancels."""
 
     def __init__(self, root: tk.Tk, get_config: Callable[[], SnapConfig], set_setting: Callable[[str, Any], None]) -> None:
         self._get_config = get_config
@@ -106,7 +106,7 @@ class CaptureOverlay:
         self._photo: Optional[ImageTk.PhotoImage] = None
         self._frozen: Optional[Image.Image] = None
         self._origin = (0, 0)
-        self._drag_start: Optional[Tuple[int, int]] = None
+        self._selection: Optional[Selection] = None
         self._rect_items: Tuple[int, int] = (
             self.canvas.create_rectangle(0, 0, 0, 0, outline="white", width=1, state="hidden"),
             self.canvas.create_rectangle(0, 0, 0, 0, outline="black", dash=(4, 4), width=1, state="hidden"),
@@ -118,7 +118,7 @@ class CaptureOverlay:
 
     def _bind(self) -> None:
         self.canvas.bind("<ButtonPress-1>", self._on_press)
-        # <Motion> also fires while the button is held, so one handler serves hover and drag.
+        # <Motion> also fires while the button is held, so one handler serves hover, drag and the move between two clicks.
         self.canvas.bind("<Motion>", lambda event: self._pointer_moved(event.x_root, event.y_root))
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Button-3>", lambda _event: self._cancel("right-click"))
@@ -182,6 +182,7 @@ class CaptureOverlay:
             )
         # The settings are read and the loupe painted after the hotkey-to-overlay time is taken, so neither adds to the logged figure.
         self.config = self._get_config()
+        self._selection = Selection(self.config.hold_to_capture)
         t_loupe = time.perf_counter()
         self._pointer_moved(*self.overlay.winfo_pointerxy())
         logger.info("ℹ️ snap: first loupe paint %.1f ms after the overlay", (time.perf_counter() - t_loupe) * 1000)
@@ -205,23 +206,25 @@ class CaptureOverlay:
         return screen_to_image(event.x_root, event.y_root, self._origin)
 
     def _on_press(self, event: tk.Event) -> None:
-        self._drag_start = self._image_point(event)
+        if self._selection is not None:
+            self._selection.press(self._image_point(event))
 
     def _pointer_moved(self, screen_x: int, screen_y: int) -> None:
         """Follow the pointer (moved by the mouse or by an arrow key): stretch the drag rectangle and repaint the loupe."""
         if self._frozen is None:
             return
         point = screen_to_image(screen_x, screen_y, self._origin)
-        if self._drag_start is not None:
-            x0, y0 = self._drag_start
+        anchor = self._selection.anchor if self._selection is not None else None
+        if anchor is not None:
+            x0, y0 = anchor
             for item in self._rect_items:
                 self.canvas.coords(item, x0, y0, point[0], point[1])
                 self.canvas.itemconfigure(item, state="normal")
         if not self.config.show_loupe:
             return
         size = None
-        if self._drag_start is not None:
-            size = selection_size(self._drag_start, point, self._frozen.size)
+        if anchor is not None:
+            size = selection_size(anchor, point, self._frozen.size)
         self.loupe.show(self._frozen, point, loupe_label((screen_x, screen_y), size), monitor_for(point, self._monitors))
 
     def _screen_bounds(self) -> Rect:
@@ -248,11 +251,13 @@ class CaptureOverlay:
             self.loupe.hide()
 
     def _on_release(self, event: tk.Event) -> None:
-        if self._drag_start is None or self._frozen is None:
+        if self._selection is None or self._frozen is None:
             return
-        rect = selection_rect(self._drag_start, self._image_point(event), self._frozen.size)
-        if rect is None:
+        outcome, rect = self._selection.release(self._image_point(event), self._frozen.size)
+        if outcome is Outcome.TOO_SMALL:
             self._cancel("selection too small")
+            return
+        if outcome is not Outcome.SAVE or rect is None:
             return
         t_release = time.perf_counter()
         self._close_overlay()
@@ -289,6 +294,6 @@ class CaptureOverlay:
         self.overlay.update_idletasks()
 
     def _finish(self) -> None:
-        self._drag_start = None
+        self._selection = None
         self._frozen = None
         self.in_use = False

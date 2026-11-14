@@ -58,6 +58,7 @@
     "jpeg_quality": 90,
     "copy_to_clipboard": true,
     "file_prefix": "snap",
-    "show_loupe": true
+    "show_loupe": true,
+    "hold_to_capture": false
   }
 }

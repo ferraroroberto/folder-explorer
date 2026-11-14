@@ -90,8 +90,9 @@ DEFAULTS: dict[str, Any] = {
                 "dismiss_category": "Dismissed by task-os", "self_address": None,
                 "add_category": False, "move_to_archive": False},
     # The tray's region screenshot: its hotkey, the folder it saves into (null: Pictures\snaps), the JPEG quality,
-    # the filename prefix and whether it copies to the clipboard and shows the loupe. The tray menu writes them
-    # (no Settings control does), and each applies from the next capture, except the hotkey, which applies at the next tray start.
+    # the filename prefix, whether it copies to the clipboard and shows the loupe, and whether a drag (not two clicks)
+    # selects. The tray menu writes them; Settings switches only hold_to_capture. Each applies from the next capture,
+    # except the hotkey, which applies at the next tray start.
     "snap": dict(snap_settings.DEFAULTS),
 }
 
@@ -106,7 +107,7 @@ _EMAIL_KEYS = {"index_path", "roots", "exclude", "download_budget_mb"}
 # The longest path the archiver may be told to write; Windows' own limit is 260.
 MAX_PATH_LENGTH = 260
 # Settings only config.json sets: no Settings control writes them.
-READ_ONLY = ("port", "server", "archive", "snap")
+READ_ONLY = ("port", "server", "archive")
 
 _TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
@@ -347,6 +348,9 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
         if key == "tray":
             if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
+        if key == "snap":
+            if not (isinstance(value, dict) and set(value) == {"hold_to_capture"} and isinstance(value["hold_to_capture"], bool)):
+                raise ValueError("snap takes hold_to_capture, true or false")
         if key == "quick_search":
             if not (isinstance(value, dict) and set(value) == {"open_folder"} and isinstance(value["open_folder"], bool)):
                 raise ValueError("quick_search takes open_folder, true or false")
@@ -403,8 +407,8 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
     current = _current_file()
     for key, value in clean.items():
         # Settings sets one outlook key; the folder and category names the file holds stay as they are.
-        if key == "outlook":
-            held = current.get("outlook")
+        if key in ("outlook", "snap"):
+            held = current.get(key)
             value = {**(held if isinstance(held, dict) else {}), **value}
         current[key] = value
     atomic_write_text(config_path(), json.dumps(current, indent=2) + "\n")
@@ -415,7 +419,7 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
 def save_snap(updates: dict[str, Any]) -> dict[str, Any]:
     """Merge checked region-screenshot settings into the file's ``snap`` block (the other keys stay as written) and return the new settings.
 
-    Only the tray writes this block, so no Settings route reaches it; a bad value raises ``ValueError`` before anything is written.
+    The tray menu writes this block; Settings reaches only ``hold_to_capture``, through :func:`save`. A bad value raises ``ValueError`` before anything is written.
     """
     clean = snap_settings.validate(updates)
     current = _current_file()

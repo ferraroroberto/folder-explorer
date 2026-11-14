@@ -62,7 +62,7 @@ folder-explorer/
 │   │                           #   listing (Search's Documents mode: every indexed Markdown and HTML file across the roots, and the match of a dropped file by name, size and time, from the index; no disk),
 │   │                           #   dropmatch (the file a dropped one is when the scan lacks it exactly: edited or new, found by its SHA-256 through the reader, one time and folder budget)
 │   ├── snap/                   # the tray's region screenshot (docs/snap.md): core (geometry, hotkey and filename rules, no Tk), settings (the snap block of
-│   │                           #   config.json), hotkey (RegisterHotKey thread, DPI context), overlay (the Tk overlay, loupe and save), clipboard, service (the Tk thread the tray starts)
+│   │                           #   config.json), hotkey (RegisterHotKey thread, DPI context), selection (the click-click and press-drag-release state machine, no Tk), overlay (the Tk overlay, loupe and save), clipboard, service (the Tk thread the tray starts)
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings

@@ -203,6 +203,38 @@ def test_the_doc_window_takes_a_drop_too(page: Page, app_url: str) -> None:
     assert errors == []
 
 
+def test_a_drop_while_the_first_load_waits_for_the_recent_list_keeps_the_dropped_file(page: Page, app_url: str) -> None:
+    """The recent list answers late: the dropped file already on show must not be redrawn or break the load."""
+    errors = _errors(page)
+    guide = _guide(page, app_url)
+    held: list[Any] = []
+
+    def hold_first(route: Any) -> None:
+        if held:
+            route.continue_()
+        else:
+            held.append(route)
+
+    page.route("**/api/doc/recent", hold_first)
+    page.goto(app_url + "/doc?" + urlencode({"root": guide["root"], "scan": guide["scan"], "id": guide["id"]}))
+    expect(page.locator("#docTitle")).to_have_text("guide.md")
+    for _ in range(50):
+        if held:
+            break
+        page.wait_for_timeout(100)
+    assert held, "the first load never asked for the recent list"
+
+    text = "# Scratch note\n\nJust text.\n"
+    _drop(page, "scratch.md", len(text.encode()), text=text)
+    expect(page.locator("#docTitle")).to_have_text("scratch.md")
+
+    held[0].continue_()
+    page.wait_for_timeout(500)
+    expect(page.locator("#docTitle")).to_have_text("scratch.md")
+    expect(page.locator("#docBody h1")).to_have_text("Scratch note")
+    assert errors == []
+
+
 def test_a_file_edited_since_the_scan_opens_with_edit_and_saves_to_disk(page: Page, app_url: str) -> None:
     """Another program's edit leaves the scan's size and time stale; the dropped bytes still find the file by their hash."""
     errors = _errors(page)

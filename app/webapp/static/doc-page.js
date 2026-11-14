@@ -113,11 +113,15 @@ async function load(download) {
     return;
   }
   $('docBody').innerHTML = '<p class="doc-loading" role="status">' + (download ? 'Downloading to this PC…' : 'Loading…') + '</p>';
-  const r = await fetchDoc(loc, download);
+  // A file dropped on the window while a request is in flight replaces `loc`; that file stays on show.
+  const started = loc;
+  const r = await fetchDoc(started, download);
+  if (loc !== started) return;
   if (!r.ok) {
     renderHeadStatus($('docStatus'), [], '');
     $('docBody').innerHTML = stateHtml(r);
-    drawSide([], await fetchRecent());
+    const recent = await fetchRecent();
+    if (loc === started) drawSide([], recent);
     return;
   }
   document.title = r.doc.name + ' · Folder explorer';
@@ -125,8 +129,10 @@ async function load(download) {
   renderHeadStatus($('docStatus'), [], r.doc.folder.join(' › '));
   drawDoc($('docBody'), r.doc);
   // Asked after the document: the server counts this open first, then lists the others.
-  drawSide(r.doc.outline, await fetchRecent());
-  if (loc.fragment) scrollToHeading($('docBody'), loc.fragment);
+  const recent = await fetchRecent();
+  if (loc !== started) return;
+  drawSide(r.doc.outline, recent);
+  if (started.fragment) scrollToHeading($('docBody'), started.fragment);
 }
 
 /** A dropped file the scan has opens as its document (a new address, so Edit and the bookmark work). */

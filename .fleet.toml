@@ -75,7 +75,7 @@ type   = "BodyState"
 # scaffold commit each came from. Re-vendor from there, never edit the copy.
 [vendored]
 base = { src = "app/webapp/static/_vendored/base", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "app/webapp/static/_vendored/base" }
-nav = { src = "app/webapp/static/_vendored/nav", sha = "9e6be351ac1e711c9c82fb8987e2405b0a1c28fe", dest = "app/webapp/static/_vendored/nav" }
+nav = { src = "app/webapp/static/_vendored/nav", sha = "cb9fff9130453c781146f2cdf5083d83fb43b0df", dest = "app/webapp/static/_vendored/nav" }
 icons = { src = "app/webapp/static/_vendored/icons", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/icons" }
 card = { src = "app/webapp/static/_vendored/card", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/card" }
 home-head = { src = "app/webapp/static/_vendored/home-head", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "app/webapp/static/_vendored/home-head" }
@@ -118,8 +118,8 @@ structure_band = { src = "scripts/structure_band.py", sha = "c8ec10d6ba57a5790fd
 instruction_ratchet = { src = "scripts/instruction_ratchet.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "scripts/instruction_ratchet.py" }
 doc_refs_ratchet = { src = "scripts/doc_refs_ratchet.py", sha = "a68f6e49393f0ef0b94ab3c79f4338a50d89fa49", dest = "scripts/doc_refs_ratchet.py" }
 dead_code_ratchet = { src = "scripts/dead_code_ratchet.py", sha = "4d0b0ff30e23eb95c73c4b0b1517ec6a43d3a836", dest = "scripts/dead_code_ratchet.py" }
-conventions_ratchet = { src = "scripts/conventions_ratchet.py", sha = "ab06ad732591d4edab00774ee93a455189c14577", dest = "scripts/conventions_ratchet.py" }
-conventions_readers = { src = "scripts/conventions_readers.py", sha = "ab06ad732591d4edab00774ee93a455189c14577", dest = "scripts/conventions_readers.py" }
+conventions_ratchet = { src = "scripts/conventions_ratchet.py", sha = "cb9fff9130453c781146f2cdf5083d83fb43b0df", dest = "scripts/conventions_ratchet.py" }
+conventions_readers = { src = "scripts/conventions_readers.py", sha = "cb9fff9130453c781146f2cdf5083d83fb43b0df", dest = "scripts/conventions_readers.py" }
 conventions_state = { src = "scripts/conventions_state.py", sha = "4d0b0ff30e23eb95c73c4b0b1517ec6a43d3a836", dest = "scripts/conventions_state.py" }
 usage_track_ratchet = { src = "scripts/usage_track_ratchet.py", sha = "4a06ca84fc9c5005d4be7fa505c9d0e7c0472dba", dest = "scripts/usage_track_ratchet.py" }
 usage_track_scan = { src = "scripts/usage_track_scan.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "scripts/usage_track_scan.py" }
@@ -193,7 +193,7 @@ history_phrases = true
 [conventions_ratchet]
 enabled        = true
 baseline       = ".conventions-ratchet-baseline.json"
-rules          = ["no-window", "logging-not-print", "no-drive-path", "secret-compare", "git-wrapper", "password-input-vendored", "login-lockout", "state-literal", "state-set-repeat", "state-write", "subprocess-timeout"]
+rules          = ["no-window", "logging-not-print", "no-drive-path", "secret-compare", "git-wrapper", "password-input-vendored", "nav-standalone-head", "login-lockout", "state-literal", "state-set-repeat", "state-write", "subprocess-timeout"]
 secret_helpers = ["src/secret_compare.py"]
 git_wrappers   = ["src/build_info.py"]
 

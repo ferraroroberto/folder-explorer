@@ -95,7 +95,7 @@ kbd {
 .qchip.is-not { text-decoration: line-through; }
 .saved-chip { background: var(--accent-soft); border-color: var(--accent-border-soft); color: var(--accent-text); }
 .saved-chip .icon, .facet .icon { width: var(--icon-inline); height: var(--icon-inline); }
-/* The row always holds Save search, so it keeps that height before the saved searches load. */
+/* The row always holds Bookmark query, so it keeps that height before the saved searches load. */
 .saved-row { min-height: 28px; }
 .saved-row .button-ghost { min-height: 28px; padding: 0 10px; font-size: var(--font-caption); font-weight: 600; position: relative; }
 .saved-row .button-ghost::before { content: ""; position: absolute; inset: -8px -2px; }

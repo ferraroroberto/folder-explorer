@@ -37,7 +37,7 @@ export function renderSaved() {
     '" data-track="saved-search">' + glyph('bookmark') + esc(s.name) + '</button>' +
     '<button type="button" class="icon-button saved-remove" data-unsave="' + s.id + '" aria-label="Forget ' + esc(s.name) +
     '" data-track="saved-remove">' + glyph('x') + '</button></span>').join('') +
-    (mode && mode !== 'docs' ? '<button type="button" class="button-ghost" id="saveSearch" data-track="save-search">Save search</button>' : '');
+    (mode && mode !== 'docs' ? '<button type="button" class="button-ghost" id="saveSearch" data-track="bookmark-query">Bookmark query</button>' : '');
 }
 
 export function renderRecent() {

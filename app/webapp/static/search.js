@@ -136,7 +136,7 @@ function renderResults() {
     rows = S.results.map((r, i) => draw(r, i, terms)).join('');
   }
   $('results').innerHTML = notes + rows +
-    (more ? '<li class="results-more"><button type="button" class="button-ghost" id="moreResults" data-track="more-results">Show more</button></li>' : '');
+    (more ? '<li class="results-more"><button type="button" class="button-ghost" id="moreResults" data-track="more-results">Show next results</button></li>' : '');
   $('keysLine').innerHTML = keysLine(mode);
   head(S.notes.length ? [{ text: 'Some filters left out', tone: 'attention' }] : [],
     mode === 'folders' ? plural(S.total, 'folder') : mode === 'docs' ? plural(S.total, 'document') : plural(S.total, 'email'));

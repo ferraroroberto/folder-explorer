@@ -4,7 +4,7 @@ The tray's screenshot: press a global hotkey anywhere, click one corner of an ar
 
 ## Selecting an area
 
-By default the first click anchors a corner and releasing it changes nothing; moving stretches the rectangle (the loupe follows and shows its size) and the second click saves. A second click that would crop under the minimum size keeps the overlay and the anchor. Turn on **Hold left click to capture** (Settings, or `snap.hold_to_capture`) for press, drag, release, where a release under the minimum size cancels. Esc or a right-click cancels in both modes, and the arrow keys nudge in both. The mode is read at each capture, so a change applies from the next one with no restart. The rules live in `src/snap/selection.py`, with no Tk, so both modes are unit-tested.
+By default the first click anchors a corner and releasing it changes nothing; moving stretches the rectangle (the loupe follows and shows its size) and the second click saves. A second click that would crop under the minimum size keeps the overlay and the anchor. Turn on **Hold to capture** (the Screenshot sheet in Settings, or `snap.hold_to_capture`) for press, drag, release, where a release under the minimum size cancels. Esc or a right-click cancels in both modes, and the arrow keys nudge in both. The mode is read at each capture, so a change applies from the next one with no restart. The rules live in `src/snap/selection.py`, with no Tk, so both modes are unit-tested.
 
 ## Selecting precisely
 
@@ -18,7 +18,7 @@ By default the first click anchors a corner and releasing it changes nothing; mo
 
 ## Settings
 
-The **Tray and screenshot** section of Settings holds every setting the tray menu does, plus the hotkey: **Hold left click to capture**, **Copy to clipboard on save**, **Show loupe**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix**, **Hotkey** and **Save folder**. A switch or a menu saves at once; a text field saves when you leave it or press Enter. Each goes through `POST /api/config` into `snap_settings.validate()`, so Settings and the tray refuse the same values with the same sentence, and a refused value leaves `config.json` untouched and puts the saved one back in the field. Only the changed key is written.
+The **Screenshot** row under **Tray and screenshot** in Settings opens a sheet holding every setting the tray menu does, plus the hotkey: **Hold to capture**, **Copy to clipboard**, **Show loupe**, **JPEG quality** (70, 80, 90, 95, 100), **File prefix**, **Hotkey** and **Save folder**. A switch or a menu saves at once; a text field saves when you leave it or press Enter. Each goes through `POST /api/config` into `snap_settings.validate()`, so Settings and the tray refuse the same values with the same sentence, and a refused value leaves `config.json` untouched and puts the saved one back in the field. Only the changed key is written.
 
 - **Hotkey:** read once when the tray starts, so a new combo applies the next time the tray starts; the row says so. A combo another application owns is reported where it always was, as "Not running: ..." at the top of the tray's Screenshot menu and in `tray.log`; Settings does not probe it, because the tray holds the registration.
 - **Save folder:** shown, never edited, so a phone can never change where the PC writes files. **Open folder** (`POST /api/snap/open-folder`, this PC only) shows the configured folder in File Explorer through `src/desktop.py`, making it first when no capture has yet; the page names no path. Change it from the tray's **Change folder...** or in `config.json`.

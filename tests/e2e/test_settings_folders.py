@@ -9,11 +9,13 @@ import pytest
 from playwright.sync_api import Locator, Page, Response, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._settings import close_setting, open_setting
 from tests.e2e.conftest import LIVE_PORT
 
 # The sheet scrolls, so its controls above or below the visible part sit outside
 # the viewport; the rows' and lists' own overflow is still linted.
-BELOW_FOLD = {"#settingsDialog " + tag: "outside the visible part of the scrolling sheet"
+BELOW_FOLD = {dialog + tag: "outside the visible part of the scrolling sheet"
+              for dialog in ("#settingsDialog ", "#settingDialog ")
               for tag in ("button", "input", "select", "[role=switch]")}
 
 
@@ -55,16 +57,20 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
     assert scans.locator("textarea, input[type=text], #emailBudget").count() == 0
 
     scans.locator(".open-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
-    expect(sheet.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
-    expect(sheet.locator("#remoteNote")).to_contain_text("this PC only")
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    remote = open_setting(page, "remote")
+    expect(remote.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
+    expect(remote.locator("#remoteNote")).to_contain_text("this PC only")
+    close_setting(page)
+    sheet = open_setting(page, "schedule")
     expect(sheet.locator("#scheduleSelect")).to_have_value("off")
+    close_setting(page)
     # A config that never set a download budget has no limit, and the menu offers that first.
+    sheet = open_setting(page, "budget")
     expect(sheet.locator("#emailBudget")).to_have_value("")
     expect(sheet.locator("#emailBudget option").first).to_have_text("No limit (recommended)")
-    roots = sheet.locator("#rootsEditor")
-    emails = sheet.locator("#emailRootsEditor")
+    close_setting(page)
+    roots = open_setting(page, "roots").locator("#rootsEditor")
     expect(roots).to_be_visible()
     field, add = (roots.locator(".folder-add " + sel).bounding_box() for sel in ("input", "button"))
     # A fine pointer's 44px field box holds a 36px visible control (transparent hit inset); a coarse pointer's field is a real 44px.
@@ -78,17 +84,25 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
     _add(roots, str(extra))
     expect(roots.locator(".action-row")).to_have_count(before + 1)
     expect(roots.locator(".folder-error")).to_be_empty()
+    close_setting(page)
 
+    emails = open_setting(page, "email-roots").locator("#emailRootsEditor")
     _add(emails, str(inbox))
     expect(emails.locator(".action-row", has_text=str(inbox))).to_be_visible()
     assert_layout_clean(page, allow=BELOW_FOLD)
+    close_setting(page)
 
+    roots = open_setting(page, "roots").locator("#rootsEditor")
     _remove(page, roots, str(extra))
     expect(roots.locator(".folder-error")).to_contain_text("Remove " + str(inbox) + " from email folders first")
     expect(roots.locator(".action-row")).to_have_count(before + 1)
+    close_setting(page)
 
+    emails = open_setting(page, "email-roots").locator("#emailRootsEditor")
     _remove(page, emails, str(inbox))
     expect(emails.locator(".action-row", has_text=str(inbox))).to_have_count(0)
+    close_setting(page)
+    roots = open_setting(page, "roots").locator("#rootsEditor")
     _remove(page, roots, str(extra))
     expect(roots.locator(".action-row")).to_have_count(before)
     expect(roots.locator(".folder-error")).to_be_empty()
@@ -99,8 +113,8 @@ def test_the_tray_click_switch_saves_with_a_toast_and_says_what_a_click_opens(pa
         pytest.skip("the switch writes the settings: never on the live app")
     page.goto(app_url + "/")
     page.locator("#paneSearch .home-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    sheet = open_setting(page, "tray-click")
     tray = sheet.locator("#trayClickSlot [role=switch]")
     expect(tray).to_have_attribute("aria-checked", "true")
     expect(sheet.locator("#trayClickNote")).to_contain_text("opens the small Quick search window")
@@ -122,8 +136,8 @@ def test_the_hold_to_capture_switch_is_off_by_default_and_saves(page: Page, app_
         pytest.skip("the switch writes the settings: never on the live app")
     page.goto(app_url + "/")
     page.locator("#paneSearch .home-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    sheet = open_setting(page, "screenshot")
     hold = sheet.locator("#snapHoldSlot [role=switch]")
     expect(hold).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#snapHoldNote")).to_contain_text("a click to start")
@@ -145,8 +159,8 @@ def test_every_screenshot_setting_is_in_settings_and_a_refusal_puts_the_saved_va
         pytest.skip("the rows write the settings: never on the live app")
     page.goto(app_url + "/")
     page.locator("#paneSearch .home-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    sheet = open_setting(page, "screenshot")
     clipboard = sheet.locator("#snapClipboardSlot [role=switch]")
     expect(clipboard).to_have_attribute("aria-checked", "true")
     expect(sheet.locator("#snapLoupeSlot [role=switch]")).to_have_attribute("aria-checked", "true")
@@ -189,10 +203,10 @@ def test_the_archive_category_switch_is_off_by_default_and_saves(page: Page, app
         pytest.skip("the switch writes the settings: never on the live app")
     page.goto(app_url + "/")
     page.locator("#paneSearch .home-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    sheet = open_setting(page, "outlook")
     category = sheet.locator("#archiveCategorySlot [role=switch]")
-    expect(category).to_have_attribute("aria-label", "Add an Outlook category when archiving")
+    expect(category).to_have_attribute("aria-label", "Outlook category")
     expect(category).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#archiveCategoryNote")).to_contain_text("show no category row")
     try:
@@ -209,10 +223,10 @@ def test_the_move_to_archive_switch_is_off_by_default_and_saves(page: Page, app_
         pytest.skip("the switch writes the settings: never on the live app")
     page.goto(app_url + "/")
     page.locator("#paneSearch .home-settings").click()
-    sheet = page.locator("#settingsDialog")
-    expect(sheet).to_be_visible()
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    sheet = open_setting(page, "outlook")
     move = sheet.locator("#archiveMoveSlot [role=switch]")
-    expect(move).to_have_attribute("aria-label", "Move to the Outlook archive folder when archiving")
+    expect(move).to_have_attribute("aria-label", "Move to archive folder")
     expect(move).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#archiveMoveNote")).to_contain_text("leaves it where it is in Outlook")
     try:

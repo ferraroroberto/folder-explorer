@@ -1,0 +1,378 @@
+<dialog class="detail-dialog" id="settingsDialog" data-track-view="settings-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Settings</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="settings-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="row row-stack" id="setupCard" hidden>
+      <span>Set up folder-explorer</span>
+      <p class="row-note">There is no config.json yet, so the built-in defaults are in use. Create it from config.example.json to keep your folders and settings in a file. An existing config.json is never overwritten.</p>
+      <div class="row-line">
+        <button type="button" class="button-tint" id="createConfig" data-track="create-config">Create config.json</button>
+      </div>
+    </div>
+    <div class="settings-groups">
+      <h3 class="settings-overline" id="groupDisplay">Display</h3>
+      <section class="card settings-group" aria-labelledby="groupDisplay">
+        <div class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
+          <span class="settings-row-label">Text size</span>
+          <div class="segmented" id="textSizeControl" role="group" aria-label="Text size">
+            <button type="button" class="segmented-item" aria-pressed="false" data-textsize="small" data-track="textsize-small">Small</button>
+            <button type="button" class="segmented-item" aria-pressed="true" data-textsize="default" data-track="textsize-default">Default</button>
+            <button type="button" class="segmented-item" aria-pressed="false" data-textsize="large" data-track="textsize-large">Large</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg>
+          <span class="settings-row-label">Totals by</span>
+          <div class="segmented" id="defaultBasisSeg" role="group" aria-label="Default totals">
+            <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="default-basis-size">Size</button>
+            <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="default-basis-disk">On disk</button>
+          </div>
+        </div>
+      </section>
+      <h3 class="settings-overline" id="groupScanning">Scanning</h3>
+      <section class="card settings-group" aria-labelledby="groupScanning">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="schedule" data-track="open-setting-schedule">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
+          <span class="settings-row-label">Scan schedule</span>
+          <span class="settings-row-value" id="valSchedule"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="roots" data-track="open-setting-roots">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <span class="settings-row-label">Folders to scan</span>
+          <span class="settings-row-value" id="valRoots"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="exclude" data-track="open-setting-exclude">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-eye-off"></use></svg>
+          <span class="settings-row-label">Skipped folders</span>
+          <span class="settings-row-value" id="valExclude"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <div class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-gauge"></use></svg>
+          <span class="settings-row-label">Index on this PC</span>
+          <span class="settings-row-value" id="indexSize"></span>
+        </div>
+      </section>
+      <h3 class="settings-overline" id="groupEmail">Email</h3>
+      <section class="card settings-group" aria-labelledby="groupEmail">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="email-roots" data-track="open-setting-email-roots">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
+          <span class="settings-row-label">Email folders</span>
+          <span class="settings-row-value" id="valEmailRoots"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="email-exclude" data-track="open-setting-email-exclude">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-eye-off"></use></svg>
+          <span class="settings-row-label">Left out of the index</span>
+          <span class="settings-row-value" id="valEmailExclude"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="budget" data-track="open-setting-budget">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-download"></use></svg>
+          <span class="settings-row-label">OneDrive downloads</span>
+          <span class="settings-row-value" id="valBudget"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="outlook" data-track="open-setting-outlook">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
+          <span class="settings-row-label">Outlook archiving</span>
+          <span class="settings-row-value" id="valOutlook"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" id="showMacro" data-track="show-macro">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>
+          <span class="settings-row-label">Outlook macro</span>
+          <span class="settings-row-value" id="valMacro"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+      <h3 class="settings-overline" id="groupFiles">Files and documents</h3>
+      <section class="card settings-group" aria-labelledby="groupFiles">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="markdown-search" data-track="open-setting-markdown-search">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <span class="settings-row-label">Documents search</span>
+          <span class="settings-row-value" id="valMarkdownSearch"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote-html" data-track="open-setting-remote-html">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <span class="settings-row-label">Remote content</span>
+          <span class="settings-row-value" id="valRemoteHtml"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="explorer-window" data-track="open-setting-explorer-window">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder-open"></use></svg>
+          <span class="settings-row-label">Explorer window</span>
+          <span class="settings-row-value" id="valExplorerWindow"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" id="mdAssocRow" data-open="md-assoc" data-track="open-setting-md-assoc" hidden>
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
+          <span class="settings-row-label">Markdown files</span>
+          <span class="settings-row-value" id="valMdAssoc"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+      <h3 class="settings-overline" id="groupTray">Tray and screenshot</h3>
+      <section class="card settings-group" aria-labelledby="groupTray">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="tray-click" data-track="open-setting-tray-click">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
+          <span class="settings-row-label">Tray click</span>
+          <span class="settings-row-value" id="valTrayClick"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="screenshot" data-track="open-setting-screenshot">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+          <span class="settings-row-label">Screenshot</span>
+          <span class="settings-row-value" id="valScreenshot"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+      <h3 class="settings-overline" id="groupRemote">Remote access</h3>
+      <section class="card settings-group" aria-labelledby="groupRemote">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote" data-track="open-setting-remote">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+          <span class="settings-row-label">Remote access</span>
+          <span class="settings-row-value" id="valRemote"></span>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </section>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog" id="settingDialog" data-track-view="setting-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1" id="settingTitle">Setting</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="setting-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+
+    <div data-setting="schedule" data-title="Scan schedule" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
+          <span class="settings-row-label">Schedule</span>
+          <select class="settings-row-select" id="scheduleSelect" data-track="schedule-select">
+            <option value="off">Off</option>
+            <option value="nightly">Every night</option>
+            <option value="hourly">Every hour</option>
+          </select>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        </label>
+        <label class="settings-row" id="scheduleTimeRow" hidden>
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-timer"></use></svg>
+          <span class="settings-row-label">Nightly scan time</span>
+          <input class="settings-row-input settings-row-time" type="time" id="scheduleTime" data-track="schedule-time">
+        </label>
+      </section>
+      <p class="settings-footnote" id="scheduleNote"></p>
+    </div>
+
+    <div data-setting="roots" data-title="Folders to scan" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
+          <span class="settings-row-label">All drives and OneDrive</span>
+          <span class="switch-slot" id="rootsAutoSlot" data-track="roots-auto"></span>
+        </label>
+      </section>
+      <div class="setting-editor" id="rootsEditor" hidden></div>
+      <p class="settings-footnote" id="rootsNote"></p>
+    </div>
+
+    <div data-setting="exclude" data-title="Skip these folders" hidden>
+      <p class="row-note setting-intro">The disk scan, folder search and the email index all leave them out. Each sits inside a folder to scan.</p>
+      <div class="setting-editor" id="excludeEditor"></div>
+    </div>
+
+    <div data-setting="email-roots" data-title="Email folders" hidden>
+      <p class="row-note setting-intro">The email index reads the .msg files in these folders. Each sits inside a folder to scan.</p>
+      <div class="setting-editor" id="emailRootsEditor"></div>
+    </div>
+
+    <div data-setting="email-exclude" data-title="Leave out of the email index" hidden>
+      <p class="row-note setting-intro">Folders inside an email folder that only the email index skips.</p>
+      <div class="setting-editor" id="emailExcludeEditor"></div>
+    </div>
+
+    <div data-setting="budget" data-title="OneDrive downloads per run" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-download"></use></svg>
+          <span class="settings-row-label">Download limit</span>
+          <select class="settings-row-select" id="emailBudget" data-track="email-budget">
+            <option value="">No limit (recommended)</option>
+            <option value="0">None (local only)</option>
+            <option value="512">512 MB</option>
+            <option value="2048">2 GB</option>
+            <option value="5120">5 GB</option>
+          </select>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        </label>
+      </section>
+      <p class="settings-footnote" id="emailBudgetNote"></p>
+    </div>
+
+    <div data-setting="outlook" data-title="Outlook archiving" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-flag"></use></svg>
+          <span class="settings-row-label">Outlook category</span>
+          <span class="switch-slot" id="archiveCategorySlot" data-track="archive-category-switch"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="archiveCategoryNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
+          <span class="settings-row-label">Move to archive folder</span>
+          <span class="switch-slot" id="archiveMoveSlot" data-track="archive-move-switch"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="archiveMoveNote"></p>
+      <p class="settings-footnote setting-after" id="outlookNote"></p>
+    </div>
+
+    <div data-setting="markdown-search" data-title="Documents search" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <span class="settings-row-label">Documents search</span>
+          <span class="switch-slot" id="markdownSearchSlot" data-track="markdown-search"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="markdownSearchNote"></p>
+    </div>
+
+    <div data-setting="remote-html" data-title="Block remote content in HTML" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
+          <span class="settings-row-label">Block remote content</span>
+          <span class="switch-slot" id="blockRemoteHtmlSlot" data-track="block-remote-html"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="blockRemoteHtmlNote"></p>
+    </div>
+
+    <div data-setting="explorer-window" data-title="Reuse an open Explorer window" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder-open"></use></svg>
+          <span class="settings-row-label">Reuse an open window</span>
+          <span class="switch-slot" id="reuseExplorerSlot" data-track="reuse-explorer"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="reuseExplorerNote"></p>
+    </div>
+
+    <div data-setting="md-assoc" data-title="Associate Markdown files with this app" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
+          <span class="settings-row-label">Open with this app</span>
+          <span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="mdAssocNote"></p>
+    </div>
+
+    <div data-setting="tray-click" data-title="Tray click opens Quick search" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
+          <span class="settings-row-label">Opens Quick search</span>
+          <span class="switch-slot" id="trayClickSlot" data-track="tray-left-click"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="trayClickNote"></p>
+    </div>
+
+    <div data-setting="screenshot" data-title="Screenshot" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
+          <span class="settings-row-label">Hold to capture</span>
+          <span class="switch-slot" id="snapHoldSlot" data-track="snap-hold-to-capture"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapHoldNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-copy"></use></svg>
+          <span class="settings-row-label">Copy to clipboard</span>
+          <span class="switch-slot" id="snapClipboardSlot" data-track="snap-copy-to-clipboard"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapClipboardNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <span class="settings-row-label">Show loupe</span>
+          <span class="switch-slot" id="snapLoupeSlot" data-track="snap-show-loupe"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapLoupeNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+          <span class="settings-row-label">JPEG quality</span>
+          <select class="settings-row-select" id="snapQuality" data-track="snap-jpeg-quality">
+            <option value="70">70</option>
+            <option value="80">80</option>
+            <option value="90">90</option>
+            <option value="95">95</option>
+            <option value="100">100</option>
+          </select>
+          <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapQualityNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-pencil"></use></svg>
+          <span class="settings-row-label">File prefix</span>
+          <input class="input-native setting-text" type="text" id="snapPrefix" maxlength="40" autocomplete="off" spellcheck="false" data-track="snap-file-prefix">
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapPrefixNote"></p>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
+          <span class="settings-row-label">Hotkey</span>
+          <input class="input-native setting-text" type="text" id="snapHotkey" autocomplete="off" spellcheck="false" data-track="snap-hotkey">
+        </label>
+      </section>
+      <p class="settings-footnote" id="snapHotkeyNote"></p>
+      <section class="card settings-group">
+        <div class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder-open"></use></svg>
+          <span class="settings-row-label">Save folder</span>
+          <button type="button" class="button-surface setting-action" id="snapOpenFolder" data-track="snap-open-folder" hidden>Open folder</button>
+        </div>
+      </section>
+      <p class="settings-footnote"><span class="mono snap-folder-path" id="snapFolderPath"></span><span id="snapFolderNote"></span></p>
+    </div>
+
+    <div data-setting="remote" data-title="Remote access" hidden>
+      <section class="card settings-group">
+        <label class="settings-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-lock"></use></svg>
+          <span class="settings-row-label">Remote access</span>
+          <span class="switch-slot" id="remoteSwitchSlot" data-track="remote-access"></span>
+        </label>
+      </section>
+      <p class="settings-footnote" id="remoteNote"></p>
+    </div>
+  </div>
+</dialog>

@@ -32,7 +32,7 @@ folder-explorer/
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child), shortlist (the cleanup shortlist: files marked in Largest, in state.sqlite3)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
-│                           #   parts/icon-sprite.html is the inline icon sprite, spliced into index.html where its include line stands;
+│                           #   parts/icon-sprite.html is the inline icon sprite and parts/settings-dialogs.html the Settings sheet and its setting sheet, each spliced into index.html where its include line stands;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js (an HTML page in a sandboxed frame)
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm

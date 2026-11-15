@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 
 from playwright.sync_api import Page, Route, expect
 
+from tests.e2e._geometry import assert_no_overlap
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.fixture_tree import DOCS_FOLDER
 
@@ -74,6 +75,8 @@ def test_a_markdown_row_opens_in_the_document_sheet(page: Page, app_url: str, br
     page.wait_for_function(IMAGE_LOADED, arg="#docSheetBody img[data-doc-img]")
     _themes(page, lambda: expect(body.locator("h1")).to_be_visible(), SHEET_SCROLLER)
 
+    expect(sheet.locator("#docOutlineBtn")).to_be_visible()
+    assert_no_overlap([sheet.locator(sel) for sel in ("#docOutlineBtn", "#docWindow", ".detail-close")])  # the header tools' hit areas never meet
     sheet.locator("#docOutlineBtn").click()
     expect(sheet.locator("#docOutline a")).to_have_text(HEADINGS)
     sheet.locator("#docOutline a", has_text="Out of reach").click()

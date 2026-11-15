@@ -108,7 +108,9 @@
 .lr-name .doc-badge { flex: none; }
 .detail-dialog.doc-dialog { width: min(860px, 94vw); height: 92vh; height: 92dvh; overflow: hidden; }
 .doc-dialog .doc-card { position: relative; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; }
-.doc-header { gap: var(--space-xs); }
+/* Every tool shares the close button's 34px box, and the gap is the two 44px hit
+   expansions together (hit-min - box), so neighbouring targets touch and never overlap. */
+.doc-header { --icon-btn-box: 34px; gap: calc(var(--hit-min) - var(--icon-btn-box)); }
 .doc-header h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-header .doc-tool { flex: none; }
 /* icon-button.css sets display on the control, so a hidden tool needs it back. */

@@ -282,7 +282,7 @@ const CLICKS = [
   ['#pruneSwitch', () => saveFolderOptions({ prune_people: !S.status.folder_search.prune_people })],
   ['#onedriveSwitch', () => saveFolderOptions({ onedrive_prevails: !S.status.folder_search.onedrive_prevails })],
   ['#keysInfo', () => $('keysDialog').showModal()],
-  ['.side-toggle', (el) => setOpen(el.closest('.side-card').id, el.getAttribute('aria-expanded') !== 'true')],
+  ['.side-toggle, .side-toggle-icon', (el) => setOpen(el.closest('.side-card').id, el.getAttribute('aria-expanded') !== 'true')],
 ];
 
 function wire() {

@@ -39,7 +39,7 @@ const MARK_END = String.fromCharCode(0xe001);
 
 /** Open or close a side card: its toggle's aria-expanded and its body's hidden move together. */
 export function setOpen(card, open) {
-  const btn = $(card).querySelector('.side-toggle');
+  const btn = $(card).querySelector('.side-toggle, .side-toggle-icon');
   btn.setAttribute('aria-expanded', String(open));
   $(btn.getAttribute('aria-controls')).hidden = !open;
 }

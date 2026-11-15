@@ -16,15 +16,21 @@ def test_the_menu_is_redrawn_once_per_change_to_config_json(isolated: Path) -> N
     # Drive the loop by hand: each wait() is one poll, and the file changes between polls.
     script = [None, "changed", None, "changed again", None]
     polls = iter(script)
+    # Each change gets its own second, counted from the first stamp: two writes inside one filesystem
+    # timestamp tick would otherwise share a modified time and the second would look like no change.
+    base = path.stat().st_mtime_ns
+    changes = 0
 
     class Stop:
         def wait(self, _interval: float) -> bool:
+            nonlocal changes
             action = next(polls, "stop")
             if action == "stop":
                 return True
             if action:
+                changes += 1
                 path.write_text(action, encoding="utf-8")
-                stamp = path.stat().st_mtime_ns + 1_000_000_000
+                stamp = base + changes * 1_000_000_000
                 os.utime(path, ns=(stamp, stamp))
             return False
 

@@ -85,10 +85,22 @@ CREATE TABLE IF NOT EXISTS recent_docs (
     opened_at REAL NOT NULL,
     PRIMARY KEY (root_key, rel)
 );
+CREATE TABLE IF NOT EXISTS shortlist (
+    id INTEGER PRIMARY KEY,
+    root_key TEXT NOT NULL,
+    rel TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    alloc INTEGER NOT NULL,
+    added_at REAL NOT NULL,
+    UNIQUE (root_key, rel)
+);
 """
 
 # Recent documents kept; the sidebar shows fewer, so one that left the scan still leaves a full list.
 RECENT_KEEP = 20
+
+# Files the cleanup shortlist holds at most: a review list, not a second index.
+SHORTLIST_MAX = 200
 
 SEARCH_MODES = ("emails", "folders")
 
@@ -309,6 +321,30 @@ def recent_docs() -> list[tuple[str, list[str]]]:
     with connect() as conn:
         rows = conn.execute("SELECT root_key, rel FROM recent_docs ORDER BY opened_at DESC").fetchall()
     return [(str(r["root_key"]), list(json.loads(r["rel"]))) for r in rows]
+
+
+def shortlist_add(root_key: str, rel: list[str], size: int, alloc: int) -> None:
+    """Keep the file at ``rel`` (names below its root) on the cleanup shortlist; marking it again keeps its place."""
+    with connect() as conn:
+        known = conn.execute("SELECT 1 FROM shortlist WHERE root_key = ? AND rel = ?", (root_key, json.dumps(rel))).fetchone()
+        if known is not None:
+            return
+        if conn.execute("SELECT COUNT(*) FROM shortlist").fetchone()[0] >= SHORTLIST_MAX:
+            raise ValueError("the shortlist holds %d files: remove some first" % SHORTLIST_MAX)
+        conn.execute("INSERT INTO shortlist (root_key, rel, size, alloc, added_at) VALUES (?, ?, ?, ?, ?)",
+                     (root_key, json.dumps(rel), size, alloc, time.time()))
+
+
+def shortlist_remove(entry_id: int) -> bool:
+    with connect() as conn:
+        return conn.execute("DELETE FROM shortlist WHERE id = ?", (entry_id,)).rowcount > 0
+
+
+def shortlist() -> list[dict[str, Any]]:
+    """Every shortlisted file, newest first: its id, root key, names below the root and the sizes it had when marked."""
+    with connect() as conn:
+        rows = conn.execute("SELECT id, root_key, rel, size, alloc, added_at FROM shortlist ORDER BY added_at DESC, id DESC").fetchall()
+    return [{**dict(r), "rel": list(json.loads(r["rel"]))} for r in rows]
 
 
 def begin_email_run(trigger: str, scope: str) -> int:

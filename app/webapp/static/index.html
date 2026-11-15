@@ -235,6 +235,11 @@
     </div>
     <div class="toolbar-slot"></div>
     <div class="pane-body">
+      <button type="button" class="card shortlist-card" data-shortlist-open data-track="largest-shortlist">
+        <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>
+        <span class="shortlist-card-text"><span class="shortlist-card-title">Cleanup shortlist</span><span class="shortlist-card-meta" data-shortlist-meta></span></span>
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
       <div class="card">
         <div class="card-head">
           <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-crown"></use></svg>Top 10 files</h2>
@@ -275,6 +280,11 @@
     </div>
     <div class="toolbar-slot"></div>
     <div class="pane-body">
+      <button type="button" class="card shortlist-card" data-shortlist-open data-track="types-shortlist">
+        <svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>
+        <span class="shortlist-card-text"><span class="shortlist-card-title">Cleanup shortlist</span><span class="shortlist-card-meta" data-shortlist-meta></span></span>
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
+      </button>
       <div class="card">
         <div class="card-head">
           <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-layout-grid"></use></svg>By file type</h2>
@@ -748,6 +758,20 @@
       <p>Files are opened read-only. Nothing changes a file, its attributes or its pin state. A file that fails isn't read again until it changes.</p>
       <p>The disk scan and the email index each have their own lock, so indexing one folder takes seconds even while a disk scan runs.</p>
     </div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog contents-dialog" id="shortlistDialog" data-track-view="shortlist-sheet">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1">Cleanup shortlist</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="shortlist-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <p class="contents-note" id="shortlistMeta"></p>
+    <ul class="rows shortlist-rows" id="shortlistList"></ul>
+    <p class="contents-note">Marking a file only lists it here. Nothing is moved or deleted.</p>
   </div>
 </dialog>
 

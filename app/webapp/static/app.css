@@ -196,9 +196,11 @@ body {
 .rows > li.row-item { display: flex; align-items: center; border-top: 1px solid var(--line-muted); }
 .rows > li.row-item:first-child { border-top: 0; }
 .row-item > .list-row { flex: 1; min-width: 0; border-top: 0; }
-.row-item > .row-kebab { flex: none; }
+.row-item > .row-kebab, .row-item > .row-mark { flex: none; }
 /* The kebab's box is the full hit square, so its target ends where the row button's begins. */
-.row-item > .row-kebab { --icon-btn-box: var(--hit-min); }
+.row-item > .row-kebab, .row-item > .row-mark { --icon-btn-box: var(--hit-min); }
+/* A shortlist bookmark that is on takes the accent tint, so a marked file reads at a glance. */
+.row-mark[aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); }
 /* A double-click opens the file, so it must not also select its name. */
 .list-row[data-open="file"] { -webkit-user-select: none; user-select: none; }
 .list-row {
@@ -452,3 +454,16 @@ button.list-row .lr-name { font-weight: 600; }
 .folder-budget .select-native { max-width: 50%; }
 .folder-remove-path { overflow-wrap: anywhere; }
 .switch-slot { display: inline-flex; }
+
+/* ------------------------------------------------------------- shortlist */
+.shortlist-card {
+  display: flex; align-items: center; gap: var(--space-sm); width: 100%;
+  min-height: var(--row-md); font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+}
+.shortlist-card > .icon { flex: none; width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); }
+.shortlist-card > .icon:first-child { color: var(--accent-text); }
+.shortlist-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shortlist-card-title { font-weight: 600; }
+.shortlist-card-meta { font-size: var(--font-body-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shortlist-rows .row-item.is-gone .lr-name { color: var(--muted); }
+.shortlist-rows .list-row { grid-template-areas: "glyph name size" ". meta meta"; }

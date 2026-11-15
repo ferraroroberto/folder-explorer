@@ -140,3 +140,35 @@ def test_scans_lists_each_root_once_and_rescans(page: Page, app_url: str, roots_
     # overshoot reaches past the bar; the lint measures the layout once that motion has ended.
     settle(page)
     assert_layout_clean(page)
+
+
+def test_the_cleanup_shortlist_marks_a_largest_file_and_shows_it_in_explore(page: Page, app_url: str) -> None:
+    # The instance is shared by every browser in the run: start from an empty list.
+    for item in page.request.get(app_url + "/api/shortlist").json()["items"]:
+        page.request.delete(app_url + "/api/shortlist/%d" % item["id"])
+    _open(page, app_url)
+    pane = _tab(page, "largest")
+    mark = page.locator("#topList .row-item", has_text="river-01.mp4").locator(".row-mark")
+    expect(mark).to_have_attribute("aria-pressed", "false")
+    mark.click()
+    expect(mark).to_have_attribute("aria-pressed", "true")
+    opener = pane.locator("[data-shortlist-open]")
+    expect(opener).to_contain_text("1 file")
+    expect(_tab(page, "types").locator("[data-shortlist-meta]")).to_contain_text("1 file")
+    _tab(page, "largest")
+    opener.click()
+    sheet = page.locator("#shortlistDialog")
+    row = sheet.locator(".row-item", has_text="river-01.mp4")
+    expect(row).to_contain_text("drone-footage")
+    for theme in ("light", "dark"):
+        page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+        page.wait_for_timeout(150)
+        assert_layout_clean(page)
+    row.locator("[data-show]").click()
+    expect(sheet).to_be_hidden()
+    expect(page.locator("#paneExplore")).to_be_visible()
+    expect(page.locator("#scopePill")).to_contain_text("drone-footage")
+    _tab(page, "largest")
+    opener.click()
+    row.locator("[data-remove]").click()
+    expect(sheet.locator(".rows-note")).to_contain_text("Nothing on the shortlist yet")

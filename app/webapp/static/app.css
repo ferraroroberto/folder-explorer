@@ -423,7 +423,9 @@ button.list-row .lr-name { font-weight: 600; }
 .detail-card .row-line:has(.switch-slot) + .input-native { margin-top: var(--space-xs); }
 .row-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .row-line > span:first-child { color: var(--ink); font-weight: 600; }
-.row-controls { display: inline-flex; align-items: center; gap: var(--space-sm); }
+/* A label whose controls do not fit beside it (a select and a time field on a phone) puts them on their own line, right-aligned, rather than pushing the row past its card. */
+.row-line:has(> .row-controls) { flex-wrap: wrap; row-gap: var(--space-sm); }
+.row-controls { display: inline-flex; align-items: center; gap: var(--space-sm); margin-left: auto; }
 .detail-card .row .row-controls .select-native { min-width: 0; }
 .detail-card .row .row-controls .input-native { min-width: 0; width: 7.5em; }
 .row-controls .input-native[hidden] { display: none; }

@@ -55,6 +55,17 @@ def test_a_config_without_some_blocks_loads_settings_with_their_defaults(page: P
     expect(sheet.locator("#setupCard")).to_be_hidden()
 
 
+def test_a_nightly_schedule_shows_its_time_field_inside_the_card(page: Page, app_url: str) -> None:
+    def change(body: dict[str, Any]) -> None:
+        body["config"]["schedule"] = "nightly"
+        body["config"]["schedule_time"] = "03:30"
+
+    _serve_config(page, change)
+    _open_settings(page, app_url)
+    expect(page.locator("#settingsDialog #scheduleTime")).to_be_visible()
+    assert_layout_clean(page, allow=BELOW_FOLD)
+
+
 def test_a_server_without_the_remote_and_archive_blocks_still_loads_settings(page: Page, app_url: str) -> None:
     def change(body: dict[str, Any]) -> None:
         for key in ("remote", "archive", "index_bytes"):

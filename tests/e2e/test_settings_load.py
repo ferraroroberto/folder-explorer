@@ -9,6 +9,7 @@ import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._settings import close_setting, open_setting
 from tests.e2e.test_settings_folders import BELOW_FOLD
 
 RAW_ERROR = "Cannot read properties"
@@ -50,9 +51,10 @@ def test_a_config_without_some_blocks_loads_settings_with_their_defaults(page: P
     sheet = page.locator("#settingsDialog")
     expect(sheet).to_be_visible()
     expect(page.locator(".toast")).to_have_count(0)
-    expect(sheet.locator("#trayClickSlot [role=switch]")).to_have_attribute("aria-checked", "true")
-    expect(sheet.locator("#trayClickNote")).to_contain_text("opens the small Quick search window")
     expect(sheet.locator("#setupCard")).to_be_hidden()
+    tray = open_setting(page, "tray-click")
+    expect(tray.locator("#trayClickSlot [role=switch]")).to_have_attribute("aria-checked", "true")
+    expect(tray.locator("#trayClickNote")).to_contain_text("opens the small Quick search window")
 
 
 def test_a_nightly_schedule_shows_its_time_field_inside_the_card(page: Page, app_url: str) -> None:
@@ -62,7 +64,7 @@ def test_a_nightly_schedule_shows_its_time_field_inside_the_card(page: Page, app
 
     _serve_config(page, change)
     _open_settings(page, app_url)
-    expect(page.locator("#settingsDialog #scheduleTime")).to_be_visible()
+    expect(open_setting(page, "schedule").locator("#scheduleTime")).to_be_visible()
     assert_layout_clean(page, allow=BELOW_FOLD)
 
 
@@ -100,7 +102,7 @@ def test_a_server_that_does_not_answer_says_what_failed_in_plain_words(page: Pag
 def test_a_save_that_the_network_drops_shows_no_script_error(page: Page, app_url: str) -> None:
     _open_settings(page, app_url)
     page.route("**/api/config", lambda route: route.abort() if route.request.method == "POST" else route.continue_())
-    page.locator("#settingsDialog #reuseExplorerSlot [role=switch]").click()
+    open_setting(page, "explorer-window").locator("#reuseExplorerSlot [role=switch]").click()
     toast = page.locator(".toast")
     expect(toast).to_contain_text("Could not save")
     assert "Failed to fetch" not in toast.inner_text() and "NetworkError" not in toast.inner_text() and "Load failed" not in toast.inner_text()
@@ -141,7 +143,7 @@ def test_with_no_config_file_the_card_creates_it_in_one_tap(page: Page, app_url:
     expect(page.locator(".toast")).to_contain_text(CREATED_TOAST)
     expect(card).to_be_hidden()
     assert created == ["POST"]
-    expect(page.locator("#settingsDialog #trayClickSlot [role=switch]")).to_be_visible()
+    expect(open_setting(page, "tray-click").locator("#trayClickSlot [role=switch]")).to_be_visible()
 
 
 def test_a_refused_create_shows_the_servers_sentence(page: Page, app_url: str) -> None:
@@ -168,8 +170,10 @@ def test_the_markdown_association_row_shows_its_state_on_this_pc(page: Page, app
     _open_settings(page, app_url)
     sheet = page.locator("#settingsDialog")
     expect(sheet.locator("#mdAssocRow")).to_be_visible()
-    expect(sheet.locator("#mdAssocNote")).to_contain_text("unknown")
-    expect(sheet.locator("#mdAssocSlot [role=switch]")).to_be_disabled()
+    expect(sheet.locator("#valMdAssoc")).to_have_text("Unknown")
+    detail = open_setting(page, "md-assoc")
+    expect(detail.locator("#mdAssocNote")).to_contain_text("unknown")
+    expect(detail.locator("#mdAssocSlot [role=switch]")).to_be_disabled()
 
     asked: list[Any] = []
     _serve_config(page, lambda body: body.update(md_assoc={"state": "off"}))
@@ -180,11 +184,13 @@ def test_the_markdown_association_row_shows_its_state_on_this_pc(page: Page, app
 
     page.route("**/api/md-assoc", assoc)
     _open_settings(page, app_url)
-    switch = sheet.locator("#mdAssocSlot [role=switch]")
+    detail = open_setting(page, "md-assoc")
+    switch = detail.locator("#mdAssocSlot [role=switch]")
     expect(switch).to_have_attribute("aria-checked", "false")
     switch.click()
     expect(switch).to_have_attribute("aria-checked", "true")
-    expect(sheet.locator("#mdAssocNote")).to_contain_text("Windows may ask once")
+    expect(detail.locator("#mdAssocNote")).to_contain_text("Windows may ask once")
+    expect(sheet.locator("#valMdAssoc")).to_have_text("On")
     assert asked == [{"on": True}]
 
 
@@ -193,3 +199,37 @@ def test_another_device_gets_no_markdown_association_row(page: Page, app_url: st
     _open_settings(page, app_url)
     expect(page.locator("#settingsDialog")).to_be_visible()
     expect(page.locator("#mdAssocRow")).to_be_hidden()
+
+
+ROW_AUDIT = """() => {
+  const problems = [];
+  document.querySelectorAll('#settingsDialog .settings-row, #settingDialog [data-setting]:not([hidden]) .settings-row').forEach((row) => {
+    if (row.offsetParent === null) return;
+    const label = row.querySelector('.settings-row-label');
+    const glyph = row.querySelector('.settings-row-icon');
+    const name = label ? label.textContent.trim() : '(no label)';
+    if (!label || label.getBoundingClientRect().height > 30) problems.push(name + ': label wraps');
+    if (!glyph || Math.round(glyph.getBoundingClientRect().width) !== 18) problems.push(name + ': no 18px glyph');
+    if (row.matches('button.settings-row[data-open]') && !(row.querySelector('.settings-row-value') && row.querySelector('.settings-row-chevron'))) problems.push(name + ': no value and chevron');
+    const value = row.querySelector('.settings-row-value');
+    if (value && value.scrollWidth > value.clientWidth + 1) problems.push(name + ': value is cut off');
+    if (row.scrollWidth > row.clientWidth + 1) problems.push(name + ': row overflows');
+  });
+  document.querySelectorAll('#settingsDialog select, #settingDialog select').forEach((select) => {
+    if (!select.classList.contains('settings-row-select') || parseFloat(getComputedStyle(select).borderTopWidth) > 0) problems.push((select.id || 'select') + ': drawn as a pill');
+  });
+  return problems;
+}"""
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_every_settings_row_is_one_line_with_a_glyph_on_a_phone_in_light_and_dark(page: Page, app_url: str, theme: str) -> None:
+    page.set_viewport_size({"width": 390, "height": 844})
+    _open_settings(page, app_url)
+    page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
+    expect(page.locator("#settingsDialog")).to_be_visible()
+    assert page.evaluate(ROW_AUDIT) == []
+    for name in ("schedule", "budget", "outlook", "screenshot", "remote"):
+        open_setting(page, name)
+        assert page.evaluate(ROW_AUDIT) == [], name
+        close_setting(page)

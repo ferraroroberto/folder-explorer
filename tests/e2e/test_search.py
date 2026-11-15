@@ -10,6 +10,7 @@ import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._settings import close_setting, open_setting
 from tests.e2e.conftest import LIVE_PORT
 from tests.e2e.test_settings_folders import BELOW_FOLD
 
@@ -289,11 +290,12 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     errors = _errors(page)
     segments = page.locator("#modeSeg .segmented-item:visible")
     markdown = page.locator('#modeSeg .segmented-item[data-value="docs"]')
-    switch = page.locator("#settingsDialog #markdownSearchSlot [role=switch]")
+    switch = page.locator("#settingDialog #markdownSearchSlot [role=switch]")
 
     def settings(want: str) -> None:
         page.locator("#paneSearch .home-settings").click()
         expect(page.locator("#settingsDialog")).to_be_visible()
+        open_setting(page, "markdown-search")
         expect(switch).to_have_attribute("aria-checked", want)
 
     page.goto(app_url + "/#search?mode=docs&q=")
@@ -309,6 +311,7 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     switch.click()
     expect(switch).to_have_attribute("aria-checked", "false")
     expect(page.locator("#markdownSearchNote")).to_contain_text("Documents mode is hidden")
+    close_setting(page)
     page.locator("#settingsDialog [data-close]").click()
 
     expect(segments).to_have_text(["Folders", "Emails"])
@@ -331,6 +334,7 @@ def test_the_markdown_search_switch_hides_the_mode_and_falls_back_to_folders(pag
     settings("false")
     switch.click()
     expect(switch).to_have_attribute("aria-checked", "true")
+    close_setting(page)
     page.locator("#settingsDialog [data-close]").click()
     expect(segments).to_have_text(["Folders", "Documents", "Emails"])
     page.locator("#modeSeg .segmented-item", has_text="Documents").click()

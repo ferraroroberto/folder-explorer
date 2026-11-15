@@ -1,4 +1,4 @@
-/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, every screenshot setting, remote access, the in-app schedule, and the folder lists for the scan and the email index. */
+/* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, every screenshot setting, remote access, the in-app schedule, and the folder lists for the scan and the email index. Each row of the pane shows its current value; a row with help text or a list opens its own sheet (settingDialog) holding the control, its note and its list. */
 
 import { getJSON, postJSON } from './api.js';
 import { readPref, state, writePref } from './state.js';
@@ -40,6 +40,7 @@ function render(body) {
   const cfg = body.config;
   const remote = body.remote;
   $('setupCard').hidden = body.config_file.exists;
+  renderValues(body);
   setSwitch(markdownSwitch, cfg.search.markdown);
   $('markdownSearchNote').textContent = cfg.search.markdown
     ? 'On: Search offers a Documents mode that lists Markdown and HTML files by name.'
@@ -80,7 +81,7 @@ function render(body) {
 
   $('scheduleSelect').value = cfg.schedule;
   $('scheduleTime').value = cfg.schedule_time;
-  $('scheduleTime').hidden = cfg.schedule !== 'nightly';
+  $('scheduleTimeRow').hidden = cfg.schedule !== 'nightly';
   $('scheduleNote').textContent = cfg.schedule === 'off'
     ? 'Off: scans run from Rescan, the tray menu or the command line.'
     : (cfg.schedule === 'nightly' ? 'Every night at ' + cfg.schedule_time : 'Every hour') + ', while the app is running.';
@@ -88,7 +89,7 @@ function render(body) {
   config = cfg;
   const auto = cfg.roots === null;
   setSwitch(autoSwitch, auto);
-  autoSwitch.setAttribute('aria-label', 'Every local drive and OneDrive');
+  autoSwitch.setAttribute('aria-label', 'All drives and OneDrive');
   $('rootsEditor').hidden = auto;
   if (!auto) lists.roots.render(cfg.roots);
   $('rootsNote').textContent = auto ? 'Scanning ' + state.roots.map((r) => r.name).join(', ') + '.' : '';
@@ -96,11 +97,39 @@ function render(body) {
   lists.emailRoots.render(cfg.email.roots);
   lists.emailExclude.render(cfg.email.exclude);
   renderBudget(cfg.email.download_budget_mb);
-  $('indexSize').textContent = fmtBytes(body.index_bytes) + ', kept on this PC';
+  $('indexSize').textContent = fmtBytes(body.index_bytes);
   $('outlookNote').textContent = body.archive.ready
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
   setBasis(readPref('basis', 'size'));
+}
+
+const onOff = (on) => (on ? 'On' : 'Off');
+const folderCount = (list) => (list.length ? list.length + (list.length === 1 ? ' folder' : ' folders') : 'None');
+const SCHEDULE_VALUE = { off: 'Off', nightly: 'Every night', hourly: 'Every hour' };
+const ASSOC_VALUE = { on: 'On', off: 'Off', partial: 'Partly set', unknown: 'Unknown' };
+const BUDGET_VALUE = { '': 'No limit', 0: 'Local only' };
+
+/** The value each sheet row shows beside its chevron, so the pane reads without opening a sheet. */
+function renderValues(body) {
+  const cfg = body.config;
+  const set = (id, text) => { $(id).textContent = text; $(id).title = text; };
+  set('valSchedule', cfg.schedule === 'nightly' ? 'Nightly, ' + cfg.schedule_time : (SCHEDULE_VALUE[cfg.schedule] || cfg.schedule));
+  set('valRoots', cfg.roots === null ? 'All drives' : folderCount(cfg.roots));
+  set('valExclude', folderCount(cfg.exclude));
+  set('valEmailRoots', folderCount(cfg.email.roots));
+  set('valEmailExclude', folderCount(cfg.email.exclude));
+  const mb = cfg.email.download_budget_mb;
+  set('valBudget', BUDGET_VALUE[budgetValue(mb)] || (mb >= 1024 ? mb / 1024 + ' GB' : mb + ' MB'));
+  const archiving = [cfg.outlook.add_category && 'Category', cfg.outlook.move_to_archive && 'Move'].filter(Boolean);
+  set('valOutlook', archiving.length ? archiving.join(' + ') : 'Off');
+  set('valMacro', body.archive.ready ? 'Ready' : 'Not ready');
+  set('valMarkdownSearch', onOff(cfg.search.markdown));
+  set('valRemoteHtml', cfg.docs.block_remote_html ? 'Blocked' : 'Allowed');
+  set('valExplorerWindow', cfg.desktop.reuse_explorer_window ? 'Reused' : 'New window');
+  set('valTrayClick', cfg.tray.left_click === 'quick_search' ? 'Quick search' : 'Open app');
+  set('valScreenshot', cfg.snap.hotkey);
+  set('valRemote', onOff(cfg.remote_access));
 }
 
 /** The screenshot rows: each shows what the tray's Screenshot menu holds, read from the same config.json block. */
@@ -152,6 +181,7 @@ const ASSOC_TEXT = {
 /** The Markdown association row: shown on this PC only, with the state the registry gave back. */
 function renderAssoc(assocState) {
   $('mdAssocRow').hidden = assocState === 'pc_only';
+  $('valMdAssoc').textContent = ASSOC_VALUE[assocState] || ASSOC_VALUE.unknown;
   setSwitch(assocSwitch, assocState === 'on');
   assocSwitch.disabled = assocState === 'unknown';
   $('mdAssocNote').textContent = ASSOC_TEXT[assocState] || ASSOC_TEXT.unknown;
@@ -227,19 +257,6 @@ async function createConfig() {
   }
 }
 
-/** The Markdown association row: built here, not in index.html, as it exists only for a server that reports this PC's association. */
-function buildAssocRow() {
-  const assocRow = document.createElement('div');
-  assocRow.className = 'row row-stack';
-  assocRow.id = 'mdAssocRow';
-  assocRow.hidden = true;
-  assocRow.innerHTML = '<div class="row-line"><span>Associate Markdown files with this app</span>' +
-    '<span class="switch-slot" id="mdAssocSlot" data-track="md-assoc-switch"></span></div><p class="row-note" id="mdAssocNote"></p>';
-  $('reuseExplorerSlot').closest('.row').after(assocRow);
-  assocSwitch = switchEl(false, { label: 'Associate Markdown files with this app', onToggle: saveAssoc });
-  $('mdAssocSlot').appendChild(assocSwitch);
-}
-
 /** The four folder lists: what the scan covers and skips, and the email folders and what their index leaves out. */
 function buildFolderLists() {
   lists.roots = folderList($('rootsEditor'), {
@@ -269,28 +286,29 @@ export function initSettings(opts) {
   });
   $('markdownSearchSlot').appendChild(markdownSwitch);
   remoteHtmlSwitch = switchEl(false, {
-    label: 'Block remote content in HTML',
+    label: 'Block remote content',
     onToggle: (next) => save({ docs: { block_remote_html: next } }),
   });
   $('blockRemoteHtmlSlot').appendChild(remoteHtmlSwitch);
   reuseSwitch = switchEl(false, {
-    label: 'Reuse an open Explorer window',
+    label: 'Reuse an open window',
     onToggle: (next) => save({ desktop: { reuse_explorer_window: next } }),
   });
   $('reuseExplorerSlot').appendChild(reuseSwitch);
-  buildAssocRow();
+  assocSwitch = switchEl(false, { label: 'Open with this app', onToggle: saveAssoc });
+  $('mdAssocSlot').appendChild(assocSwitch);
   categorySwitch = switchEl(false, {
-    label: 'Add an Outlook category when archiving',
+    label: 'Outlook category',
     onToggle: (next) => save({ outlook: { add_category: next } }),
   });
   $('archiveCategorySlot').appendChild(categorySwitch);
   moveSwitch = switchEl(false, {
-    label: 'Move to the Outlook archive folder when archiving',
+    label: 'Move to archive folder',
     onToggle: (next) => save({ outlook: { move_to_archive: next } }),
   });
   $('archiveMoveSlot').appendChild(moveSwitch);
   traySwitch = switchEl(true, {
-    label: 'Tray click opens Quick search',
+    label: 'Opens Quick search',
     onToggle: async (next) => {
       if (await save({ tray: { left_click: next ? 'quick_search' : 'open_app' } })) {
         showToast(next ? 'Tray click opens Quick search' : 'Tray click opens the app');
@@ -299,12 +317,12 @@ export function initSettings(opts) {
   });
   $('trayClickSlot').appendChild(traySwitch);
   snapHoldSwitch = switchEl(false, {
-    label: 'Hold left click to capture',
+    label: 'Hold to capture',
     onToggle: (next) => saveSnap({ hold_to_capture: next }),
   });
   $('snapHoldSlot').appendChild(snapHoldSwitch);
   snapClipboardSwitch = switchEl(true, {
-    label: 'Copy to clipboard on save',
+    label: 'Copy to clipboard',
     onToggle: (next) => saveSnap({ copy_to_clipboard: next }),
   });
   $('snapClipboardSlot').appendChild(snapClipboardSwitch);
@@ -318,10 +336,11 @@ export function initSettings(opts) {
   $('snapHotkey').addEventListener('change', (e) => saveSnap({ hotkey: e.target.value }));
   $('snapOpenFolder').addEventListener('click', openSnapFolder);
   $('createConfig').addEventListener('click', createConfig);
+  $('settingsDialog').querySelectorAll('[data-open]').forEach((row) => row.addEventListener('click', () => openSetting(row.dataset.open)));
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });
   $('remoteSwitchSlot').appendChild(remoteSwitch);
   autoSwitch = switchEl(true, {
-    label: 'Every local drive and OneDrive',
+    label: 'All drives and OneDrive',
     onToggle: async (next) => {
       if (next) {
         if (await save({ roots: null })) onRootsChanged();
@@ -346,6 +365,17 @@ export function initSettings(opts) {
     writePref('basis', b.dataset.value);
     setBasis(b.dataset.value);
   });
+}
+
+/** Open the sheet for one setting: its control, its note and any folder list, over the Settings sheet. */
+function openSetting(name) {
+  const dialog = $('settingDialog');
+  dialog.querySelectorAll('[data-setting]').forEach((section) => {
+    const shown = section.dataset.setting === name;
+    section.hidden = !shown;
+    if (shown) $('settingTitle').textContent = section.dataset.title;
+  });
+  dialog.showModal();
 }
 
 /** The server's build for the load-failure sentence, '' when it can't say. */

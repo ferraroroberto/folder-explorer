@@ -50,6 +50,8 @@ It needs the vendored [`icon-button/`](../icon-button/) stylesheet and two glyph
 - **The status line** is a polite live region and empty between copies, so it takes no room. "Copied" is neutral; "Copy failed" takes `--danger-text`, because only an error tints.
 - **What is copied** is the `<pre>`'s `textContent`, so markup inside it (a highlighter's spans) never reaches the clipboard.
 - **No clipboard** (an insecure page, a denied permission) takes the same path as a rejected write: the header says "Copy failed".
+- **A listing with no header** (a command's output, a trace) is the same frame with the `.code-listing-head` left out: `<div class="code-listing"><pre>…</pre></div>`. Its text is 13px on `--card`, so a bare `<pre>` at the 12px caption size or on a darker fill is replaced by it (design-review `COMP-17`).
+- **Inline code** is `<code class="code-inline">`: mono at `0.875em` of the text around it on `--neutral-soft`, never `caption`-sized and never on `canvas-subtle`, which is true black inside a dark card. A `code` inside a `pre` is the listing's own text and takes no class.
 
 ## Required design tokens
 
@@ -62,3 +64,4 @@ Wired to `~/.claude/design.md` (+ `design.dark.md`), never redefined here.
 | `--accent-text`, `--danger-text` | the copied glyph, the failure line |
 | `--radius-md`, `--font-caption`, `--hit-min` | frame radius, header size, target floor |
 | `--icon-inline` | glyph size (through `icon-button`) |
+| `--neutral-soft` | the `.code-inline` chip fill |

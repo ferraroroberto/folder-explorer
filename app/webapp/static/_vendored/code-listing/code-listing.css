@@ -17,7 +17,7 @@
  *
  * Needs icon-button.css (the control) and the app's tokens: --card, --line,
  * --line-muted, --muted, --ink, --accent-text, --danger-text, --radius-md,
- * --font-caption, --hit-min.
+ * --font-caption, --hit-min, --neutral-soft (the inline chip).
  */
 
 .code-listing {
@@ -63,6 +63,20 @@
 .code-listing-copy[data-copied="true"] { color: var(--accent-text); }
 .code-listing-copy[data-copied="true"] .code-listing-copy-glyph { display: none; }
 .code-listing-copy[data-copied="true"] .code-listing-copied { display: inline; }
+
+/* The inline code chip (design.md `code-inline`): mono at 0.875em of the text
+ * around it, never caption-sized, on neutral-soft, which is a tint of the
+ * muted ink over whatever card holds it and so is never darker than that card
+ * (canvas-subtle is true black inside a dark card). Opt-in by class, so a
+ * `code` inside a `pre` stays the listing's own text. */
+.code-inline {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--neutral-soft);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.875em;
+}
 
 .code-listing pre {
   margin: 0;

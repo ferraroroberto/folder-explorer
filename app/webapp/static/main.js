@@ -6,6 +6,7 @@ import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
 import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
 import { loadLargest } from './largest.js';
 import { loadTypes, typeOptions } from './types.js';
+import { initShortlist } from './shortlist.js';
 import { loadRoots, renderRoots, scansStatus } from './scans.js';
 import { initEmailScans, loadEmailScans } from './email-scans.js';
 import { initSettings, openSettings } from './settings.js';
@@ -146,7 +147,7 @@ async function resetRoot() {
   await renderActive();
 }
 
-/** Open Explore at one folder of one root: Search's "Show folder" and "Show in Explore". */
+/** Open Explore at one folder of one root: Search's "Show folder" and "Show in Explore", and the shortlist's. */
 async function showInExplore(nav, rootKey, folderId) {
   const r = state.roots.find((x) => x.key === rootKey);
   if (!r || !r.current) { showToast('That root has no finished scan yet'); return; }
@@ -311,6 +312,7 @@ async function boot() {
   placeToolbar(state.tab);
   initSearch({ nav, showInExplore: (root, folder) => showInExplore(nav, root, folder) });
   initExplore({ onSelect: onFolderSelected });
+  initShortlist({ showInExplore: (root, folder) => showInExplore(nav, root, folder) });
   initEmailScans();
   initArchive();
   initDrop({ open: openIndexed, show: openDropped, ownWindow: true });

@@ -1,8 +1,9 @@
-/* Largest: the top 10 files under the selected folder and its top percentile. */
+/* Largest: the top 10 files under the selected folder, each with its shortlist bookmark, and its top percentile. */
 
 import { getJSON } from './api.js';
 import { state, query, val } from './state.js';
 import { bar, cloudMark, esc, fmtBytes, fmtNum, fmtPct, glyph, pct, plural } from './fmt.js';
+import { markButton } from './shortlist.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,10 +22,10 @@ function renderTop(top) {
   $('topList').innerHTML = top.files.map((f, i) => {
     const p = pct(val(f), whole);
     const where = f.path.length ? f.path.join(' › ') : top.folder.name;
-    return '<li><div class="list-row" title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes"><span class="rank">' + (i + 1) + '</span>' +
+    return '<li class="row-item"><div class="list-row" title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes"><span class="rank">' + (i + 1) + '</span>' +
       '<span class="lr-name"><span>' + esc(f.name) + '</span>' + cloudMark(f.online) + '</span>' +
       '<span class="lr-where"><span class="lr-path">' + esc(where) + '</span><span class="lr-pct"> · ' + fmtPct(p) + '</span></span>' +
-      '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div></li>';
+      '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div>' + markButton(f) + '</li>';
   }).join('') || '<li class="rows-note">' + (state.type !== null ? 'No files match the type filter.' : 'No files in this folder.') + '</li>';
 }
 

@@ -29,7 +29,7 @@ folder-explorer/
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the document viewer), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
-│       │                       #   verbs over HTTP, each run as the CLI's child)
+│       │                       #   verbs over HTTP, each run as the CLI's child), shortlist (the cleanup shortlist: files marked in Largest, in state.sqlite3)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
 │                           #   parts/icon-sprite.html is the inline icon sprite, spliced into index.html where its include line stands;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);

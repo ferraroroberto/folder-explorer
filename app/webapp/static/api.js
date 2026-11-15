@@ -53,3 +53,7 @@ export async function getJSON(path) {
 export async function postJSON(path, body) {
   return parse(await api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }));
 }
+
+export async function deleteJSON(path) {
+  return parse(await api(path, { method: 'DELETE' }));
+}

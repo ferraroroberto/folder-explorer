@@ -35,6 +35,7 @@ from app.webapp.routers import (
     search,
     search_v1,
     settings,
+    shortlist,
 )
 from app.webapp.state import EMAILS, POOL, refresh_pool
 from src import config, scan_runner, store
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(archive_v1.router)
     app.include_router(emails.router)
     app.include_router(archive.router)
+    app.include_router(shortlist.router)
     # Local-only view/tap log, under the same sign-in rule as every other route.
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
 

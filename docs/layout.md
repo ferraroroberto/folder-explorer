@@ -14,6 +14,7 @@ folder-explorer/
 │   │                           #   sheet's prepare and file, Find in mailbox), each verb in its own process
 │   ├── tray/                   # `pythonw -m app.tray`: the tray that owns the web app
 │   │   ├── tray.py             # menu (left click: Quick search or Open), adopt-or-spawn, watchdog, breadcrumbs
+│   │   ├── respawn.py          # adopt-or-spawn and the watchdog's on_wedge, every spawn through the one RespawnGuard
 │   │   ├── single_instance.py  # vendored: named-mutex single instance + start lock
 │   │   ├── watchdog.py         # vendored: retry-with-backoff, health watchdog, breadcrumb log
 │   │   └── snap_menu.py        # the tray's Screenshot submenu over a SnapService, and its redraw when config.json changes
@@ -94,6 +95,7 @@ folder-explorer/
 │   └── (vendored)              # build_info, compression, login_alert, login_lockout, no_window, notify/, password, pooled_http, runtime_data, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
+│                               #   tests/tray the tray's respawn path over a fake clock and process table,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, gen_token
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas

@@ -2,7 +2,8 @@
 
 Started by ``tray.bat`` as ``pythonw -m app.tray``. One tray per session (a
 named mutex); the webapp start retries with backoff, a dead webapp is
-respawned, and a wedged one (listening, not answering) is only reported.
+respawned through one ``RespawnGuard`` (never a second copy while the first
+boots), and a wedged one (listening, not answering) is only reported.
 Every start, retry, respawn and recovery is written to ``watchdog.log`` in
 the runtime-data folder, the one record a console-less tray leaves.
 
@@ -31,9 +32,15 @@ for _name in ("stdout", "stderr"):
 import pystray  # noqa: E402 -- after the stream rebind above
 from PIL import Image  # noqa: E402
 
+from app.tray.respawn import make_launch, make_on_wedge  # noqa: E402
 from app.tray.single_instance import SingleInstance  # noqa: E402
 from app.tray.snap_menu import refresh_when_config_changes, snap_menu_item  # noqa: E402
-from app.tray.watchdog import BreadcrumbLog, HealthWatchdog, retry_with_backoff  # noqa: E402
+from app.tray.watchdog import (  # noqa: E402
+    BreadcrumbLog,
+    HealthWatchdog,
+    RespawnGuard,
+    retry_with_backoff,
+)
 from app.webapp.bind import resolve_bind  # noqa: E402
 from app.webapp.manager import WebappManager  # noqa: E402
 from src import config, scan_runner, store  # noqa: E402
@@ -62,30 +69,25 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, filename=str(log_dir / "tray.log"),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s", encoding="utf-8")
     crumbs = BreadcrumbLog(log_dir / "watchdog.log")
-    guard = SingleInstance(MUTEX_NAME)
-    if not guard.acquired:
+    instance = SingleInstance(MUTEX_NAME)
+    if not instance.acquired:
         crumbs("tray already running in this session; exiting")
         return 0
     manager = WebappManager()
     stop = threading.Event()
+    guard = RespawnGuard(crumbs)
+    launch = make_launch(manager, guard, crumbs)
 
     def start_webapp() -> None:
         crumbs("webapp start attempt")
-        manager.start()
+        launch()
 
-    def respawn(failures: int) -> None:
-        if manager.owns_running():
-            crumbs("webapp listening but not answering /healthz after %d probes; leaving it running" % failures)
-            return
-        crumbs("webapp down after %d probes; respawning" % failures)
-        try:
-            manager.start()
-            crumbs("webapp respawned")
-        except Exception as exc:  # noqa: BLE001 -- the tray must outlive a failed respawn
-            crumbs("webapp respawn failed: %s" % exc)
-            watchdog.rearm()
+    def on_recover() -> None:
+        guard.mark_healthy()
+        crumbs("webapp recovered")
 
-    watchdog = HealthWatchdog(manager.healthy, respawn, lambda: crumbs("webapp recovered"))
+    on_wedge = make_on_wedge(manager, guard, crumbs, lambda: watchdog.rearm())
+    watchdog = HealthWatchdog(manager.healthy, on_wedge, on_recover)
 
     def boot() -> None:
         try:
@@ -114,7 +116,8 @@ def main() -> int:
     def on_restart(icon: "pystray.Icon", item: object) -> None:
         crumbs("webapp restart from the tray menu")
         try:
-            manager.restart()
+            manager.stop()
+            launch()
         except Exception as exc:  # noqa: BLE001
             crumbs("restart failed: %s" % exc)
 
@@ -143,5 +146,5 @@ def main() -> int:
     snap.on_change = icon.update_menu
     threading.Thread(target=refresh_when_config_changes, args=(icon.update_menu, stop), name="snap-menu-watch", daemon=True).start()
     icon.run()
-    guard.release()
+    instance.release()
     return 0

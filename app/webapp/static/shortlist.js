@@ -36,22 +36,20 @@ export async function loadShortlist() {
   take(await getJSON('/api/shortlist'));
 }
 
-function markLabel(on, name) {
-  return (on ? 'Remove ' : 'Add ') + name + (on ? ' from' : ' to') + ' the cleanup shortlist';
-}
+// One name in both states: aria-pressed carries on or off, so a screen reader hears a toggle, not an Add or Remove action.
+const markLabel = (name) => 'Shortlist ' + name;
 
 function paintMark(btn) {
   const on = entryFor(Number(btn.dataset.id)) !== undefined;
   btn.setAttribute('aria-pressed', String(on));
-  btn.setAttribute('aria-label', markLabel(on, btn.dataset.name));
-  btn.title = on ? 'On the shortlist' : 'Add to the shortlist';
+  btn.setAttribute('aria-label', markLabel(btn.dataset.name));
 }
 
 /** The bookmark toggle a Largest row ends with. */
 export function markButton(f) {
   const on = entryFor(f.id) !== undefined;
   return '<button type="button" class="icon-button row-mark" data-id="' + f.id + '" data-name="' + esc(f.name) + '" aria-pressed="' + on +
-    '" aria-label="' + esc(markLabel(on, f.name)) + '" title="' + (on ? 'On the shortlist' : 'Add to the shortlist') + '" data-track="largest-review">' +
+    '" aria-label="' + esc(markLabel(f.name)) + '" title="Shortlist" data-track="largest-review">' +
     glyph('bookmark') + '</button>';
 }
 

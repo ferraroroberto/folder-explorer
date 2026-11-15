@@ -1,9 +1,8 @@
-"""Adopt-or-spawn for the webapp process the tray owns.
+"""The webapp process the tray owns: probe, spawn, stop.
 
-``start()`` adopts a webapp already answering on the port, or spawns
-``python -m app.webapp`` from this venv. The bind (loopback HTTP or tailnet
-HTTPS) is read from config at every spawn, so a restart picks up a changed
-``remote_access`` setting. ``stop()`` only stops a process this manager
+``spawn()`` starts ``python -m app.webapp`` from this venv. The bind
+(loopback HTTP or tailnet HTTPS) is read from config at every spawn, so a
+restart picks up a changed ``remote_access`` setting. ``stop()`` only stops a process this manager
 spawned. The child writes its log to ``webapp.log`` in the runtime-data
 folder: a ``pythonw`` tray has no console to inherit.
 """
@@ -12,9 +11,9 @@ from __future__ import annotations
 
 import logging
 import os
+import socket
 import subprocess
 import sys
-import time
 from typing import IO, Optional
 
 import requests
@@ -28,9 +27,7 @@ from src.pooled_http import build_session, pooled_request
 
 logger = logging.getLogger(__name__)
 
-_STARTUP_TIMEOUT_S = 30.0
 _PROBE_TIMEOUT_S = 2.0
-_POLL_S = 0.4
 _STOP_WAIT_S = 10.0
 # The log restarts empty past this size at the next spawn.
 _LOG_MAX_BYTES = 5_000_000
@@ -72,27 +69,23 @@ class WebappManager:
                 continue
         return False
 
-    def owns_running(self) -> bool:
-        return self._proc is not None and self._proc.poll() is None
+    def port_in_use(self) -> bool:
+        """True when something accepts a connection on the webapp's loopback port, answering or not."""
+        try:
+            with socket.create_connection(("127.0.0.1", self.port), timeout=_PROBE_TIMEOUT_S):
+                return True
+        except OSError:
+            return False
 
-    def start(self) -> None:
-        """Adopt a healthy webapp, or spawn one and wait until it answers. Raises on failure."""
+    def spawn(self) -> int:
+        """Start ``python -m app.webapp`` and return its pid without waiting for readiness.
+
+        Readiness is the watchdog probe's job: a wait that times out would drop the pid of a child still booting.
+        """
         with cross_process_lock(r"Global\folder-explorer-webapp-start-%d" % self.port):
-            if self.healthy():
-                logger.info("ℹ️ webapp already answering on port %d, adopted", self.port)
-                return
-            self._spawn()
-            deadline = time.monotonic() + _STARTUP_TIMEOUT_S
-            while time.monotonic() < deadline:
-                if self._proc is not None and self._proc.poll() is not None:
-                    raise RuntimeError("webapp exited during start (code %s); see webapp.log" % self._proc.returncode)
-                if self.healthy():
-                    logger.info("✅ webapp up at %s", self.url)
-                    return
-                time.sleep(_POLL_S)
-            raise RuntimeError("webapp did not answer within %.0f s; see webapp.log" % _STARTUP_TIMEOUT_S)
+            return self._spawn()
 
-    def _spawn(self) -> None:
+    def _spawn(self) -> int:
         log_path = store.data_dir() / "webapp.log"
         if log_path.exists() and log_path.stat().st_size > _LOG_MAX_BYTES:
             log_path.unlink()
@@ -106,6 +99,7 @@ class WebappManager:
             stdin=subprocess.DEVNULL, stdout=self._log, stderr=subprocess.STDOUT, creationflags=flags,
         )
         logger.info("🚀 webapp spawned, pid %d", self._proc.pid)
+        return self._proc.pid
 
     def stop(self) -> None:
         proc, self._proc = self._proc, None
@@ -118,7 +112,3 @@ class WebappManager:
         if self._log is not None:
             self._log.close()
             self._log = None
-
-    def restart(self) -> None:
-        self.stop()
-        self.start()

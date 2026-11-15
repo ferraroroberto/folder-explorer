@@ -170,6 +170,9 @@ kbd {
 .summary-meta { margin-left: auto; color: var(--muted); font-size: var(--font-body-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .summary-chevron { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); transition: transform 0.15s ease; }
 .side-toggle[aria-expanded="true"] .summary-chevron { transform: rotate(90deg); }
+/* The Filters card opens from its glyph-only icon-button, with the title and the active count beside it. */
+.side-head { display: flex; align-items: center; gap: var(--space-sm); min-height: var(--row-md); padding: 0 6px 0 14px; }
+.side-head:has(.side-toggle-icon[aria-expanded="true"]) { border-bottom: 1px solid var(--line-muted); }
 .side-body { padding: 12px 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 
 /* Filter fields */
@@ -316,7 +319,7 @@ kbd {
   .search-layout[data-mode="docs"] .search-side { display: none; }
   .results-card { grid-area: results; min-height: 0; overflow: auto; }
   .preview-card { grid-area: preview; display: block; min-height: 0; overflow: auto; }
-  .search-side .side-toggle { min-height: var(--row-sm); }
+  .search-side .side-toggle, .search-side .side-head { min-height: var(--row-sm); }
 }
 @media (max-width: 1099px), (pointer: coarse) {
   .search-side { display: grid; gap: var(--gap); }

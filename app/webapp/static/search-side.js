@@ -126,6 +126,7 @@ export function renderFilters() {
     $('filtersBody').innerHTML = mode === 'folders' ? folderOptionsHtml() : mode === 'emails' ? emailFiltersHtml() : '';
   }
   $('filtersTitle').textContent = mode === 'folders' ? 'Display' : 'Filters';
+  $('filtersToggle').setAttribute('aria-label', mode === 'folders' ? 'Show display settings' : 'Show filters');
   if (mode === 'folders') {
     const fs = S.status.folder_search;
     $('skipVal').textContent = String(fs.skip_levels);

@@ -132,6 +132,7 @@ runtime_write_resolve = { src = "scripts/runtime_write_resolve.py", sha = "c8ec1
 box_lock_gate = { src = "scripts/box_lock_gate.ps1", sha = "de5b351ecbc58f0908bc1cbdcdf76fd41f36005d", dest = "scripts/box_lock_gate.ps1" }
 instruction_frontmatter = { src = "scripts/instruction_frontmatter.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_frontmatter.py" }
 instruction_repeats = { src = "scripts/instruction_repeats.py", sha = "c5535ac326c398df8f44486f386ff0e0b6d4c61c", dest = "scripts/instruction_repeats.py" }
+subject_text = { src = "src/subject_text.py", sha = "3e4f46013f4a1bda6a7e33a0e39d589ecbc2de23", dest = "src/subject_text.py" }
 
 # [structure_ratchet] -- scripts/structure_ratchet.py fails when a file passes 1,000
 # lines, a function 100 lines or a directory 40 modules, when src/ imports app/, and

@@ -9,10 +9,7 @@ from __future__ import annotations
 
 import re
 
-# Matches a run of reply/forward prefixes at the start of a subject line. The
-# colon (ASCII or full-width) is required: without it a word that merely starts
-# with "re", "rv" or "fw" (Recibo, Revisión, Report) would lose its first letters.
-RE_REPLY_PREFIX = re.compile(r"^\s*(?:(?:re|rv|fwd?)\s*[:：]\s*)+", re.IGNORECASE)
+from src.subject_text import clean_subject as strip_reply_prefixes
 
 # Matches a trailing `.msg` filename extension.
 _RE_MSG_SUFFIX = re.compile(r"\s*\.msg$", re.IGNORECASE)
@@ -59,7 +56,7 @@ def clean_subject(raw: str | None, *, strip_msg_suffix: bool = False) -> str:
     """
     if not raw:
         return ""
-    s = RE_REPLY_PREFIX.sub("", raw.strip())
+    s = strip_reply_prefixes(raw)
     if strip_msg_suffix:
         s = _RE_MSG_SUFFIX.sub("", s)
     return s.strip()

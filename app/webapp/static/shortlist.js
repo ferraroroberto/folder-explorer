@@ -67,14 +67,19 @@ async function toggle(btn) {
   }
 }
 
-function summary() {
+/** The shortlist's line as words plus the figures that end it, so a row can keep the figures whole at phone width. */
+function summaryParts() {
   const here = list.items.filter((i) => i.file).length;
-  if (!list.items.length) return 'Mark files in Largest to review them here.';
-  return plural(list.items.length, 'file') + ' · ' + fmtBytes(list.size) + (here < list.items.length ? ' · ' + (list.items.length - here) + ' gone' : '');
+  if (!list.items.length) return { text: 'Mark files in Largest to review them here.', tail: [] };
+  return { text: plural(list.items.length, 'file'), tail: [fmtBytes(list.size)].concat(here < list.items.length ? [(list.items.length - here) + ' gone'] : []) };
 }
 
+const summary = () => { const m = summaryParts(); return [m.text].concat(m.tail).join(' · '); };
+
 function renderOpeners() {
-  document.querySelectorAll('[data-shortlist-meta]').forEach((el) => { el.textContent = summary(); });
+  const m = summaryParts();
+  const html = '<span class="action-row-meta-text">' + esc(m.text) + '</span>' + m.tail.map((t) => '<span class="action-row-meta-tail">' + esc(t) + '</span>').join('');
+  document.querySelectorAll('[data-shortlist-meta]').forEach((el) => { el.innerHTML = html; });
 }
 
 function entryRow(i) {

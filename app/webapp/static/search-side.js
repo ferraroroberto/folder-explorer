@@ -16,7 +16,7 @@ export function renderChips() {
   $('queryChips').innerHTML = ops.map((t, i) =>
     '<button type="button" class="qchip' + (t.neg ? ' is-not' : '') + '" data-chip="' + i + '" aria-label="Remove ' +
     esc((t.neg ? 'not ' : '') + LABEL[t.key] + ' ' + t.val) + '" data-track="chip-remove">' +
-    '<span class="q-key">' + esc(LABEL[t.key]) + '</span><span class="q-val">' + esc(t.val) + '</span>' + glyph('x') + '</button>').join('');
+    '<span class="q-key">' + esc(LABEL[t.key]) + '</span><span class="q-val" data-user-content>' + esc(t.val) + '</span>' + glyph('x') + '</button>').join('');
 }
 
 /** The box without its ``n``-th operator chip. */
@@ -34,7 +34,7 @@ export function renderSaved() {
   const mine = S.saved.filter((s) => s.mode === mode);
   $('savedRow').innerHTML = mine.map((s) =>
     '<span class="saved-item"><button type="button" class="saved-chip" data-saved="' + s.id + '" title="' + esc(s.query) +
-    '" data-track="saved-search">' + glyph('bookmark') + esc(s.name) + '</button>' +
+    '" data-track="saved-search">' + glyph('bookmark') + '<span data-user-content>' + esc(s.name) + '</span></button>' +
     '<button type="button" class="icon-button saved-remove" data-unsave="' + s.id + '" aria-label="Forget ' + esc(s.name) +
     '" data-track="saved-remove">' + glyph('x') + '</button></span>').join('') +
     (mode && mode !== 'docs' ? '<button type="button" class="button-ghost" id="saveSearch" data-track="bookmark-query">Bookmark query</button>' : '');
@@ -52,7 +52,7 @@ export function renderRecent() {
     '<button type="button" class="button-ghost recent-clear" data-track="recent-clear">Clear</button></div>' +
     '<ul class="recent-items" id="recentItems"' + (open ? '' : ' hidden') + '>' + list.map((r) =>
       '<li><button type="button" class="recent-item" data-recent="' + esc(r) + '" data-track="recent-search">' + glyph('clock') +
-      '<span>' + esc(r) + '</span></button>' +
+      '<span data-user-content>' + esc(r) + '</span></button>' +
       '<button type="button" class="icon-button recent-remove" data-unrecent="' + esc(r) + '" aria-label="Remove ' + esc(r) +
       '" data-track="recent-remove">' + glyph('x') + '</button></li>').join('') + '</ul>';
 }
@@ -167,9 +167,9 @@ export const toggled = (key, on, val) => withOp(box().value, key, on ? '' : val)
 
 // --------------------------------------------------------------- facets
 
-function facetChip(op, val, label, count, pressed, track) {
+function facetChip(op, val, label, count, pressed, track, own = false) {
   return '<button type="button" class="facet" data-op="' + op + '" data-val="' + esc(val) + '" aria-pressed="' + pressed +
-    '" data-track="' + track + '">' + esc(label) + ' <span class="count">' + fmtNum(count) + '</span></button>';
+    '" data-track="' + track + '">' + (own ? '<span data-user-content>' + esc(label) + '</span>' : esc(label)) + ' <span class="count">' + fmtNum(count) + '</span></button>';
 }
 
 export function renderFacets() {
@@ -182,8 +182,8 @@ export function renderFacets() {
   const group = (title, items) => (items.length ? '<div class="facet-group"><span class="facet-title">' + title + '</span><div class="facet-chips">' + items.join('') + '</div></div>' : '');
   const from = getOp(toks, 'from');
   const inF = getOp(toks, 'in');
-  const senders = f.senders.map((s) => facetChip('from', s.value, s.name || s.value, s.count, from === s.value, 'facet-sender'));
-  const folders = f.folders.map((x) => facetChip('in', x.value, shortFolder(x.value), x.count, inF === x.value, 'facet-folder'));
+  const senders = f.senders.map((s) => facetChip('from', s.value, s.name || s.value, s.count, from === s.value, 'facet-sender', true));
+  const folders = f.folders.map((x) => facetChip('in', x.value, shortFolder(x.value), x.count, inF === x.value, 'facet-folder', true));
   const years = f.years.map((y) => facetChip('year', y.value, y.value, y.count,
     getOp(toks, 'after') === y.value + '-01-01' && getOp(toks, 'before') === y.value + '-12-31', 'facet-year'));
   const more = [];

@@ -14,22 +14,27 @@ export async function loadRoots() {
   return body;
 }
 
-/** The row's status line: `text` is the words, `tail` the figures that must stay whole beside them. */
+/**
+ * The row's status line: `text` is the words, `tail` the figures that must stay whole beside them.
+ * A 390px row holds about three figures once a root has millions of files, so the scan duration
+ * rides in `title` rather than a fourth tail item.
+ */
 function meta(r) {
   if (r.running) return { text: 'Scanning…', tail: [plural(r.running.files, 'file'), plural(r.running.folders, 'folder') + ' read'], live: true };
   const parts = [];
   let tail = [];
+  let title = '';
   if (!r.exists) parts.push('Folder not found');
   if (r.state === 'unknown') parts.push('Cannot tell whether a scan is running');
   if (r.failed) parts.push(r.state === 'interrupted' ? 'Last scan stopped early' : 'Last scan failed');
   if (r.current) {
     const c = r.current;
-    parts.push('Scanned ' + fmtAgo(c.finished_at));
-    tail = [fmtDuration(c.finished_at - c.started_at), plural(c.files, 'file'), fmtBytes(c.size)];
+    tail = [fmtAgo(c.finished_at), plural(c.files, 'file'), fmtBytes(c.size)];
+    title = 'Scan took ' + fmtDuration(c.finished_at - c.started_at);
   } else if (r.exists) {
     parts.push('Not scanned yet');
   }
-  return { text: parts.join(' · '), tail, warn: !r.exists || !!r.failed || r.state === 'unknown' };
+  return { text: parts.join(' · '), tail, title, warn: !r.exists || !!r.failed || r.state === 'unknown' };
 }
 
 export function renderRoots() {
@@ -40,7 +45,7 @@ export function renderRoots() {
     return '<li class="action-row root-row">' +
       '<button type="button" class="action-row-main" data-act="open-root" data-root="' + esc(r.key) + '" data-track="root-open"' + (r.current ? '' : ' disabled') + '>' +
       '<span class="action-row-title">' + glyph(r.kind === 'synced' ? 'cloud' : 'folder', 'root-glyph') + esc(r.name) + '<span class="chip">' + esc(r.kind) + '</span></span>' +
-      '<span class="action-row-meta' + (m.live ? ' is-live' : '') + (m.warn ? ' is-warn' : '') + '">' +
+      '<span class="action-row-meta' + (m.live ? ' is-live' : '') + (m.warn ? ' is-warn' : '') + '"' + (m.title ? ' title="' + esc(m.title) + '"' : '') + '>' +
       '<span class="action-row-meta-text">' + esc(m.text) + '</span>' +
       m.tail.map((t) => '<span class="action-row-meta-tail">' + esc(t) + '</span>').join('') + '</span>' +
       '</button>' +

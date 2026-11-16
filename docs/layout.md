@@ -92,7 +92,7 @@ folder-explorer/
 │   ├── secrets_env.py          # the sign-in secrets in .env
 │   ├── secret_compare.py       # the one constant-time secret comparison
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL; splices a page's `<!--include x.html-->` fragments
-│   └── (vendored)              # build_info, compression, login_alert, login_lockout, no_window, notify/, password, pooled_http, runtime_data, subject_text, usage_log
+│   └── (vendored)              # build_info, compression, login_alert, login_lockout, no_window, notify/, password, pooled_http, runtime_data, shell_etag, subject_text, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite,
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,

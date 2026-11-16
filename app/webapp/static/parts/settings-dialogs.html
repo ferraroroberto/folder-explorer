@@ -34,6 +34,46 @@
           </div>
         </div>
       </section>
+      <h3 class="settings-overline" id="groupFeatures">Available features</h3>
+      <section class="card settings-group" aria-labelledby="groupFeatures">
+        <label class="settings-row feature-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Email</span>
+            <span class="settings-row-hint" id="featWhyEmail" data-tone="attention"></span>
+            <span class="settings-row-hint" id="featHintEmail"></span>
+          </span>
+          <span class="switch-slot" id="featSlotEmail" data-track="feature-email"></span>
+        </label>
+        <label class="settings-row feature-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Outlook archive</span>
+            <span class="settings-row-hint" id="featWhyArchive" data-tone="attention"></span>
+            <span class="settings-row-hint" id="featHintArchive"></span>
+          </span>
+          <span class="switch-slot" id="featSlotArchive" data-track="feature-archive"></span>
+        </label>
+        <label class="settings-row feature-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Documents</span>
+            <span class="settings-row-hint" id="featWhyDocuments" data-tone="attention"></span>
+            <span class="settings-row-hint" id="featHintDocuments"></span>
+          </span>
+          <span class="switch-slot" id="featSlotDocuments" data-track="feature-documents"></span>
+        </label>
+        <label class="settings-row feature-row">
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-camera"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Screenshot</span>
+            <span class="settings-row-hint" id="featWhyScreenshot" data-tone="attention"></span>
+            <span class="settings-row-hint" id="featHintScreenshot"></span>
+          </span>
+          <span class="switch-slot" id="featSlotScreenshot" data-track="feature-screenshot"></span>
+        </label>
+      </section>
+      <p class="settings-footnote">Every block is on by default. A block that is off hides its screens, stops its background work and skips its calls; this machine's choice is kept in config.json, which is never committed.</p>
       <h3 class="settings-overline" id="groupScanning">Scanning</h3>
       <section class="card settings-group" aria-labelledby="groupScanning">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="schedule" data-track="open-setting-schedule">
@@ -60,8 +100,8 @@
           <span class="settings-row-value" id="indexSize"></span>
         </div>
       </section>
-      <h3 class="settings-overline" id="groupEmail">Email</h3>
-      <section class="card settings-group" aria-labelledby="groupEmail">
+      <h3 class="settings-overline" id="groupEmail" data-feature="email">Email</h3>
+      <section class="card settings-group" aria-labelledby="groupEmail" data-feature="email">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="email-roots" data-track="open-setting-email-roots">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
           <span class="settings-row-label">Email folders</span>
@@ -80,6 +120,9 @@
           <span class="settings-row-value" id="valBudget"></span>
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
+      </section>
+      <h3 class="settings-overline" id="groupOutlook" data-feature="archive">Outlook archive</h3>
+      <section class="card settings-group" aria-labelledby="groupOutlook" data-feature="archive">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="outlook" data-track="open-setting-outlook">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
           <span class="settings-row-label">Outlook archiving</span>
@@ -95,13 +138,13 @@
       </section>
       <h3 class="settings-overline" id="groupFiles">Files and documents</h3>
       <section class="card settings-group" aria-labelledby="groupFiles">
-        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="markdown-search" data-track="open-setting-markdown-search">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="markdown-search" data-feature="documents" data-track="open-setting-markdown-search">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
           <span class="settings-row-label">Documents search</span>
           <span class="settings-row-value" id="valMarkdownSearch"></span>
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
-        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote-html" data-track="open-setting-remote-html">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote-html" data-feature="documents" data-track="open-setting-remote-html">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
           <span class="settings-row-label">Remote content</span>
           <span class="settings-row-value" id="valRemoteHtml"></span>
@@ -113,7 +156,7 @@
           <span class="settings-row-value" id="valExplorerWindow"></span>
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
-        <button type="button" class="settings-row" aria-haspopup="dialog" id="mdAssocRow" data-open="md-assoc" data-track="open-setting-md-assoc" hidden>
+        <button type="button" class="settings-row" aria-haspopup="dialog" id="mdAssocRow" data-open="md-assoc" data-feature="documents" data-track="open-setting-md-assoc" hidden>
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
           <span class="settings-row-label">Markdown files</span>
           <span class="settings-row-value" id="valMdAssoc"></span>
@@ -128,7 +171,7 @@
           <span class="settings-row-value" id="valTrayClick"></span>
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
-        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="screenshot" data-track="open-setting-screenshot">
+        <button type="button" class="settings-row" aria-haspopup="dialog" data-open="screenshot" data-feature="screenshot" data-track="open-setting-screenshot">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-camera"></use></svg>
           <span class="settings-row-label">Screenshot</span>
           <span class="settings-row-value" id="valScreenshot"></span>

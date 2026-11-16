@@ -60,5 +60,11 @@
     "file_prefix": "snap",
     "show_loupe": true,
     "hold_to_capture": false
+  },
+  "features": {
+    "email": true,
+    "archive": true,
+    "documents": true,
+    "screenshot": true
   }
 }

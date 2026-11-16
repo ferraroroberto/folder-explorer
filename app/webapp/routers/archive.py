@@ -32,11 +32,12 @@ import time
 import uuid
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
 from app.webapp.auth import is_pc_itself
+from app.webapp.feature_gate import require
 from app.webapp.state import ScanChanged, locate_folder, sheet_folders, sheet_subfolders
-from src import config, macro_home
+from src import config, features, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
 from src.email import archive_sheet
@@ -49,7 +50,7 @@ from src.roots import resolve_roots
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require("archive"))])
 
 MACRO_FILE = PROJECT_ROOT / "assets" / "ArchiveMacro.bas"
 
@@ -261,7 +262,9 @@ def bridge_file(args: list[str], timeout: float, follow_up_timeout: float,
 def archive_status(cfg: dict[str, Any], pc: bool) -> dict[str, Any]:
     """Whether the Archive card and Find in mailbox run here, and why not when they don't."""
     reason = None
-    if bridge_off():
+    if not features.enabled(cfg, "archive"):
+        reason = features.OFF_SENTENCE
+    elif bridge_off():
         reason = OFF_REASON
     elif not pc:
         reason = "Archiving works on the PC"

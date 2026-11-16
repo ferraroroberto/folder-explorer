@@ -7,6 +7,7 @@ folder-explorer/
 ├── app/                        # entry points and the web layer
 │   ├── cli/__main__.py         # `python -m app.cli scan|roots|email|folders`: scans and the email index with no app running
 │   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
+│   ├── cli/archive_gate.py     # `email batch` with the Outlook archive block off: one JSON refusal, exit 2, before any Outlook code loads
 │   ├── cli/folders.py          # `folders search --json`: folder search for another app, one JSON document
 │   ├── launcher.py             # `pythonw -m app.launcher <file>`: the Markdown "Open with" handler (names the file by its
 │   │                           #   scanned folder, asks the app for its id, opens the /doc window)
@@ -22,6 +23,7 @@ folder-explorer/
 │       ├── __main__.py         # `python -m app.webapp`: bind from remote_access, cert renewal, serve.run
 │       ├── server.py           # FastAPI app: routers, sign-in gate, gzip, cache-busted static mount
 │       ├── bind.py             # remote_access + certificate -> host, scheme, state
+│       ├── feature_gate.py     # `require(block)`: the router dependency that answers 404 while a feature block is switched off
 │       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
@@ -32,7 +34,8 @@ folder-explorer/
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
 │       │                       #   verbs over HTTP, each run as the CLI's child), shortlist (the cleanup shortlist: files marked in Largest, in state.sqlite3)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
-│                           #   parts/icon-sprite.html is the inline icon sprite and parts/settings-dialogs.html the Settings sheet and its setting sheet, each spliced into index.html where its include line stands;
+│                           #   state.js also holds the page's view of the feature blocks (`isOn`, and `data-features-off` on `<html>`, which app.css reads to hide a block's `[data-feature]` parts);
+                          #   parts/icon-sprite.html is the inline icon sprite and parts/settings-dialogs.html the Settings sheet and its setting sheet, each spliced into index.html where its include line stands;
 │                           #   body-state.js is the Search preview's "Show all" load state (docs/body-state.md);
 │                           #   doc.html + doc-page.js the /doc window, doc-view.js the viewer body it shares with doc-sheet.js (an HTML page in a sandboxed frame)
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
@@ -87,6 +90,7 @@ folder-explorer/
 │   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
 │   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
 │   ├── config.py               # config.json with defaults and validation
+│   ├── features.py             # the feature blocks (email, archive, documents, screenshot): their keys, which are on, and whether each can run on this machine
 │   ├── atomic_write.py         # the one atomic writer: text (config.json, .env) and bytes (a saved Markdown file); unique temp, cleanup on failure; swap_in renames a built file
 │   ├── runtime_files.py        # mkdir, lock-file open and SQLite connects for a path a caller names; raises on a path under a code folder
 │   ├── secrets_env.py          # the sign-in secrets in .env
@@ -100,7 +104,7 @@ folder-explorer/
 ├── scripts/                    # the gate, the ten ratchets (vendored), gen_icons, gen_tailscale_cert, gen_token
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, scanning.md, service-api.md (the v1 search and archive API), and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

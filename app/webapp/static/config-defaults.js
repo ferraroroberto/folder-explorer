@@ -27,6 +27,7 @@ export const DEFAULTS = {
     self_address: null, add_category: false, move_to_archive: false,
   },
   snap: { folder: null, hotkey: 'ctrl+shift+a', jpeg_quality: 90, copy_to_clipboard: true, file_prefix: 'snap', show_loupe: true, hold_to_capture: false },
+  features: { email: true, archive: true, documents: true, screenshot: true },
 };
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -56,6 +57,8 @@ export function settingsBody(raw) {
       can_open: isObject(raw.snap_folder) && raw.snap_folder.can_open === true,
     },
     index_bytes: typeof raw.index_bytes === 'number' ? raw.index_bytes : 0,
+    // The feature blocks' states; an older server reports none, and every block is then on.
+    features: Array.isArray(raw.features) ? raw.features : [],
     // Only a server that says the file is missing gets the setup card; an older one says nothing.
     config_file: { exists: !(isObject(raw.config_file) && raw.config_file.exists === false) },
     // Only this PC is told the Markdown association's state; any other device, or an older server, hides the row.

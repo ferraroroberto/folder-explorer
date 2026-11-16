@@ -20,6 +20,7 @@ import { docUrl } from './doc-view.js';
 import { handOff } from './doc-handoff.js';
 import { glyph } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { isOn } from './state.js';
 
 const JSON_HEAD = { 'Content-Type': 'application/json' };
 
@@ -110,24 +111,26 @@ export function initDrop(host) {
   };
   const reset = () => { depth = 0; toggle(false); };
 
+  // With the Documents block off the window is no drop target: the browser keeps its own handling of a dropped file.
+  const ignored = (e) => !isOn('documents') || !dragHasFiles(e.dataTransfer);
   window.addEventListener('dragenter', (e) => {
-    if (!dragHasFiles(e.dataTransfer)) return;
+    if (ignored(e)) return;
     e.preventDefault();
     depth += 1;
     toggle(true);
   });
   window.addEventListener('dragover', (e) => {
-    if (!dragHasFiles(e.dataTransfer)) return;
+    if (ignored(e)) return;
     e.preventDefault();  // without this the browser would open the file in the tab
     e.dataTransfer.dropEffect = 'copy';
   });
   window.addEventListener('dragleave', (e) => {
-    if (!dragHasFiles(e.dataTransfer)) return;
+    if (ignored(e)) return;
     depth = Math.max(0, depth - 1);
     if (!depth) toggle(false);
   });
   window.addEventListener('drop', async (e) => {
-    if (!dragHasFiles(e.dataTransfer)) return;
+    if (ignored(e)) return;
     e.preventDefault();
     reset();
     const picked = pickDrop(e.dataTransfer.files);

@@ -154,6 +154,11 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:2] == ["email", "batch"]:
         # Before any logging is set up here: the batch's stdout carries only its JSON document.
+        from app.cli import archive_gate
+
+        off = archive_gate.refusal(argv[2:])
+        if off is not None:
+            return off
         from app.cli import email_batch
 
         return email_batch.main(argv[2:])

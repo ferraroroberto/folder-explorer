@@ -18,18 +18,19 @@ import threading
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.webapp.auth import is_pc_itself
+from app.webapp.feature_gate import require
 from app.webapp.routers.archive import OFF_REASON, bridge_off
 from src import archive_api
 from src.email import body as child
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/archive")
+router = APIRouter(prefix="/api/v1/archive", dependencies=[Depends(require("archive"))])
 
 # Seconds a freshly started Outlook gets to answer (the CLI's --start-timeout), inside the call's own budget.
 START_TIMEOUT_S = 60.0

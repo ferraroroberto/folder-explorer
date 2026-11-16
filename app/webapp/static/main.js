@@ -1,7 +1,7 @@
 /* Folder explorer: boot, tabs, toolbar, header lines, scan polling, the jump from Search into Explore and the shared click handling. */
 
 import { getJSON, postJSON, authHeaders, ApiError } from './api.js';
-import { readPref, rootInfo, state, writePref, APP } from './state.js';
+import { readPref, rootInfo, state, writePref, APP, loadFeatures, onFeaturesChange } from './state.js';
 import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
 import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
 import { loadLargest } from './largest.js';
@@ -297,6 +297,11 @@ async function showBuild() {
 }
 
 async function boot() {
+  // Explore's document badges and menus follow the Documents block; the blocks are read below, before the first view draws.
+  onFeaturesChange(() => {
+    dirty.add('explore');
+    if (state.tab === 'explore') renderActive().catch(fail);
+  });
   const usage = initUsageLog({ headers: authHeaders });
   const onTab = (tab) => {
     if (state.tab === 'search' && tab !== 'search') leaveSearch();
@@ -326,6 +331,8 @@ async function boot() {
   wireToolbar(nav);
   showBuild();
   state.root = readPref('root', null);
+  // Every control is wired by now; reading the blocks first means a view that is off never draws, and a drop is never missed while it loads.
+  await loadFeatures();
   booted = true;
   try {
     await refreshRoots();

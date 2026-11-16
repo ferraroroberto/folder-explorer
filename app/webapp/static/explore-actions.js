@@ -10,7 +10,7 @@
 import { postJSON } from './api.js';
 import { esc, glyph } from './fmt.js';
 import { copyText } from './search-state.js';
-import { rootInfo, state } from './state.js';
+import { rootInfo, state, isOn } from './state.js';
 import { docUrl } from './doc-view.js';
 import { openDoc } from './doc-sheet.js';
 import { createRowMenu } from './_vendored/row-menu/row-menu.js';
@@ -51,8 +51,8 @@ export function initExploreActions(getContents) {
   });
 }
 
-/** True for a file the viewer reads: Markdown or HTML, by its extension. */
-export const isDocument = (it) => it.kind !== 'folder' && DOC_EXTS.has(String(it.ext || '').toLowerCase());
+/** True for a file the viewer reads: Markdown or HTML, by its extension, while the Documents block is on. */
+export const isDocument = (it) => isOn('documents') && it.kind !== 'folder' && DOC_EXTS.has(String(it.ext || '').toLowerCase());
 
 const docLoc = (id) => {
   const it = source().items.find((x) => x.kind === 'file' && x.id === id);

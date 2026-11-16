@@ -100,7 +100,7 @@ function treeRow(n, depth, share, open, sel) {
         '" aria-label="' + (open ? 'Collapse ' : 'Expand ') + esc(n.name) + '" data-track="tree-expand">' + glyph('chevron-right') + '</button>'
       : '<span class="tree-spacer" aria-hidden="true"></span>') +
     '<button type="button" class="tree-main" data-act="select" data-open="folder" data-id="' + n.id + '" title="' + esc(n.name) + '"' + (sel ? ' aria-current="true"' : '') + ' data-track="tree-select">' +
-    '<span class="tree-name">' + glyph('folder') + '<span class="tree-label">' + esc(n.name) + '</span>' + hiddenMark(n.hidden) + '</span>' +
+    '<span class="tree-name">' + glyph('folder') + '<span class="tree-label" data-user-content>' + esc(n.name) + '</span>' + hiddenMark(n.hidden) + '</span>' +
     '<span class="tree-size">' + fmtBytes(val(n)) + '</span>' +
     '<span class="tree-meta"><span class="tree-files">' + fmtNum(n.files) + '<span class="tree-unit">' + (n.files === 1 ? ' file' : ' files') + '</span></span><span class="sep"> · </span><span class="tree-share">' + fmtPct(share) + '</span></span>' +
     bar(share) + '</button></div>';
@@ -134,7 +134,7 @@ const rowItem = (it, i, row) => '<li class="row-item' + (it.hidden ? ' is-hidden
 function folderRow(it, whole, i) {
   const p = pct(val(it), whole);
   return rowItem(it, i, '<button type="button" class="list-row" data-act="select" data-open="folder" data-id="' + it.id + '" data-track="contents-folder">' + glyph('folder') +
-    '<span class="lr-name"><span>' + esc(it.name) + '</span>' + hiddenMark(it.hidden) + '</span>' +
+    '<span class="lr-name"><span data-user-content>' + esc(it.name) + '</span>' + hiddenMark(it.hidden) + '</span>' +
     '<span class="lr-meta">Folder · ' + plural(it.files, 'file') + ' · ' + fmtPct(p) + '</span>' +
     '<span class="lr-type">Folder</span><span class="lr-date"></span><span class="lr-share">' + fmtPct(p) + '</span>' +
     '<span class="lr-size">' + fmtBytes(val(it)) + '</span>' + bar(p) + '</button>');
@@ -147,7 +147,7 @@ function fileRow(f, whole, nested, i) {
   const doc = isDocument(f);
   return rowItem(f, i, '<div class="list-row' + (nested ? ' has-path' : '') + '" data-open="file" data-id="' + f.id + '"' + (doc ? ' data-doc="1"' : '') +
     ' title="Size ' + fmtNum(f.size) + ' bytes · On disk ' + fmtNum(f.disk) + ' bytes">' + glyph('file-text') +
-    '<span class="lr-name"><span>' + esc(f.name) + '</span>' + (doc ? '<span class="chip doc-badge">' + (/^html?$/i.test(String(f.ext || '')) ? 'HTML' : 'MD') + '</span>' : '') + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
+    '<span class="lr-name"><span data-user-content>' + esc(f.name) + '</span>' + (doc ? '<span class="chip doc-badge">' + (/^html?$/i.test(String(f.ext || '')) ? 'HTML' : 'MD') + '</span>' : '') + cloudMark(f.online) + hiddenMark(f.hidden) + '</span>' +
     '<span class="lr-meta' + (nested ? ' is-path' : '') + '">' + esc(meta) + '</span>' +
     '<span class="lr-type">' + (f.ext ? esc(extLabel(f.ext)) : '—') + '</span><span class="lr-date">' + fmtDate(f.mtime) + '</span><span class="lr-share">' + fmtPct(p) + '</span>' +
     '<span class="lr-size">' + fmtBytes(val(f)) + '</span>' + bar(p) + '</div>');

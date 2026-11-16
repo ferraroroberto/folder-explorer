@@ -73,9 +73,9 @@ function writeHash() {
 
 function emailRow(h, i) {
   return '<li><button type="button" class="result-row" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(plain(h.subject) + ' - ' + plain(h.snippet)) + '" data-track="email-result">' +
-    '<span class="rr-who">' + esc(h.from_name || h.from_addr || '(no sender)') + '</span><span class="rr-when">' + esc(mailDate(h.date)) + '</span>' +
-    '<span class="rr-subj">' + marked(h.subject || '(no subject)') + '</span>' +
-    '<span class="rr-snip">' + marked(h.snippet) + '</span>' +
+    '<span class="rr-who" data-user-content>' + esc(h.from_name || h.from_addr || '(no sender)') + '</span><span class="rr-when">' + esc(mailDate(h.date)) + '</span>' +
+    '<span class="rr-subj" data-user-content>' + marked(h.subject || '(no subject)') + '</span>' +
+    '<span class="rr-snip" data-user-content>' + marked(h.snippet) + '</span>' +
     '<span class="rr-meta"><span class="chip">' + esc(shortFolder(h.folder)) + '</span>' +
     (h.attachments ? '<span title="' + plural(h.attachments, 'attachment') + '">' + glyph('paperclip') + '</span>' + h.attachments : '') +
     (h.flagged ? '<span class="is-flag" title="Flagged">' + glyph('flag') + '</span>' : '') + '</span></button></li>';
@@ -83,9 +83,9 @@ function emailRow(h, i) {
 
 function folderRow(f, i, terms) {
   return '<li><button type="button" class="result-row is-folder" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(winPath(f.path)) + '" data-track="folder-result">' +
-    '<span class="rr-who">' + glyph(f.people ? 'users' : 'folder') + '<span>' + hl(f.name, terms) + '</span></span>' +
+    '<span class="rr-who">' + glyph(f.people ? 'users' : 'folder') + '<span data-user-content>' + hl(f.name, terms) + '</span></span>' +
     '<span class="rr-when">' + fmtBytes(f.size) + '</span>' +
-    '<span class="rr-snip">' + hl(f.display, terms) + '</span>' +
+    '<span class="rr-snip" data-user-content>' + hl(f.display, terms) + '</span>' +
     '<span class="rr-meta"><span class="rr-score">' + scoreChip(f.score) + '</span>' + plural(f.files, 'file') + (f.people ? ' · <span class="chip tone-accent">' + plural(f.people, 'person', 'people') + '</span>' : '') +
     (f.kind === 'synced' ? ' · ' + glyph('cloud') + 'OneDrive' : '') + '</span></button></li>';
 }
@@ -93,9 +93,9 @@ function folderRow(f, i, terms) {
 function docRow(h, i, terms) {
   const where = [h.root_name].concat(h.folder).join(' › ');
   return '<li><button type="button" class="result-row is-doc" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(winPath(h.path)) + '" data-track="doc-result">' +
-    '<span class="rr-who">' + glyph('file-text') + '<span>' + hl(h.name, terms) + '</span>' + cloudMark(h.online) + '</span>' +
+    '<span class="rr-who">' + glyph('file-text') + '<span data-user-content>' + hl(h.name, terms) + '</span>' + cloudMark(h.online) + '</span>' +
     '<span class="rr-when">' + esc(fmtDate(h.mtime)) + '</span>' +
-    '<span class="rr-snip">' + esc(where) + '</span>' +
+    '<span class="rr-snip" data-user-content>' + esc(where) + '</span>' +
     '<span class="rr-meta"><span>' + fmtBytes(h.size) + '</span>' + (h.online ? '<span class="chip">Online-only</span>' : '') + '</span></button></li>';
 }
 

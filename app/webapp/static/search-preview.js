@@ -116,7 +116,7 @@ function emailHtml(d) {
     (d.to ? '<dt>To</dt><dd>' + esc(d.to) + '</dd>' : '') +
     (d.cc ? '<dt>Cc</dt><dd>' + esc(d.cc) + '</dd>' : '') +
     '<dt>Date</dt><dd>' + esc(mailDate(d.date, true)) + '</dd>' +
-    '<dt>Folder</dt><dd><button type="button" class="reference-pill" data-act="folder" data-track="folder-pill">' + glyph('folder') + '<span>' + esc(shortFolder(d.folder)) + '</span></button></dd>' +
+    '<dt>Folder</dt><dd><button type="button" class="reference-pill" data-act="folder" data-track="folder-pill">' + glyph('folder') + '<span data-user-content>' + esc(shortFolder(d.folder)) + '</span></button></dd>' +
     (size ? '<dt>Size</dt><dd>' + fmtBytes(size) + '</dd>' : '') + '</dl>' +
     (atts && atts.length ? '<div class="pv-section"><span class="pv-label">' + plural(atts.length, 'attachment') + '</span><div class="pv-atts">' +
       atts.map((a) => '<span class="file-chip">' + glyph('paperclip') + hl(a, d.words) + '</span>').join('') + '</div></div>' : '') +
@@ -166,7 +166,7 @@ function docHtml(h) {
     '<h2 class="pv-subject">' + esc(h.name) + '</h2>' +
     (h.online ? '<div class="pv-flags"><span class="chip">Online-only</span></div>' : '') +
     '<dl class="pv-fields"><dt>Folder</dt><dd><button type="button" class="reference-pill" data-act="folder" data-track="folder-pill">' + glyph('folder') +
-    '<span>' + esc([h.root_name].concat(h.folder).join(' › ')) + '</span></button></dd>' +
+    '<span data-user-content>' + esc([h.root_name].concat(h.folder).join(' › ')) + '</span></button></dd>' +
     '<dt>Size</dt><dd>' + fmtBytes(h.size) + '</dd><dt>Modified</dt><dd>' + esc(fmtDate(h.mtime)) + '</dd></dl>' +
     '<div class="pv-actions">' +
     '<button type="button" class="button-primary" data-act="view" data-track="doc-view">' + glyph('file-text') + 'View</button>' +

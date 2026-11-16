@@ -84,24 +84,6 @@ body {
 .reference-pill .icon { width: var(--icon-inline); height: var(--icon-inline); }
 .reference-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* On a fine pointer native selects and inputs reach the 44px floor with real geometry (a coarse pointer
-   already gets a 44px control from select-native): the element box is --hit-min tall, the visible --control-h box is its padding box inside a transparent vertical border, and the
-   1px boundary is an inset shadow, so the control looks the same and a select has no ::before to expand.
-   A textarea grows with its text, so it keeps the plain recipe. */
-@media (pointer: fine) {
-  :is(.input-native, .select-native):not(textarea) {
-    --control-inset: calc((var(--hit-min) - var(--control-h)) / 2);
-    height: var(--hit-min);
-    border-style: solid;
-    border-color: transparent;
-    border-width: var(--control-inset) 0;
-    border-radius: var(--radius-md) / calc(var(--radius-md) + var(--control-inset));
-    background: var(--input-bg) padding-box;
-    box-shadow: inset 0 0 0 1px var(--control-border);
-  }
-  :is(.input-native, .select-native):not(textarea):focus-visible { outline-offset: calc(2px - var(--control-inset)); }
-}
-
 /* ---------------------------------------------------------------- summary */
 .summary {
   display: grid;

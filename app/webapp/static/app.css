@@ -454,14 +454,7 @@ button.list-row .lr-name { font-weight: 600; }
 .switch-slot { display: inline-flex; }
 
 /* ------------------------------------------------------------- shortlist */
-.shortlist-card {
-  display: flex; align-items: center; gap: var(--space-sm); width: 100%;
-  min-height: var(--row-md); font: inherit; color: var(--ink); text-align: left; cursor: pointer;
-}
-.shortlist-card > .icon { flex: none; width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); }
-.shortlist-card > .icon:first-child { color: var(--accent-text); }
-.shortlist-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.shortlist-card-title { font-weight: 600; }
-.shortlist-card-meta { font-size: var(--font-body-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shortlist-row .action-row-title { display: inline-flex; align-items: center; gap: var(--space-sm); }
+.shortlist-row .action-row-title > .icon { flex: none; width: var(--icon-inline); height: var(--icon-inline); color: var(--accent-text); }
 .shortlist-rows .row-item.is-gone .lr-name { color: var(--muted); }
 .shortlist-rows .list-row { grid-template-areas: "glyph name size" ". meta meta"; }

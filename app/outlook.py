@@ -39,7 +39,7 @@ from contextlib import contextmanager
 from typing import Any, Optional
 
 from app.webapp.bind import resolve_bind
-from src import config, store
+from src import config, features, store
 from src.email import archive_sheet
 from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_settings import get_mailbox_archive_folder
@@ -354,6 +354,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     _setup_logging()
     cfg = config.load()
     timer.mark("config")
+    if not features.enabled(cfg, "archive"):
+        # No Outlook call of any kind: the block is off on this machine.
+        _emit(error_document(ERR_FAILED, features.OFF_SENTENCE))
+        return EXIT_REFUSED
     if args.verb == "archive":
         return archive(cfg, args.entry_id, args.store_id, timer)
     if args.verb == "prepare":

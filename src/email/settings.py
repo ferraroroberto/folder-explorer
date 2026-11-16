@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
+from src import features
 from src.email.schema import own_index_path
 from src.roots import Root, normalize
 
@@ -79,5 +80,8 @@ def email_part(cfg: dict[str, Any], scan_roots: list[Root]) -> EmailPart:
         problem = "the email index was not found: " + path.name
     stage = ("email.index_path names another app's index, which this app never writes" if not own else reader)
     budget_mb = email.get("download_budget_mb")
+    if not features.enabled(cfg, "email"):
+        # The switch beats every other state: no search, no preview read and no stage, so no index is opened or written.
+        problem = reader = stage = features.OFF_SENTENCE
     return EmailPart(path, roots if not outside else [], problem, reader, own,
                      None if budget_mb is None else int(budget_mb) * MB, stage)

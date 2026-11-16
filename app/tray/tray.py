@@ -8,7 +8,7 @@ Every start, retry, respawn and recovery is written to ``watchdog.log`` in
 the runtime-data folder, the one record a console-less tray leaves.
 
 The region screenshot (``src.snap``) runs in this process on a Tk thread of its own, its settings in the
-**Screenshot** submenu.
+**Screenshot** submenu; Settings' Available features switches the whole block off, and the tray then neither loads nor starts it.
 
 A left click runs the menu's default item, which ``tray.left_click`` picks at
 click time: the Quick search window (``src.search_window``) or the web app.
@@ -22,6 +22,7 @@ import os
 import sys
 import threading
 import webbrowser
+from typing import TYPE_CHECKING, Optional
 
 # Under pythonw there is no console: anything that touches sys.stdout or
 # sys.stderr would crash the tray, so bind them to a null sink first.
@@ -34,7 +35,6 @@ from PIL import Image  # noqa: E402
 
 from app.tray.respawn import make_launch, make_on_wedge  # noqa: E402
 from app.tray.single_instance import SingleInstance  # noqa: E402
-from app.tray.snap_menu import refresh_when_config_changes, snap_menu_item  # noqa: E402
 from app.tray.watchdog import (  # noqa: E402
     BreadcrumbLog,
     HealthWatchdog,
@@ -43,11 +43,13 @@ from app.tray.watchdog import (  # noqa: E402
 )
 from app.webapp.bind import resolve_bind  # noqa: E402
 from app.webapp.manager import WebappManager  # noqa: E402
-from src import config, scan_runner, store  # noqa: E402
+from src import config, features, scan_runner, store  # noqa: E402
 from src.config import PROJECT_ROOT  # noqa: E402
 from src.scan_lock import ScanBusy  # noqa: E402
 from src.search_window import QuickSearch  # noqa: E402
-from src.snap.service import SnapService  # noqa: E402
+
+if TYPE_CHECKING:
+    from src.snap.service import SnapService
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,41 @@ def left_click_searches() -> bool:
 def local_base() -> str:
     """The web app's loopback address over the scheme its bind uses now, for the Quick search window's API calls."""
     return resolve_bind(config.load()).local_url
+
+
+def start_screenshot(crumbs: BreadcrumbLog) -> "Optional[SnapService]":
+    """The region screenshot's service, started beside the tray icon so a slow start never delays it; None when its feature block is off.
+
+    The block is read once, at tray start: the Tk thread and the hotkey come up with the tray, so a change in Settings applies at the next
+    start. The snap modules load only here, so a machine without tkinter or mss never imports them.
+    """
+    if not features.enabled(config.load(), "screenshot"):
+        crumbs("screenshot is switched off (Settings, Available features)")
+        return None
+    from src.snap.service import SnapService
+
+    snap = SnapService()
+    threading.Thread(target=snap.start, name="snap-start", daemon=True).start()
+    return snap
+
+
+def screenshot_menu(snap: "Optional[SnapService]") -> tuple["pystray.MenuItem", ...]:
+    """The tray's Screenshot submenu, or nothing when the block is off."""
+    if snap is None:
+        return ()
+    from app.tray.snap_menu import snap_menu_item
+
+    return (snap_menu_item(snap),)
+
+
+def watch_screenshot_menu(snap: "Optional[SnapService]", icon: "pystray.Icon", stop: threading.Event) -> None:
+    """Redraw the Screenshot submenu's checks when a setting changes, on or off the tray's own menu."""
+    if snap is None:
+        return
+    from app.tray.snap_menu import refresh_when_config_changes
+
+    snap.on_change = icon.update_menu
+    threading.Thread(target=refresh_when_config_changes, args=(icon.update_menu, stop), name="snap-menu-watch", daemon=True).start()
 
 
 def main() -> int:
@@ -98,7 +135,7 @@ def main() -> int:
         watchdog.run(stop)
 
     quick = QuickSearch(local_base)
-    snap = SnapService()
+    snap = start_screenshot(crumbs)
 
     def on_open(icon: "pystray.Icon", item: object) -> None:
         webbrowser.open(manager.url)
@@ -123,13 +160,12 @@ def main() -> int:
 
     def on_quit(icon: "pystray.Icon", item: object) -> None:
         stop.set()
-        snap.stop()
+        if snap is not None:
+            snap.stop()
         manager.stop()
         icon.stop()
 
     threading.Thread(target=boot, name="webapp-boot", daemon=True).start()
-    # The screenshot's Tk thread and hotkey come up beside the tray icon, so a slow start never delays it.
-    threading.Thread(target=snap.start, name="snap-start", daemon=True).start()
     icon = pystray.Icon(
         "folder-explorer",
         Image.open(PROJECT_ROOT / "assets" / "tray" / "folder-explorer.ico"),
@@ -138,13 +174,12 @@ def main() -> int:
             pystray.MenuItem("Quick search", on_quick_search, default=lambda _item: left_click_searches()),
             pystray.MenuItem("Open", on_open, default=lambda _item: not left_click_searches()),
             pystray.MenuItem("Rescan now", on_rescan),
-            snap_menu_item(snap),
+            *screenshot_menu(snap),
             pystray.MenuItem("Restart web app", on_restart),
             pystray.MenuItem("Quit", on_quit),
         ),
     )
-    snap.on_change = icon.update_menu
-    threading.Thread(target=refresh_when_config_changes, args=(icon.update_menu, stop), name="snap-menu-watch", daemon=True).start()
+    watch_screenshot_menu(snap, icon, stop)
     icon.run()
     instance.release()
     return 0

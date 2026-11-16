@@ -13,6 +13,7 @@ import { bar, esc, glyph, plural, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { bindCodeListing } from './_vendored/code-listing/code-listing.js';
+import { isOn, onFeaturesChange } from './state.js';
 
 const $ = (id) => document.getElementById(id);
 // How long the server may hold a visible page's hand-off poll open; it answers the moment the macro hands a mail over.
@@ -521,7 +522,8 @@ function takeHandoff(doc) {
 
 async function pollPending() {
   pollTimer = null;
-  if (polling) return;
+  // The Archive block off: the hand-off poll ends here, and switching the block on starts it again.
+  if (polling || !isOn('archive')) return;
   let next = PENDING_MS;
   if (document.visibilityState === 'visible') {
     polling = true;
@@ -549,6 +551,7 @@ export function startArchivePoll() {
 // --------------------------------------------------------------- wiring
 
 export function initArchive() {
+  onFeaturesChange(() => { if (isOn('archive')) startArchivePoll(); });
   $('openArchive').addEventListener('click', () => openArchive());
   $('showMacro').addEventListener('click', () => { $('settingsDialog').close(); openMacro(); });
   bindCodeListing();

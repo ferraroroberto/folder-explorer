@@ -13,14 +13,15 @@ import os
 import time
 from typing import Any, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
+from app.webapp.feature_gate import require
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.routers.browse import scanned_path_or_http
 from app.webapp.state import EMAILS, POOL, doc_hits, folder_hits
-from src import config, store
+from src import config, features, store
 from src.desktop import (
     GoneError,
     ensure_there,
@@ -71,6 +72,8 @@ def _scanned(roots: list[Root]) -> list[tuple[Root, dict[str, Any]]]:
 
 def _docs_part(cfg: dict[str, Any], scanned: bool) -> dict[str, Any]:
     """The Documents mode: off by the Settings switch, else ready once a root has a finished scan."""
+    if not features.enabled(cfg, "documents"):
+        return {"ready": False, "reason": features.OFF_SENTENCE}
     if not cfg["search"]["markdown"]:
         return {"ready": False, "reason": "turned off in Settings"}
     return {"ready": scanned, "reason": None if scanned else "no root has a finished scan yet"}
@@ -112,7 +115,7 @@ def search_folders(q: str = "", prune: Optional[bool] = None, skip: Optional[int
     return folder_hits(config.load(), q, prune, skip, onedrive)
 
 
-@router.get("/search/docs")
+@router.get("/search/docs", dependencies=[Depends(require("documents"))])
 def search_docs(q: str = "", offset: int = Query(0, ge=0), limit: int = Query(DOC_PAGE, ge=1, le=MAX_PAGE)) -> dict[str, Any]:
     """The documents (Markdown and HTML) of every scanned root, newest first, whose name holds every word of ``q``; metadata only."""
     return doc_hits(config.load(), q, offset, limit)
@@ -228,7 +231,7 @@ def reveal_email(row_id: int, request: Request) -> dict[str, str]:
     return {"status": "opened"}
 
 
-@router.post("/emails/{row_id}/find")
+@router.post("/emails/{row_id}/find", dependencies=[Depends(require("archive"))])
 def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
     """Find in mailbox: open the live copy of an archived mail in Outlook, looked up by its Message-ID."""
     _pc_only(request)

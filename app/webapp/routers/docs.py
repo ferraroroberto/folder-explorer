@@ -16,11 +16,12 @@ import os
 import re
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.webapp import state
 from app.webapp.auth import is_pc_itself
+from app.webapp.feature_gate import require
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, store, winfs
 from src.docs import reader, writer
@@ -31,7 +32,7 @@ from src.roots import Root, resolve_roots
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/doc")
+router = APIRouter(prefix="/api/doc", dependencies=[Depends(require("documents"))])
 
 _STATUS = {"not_found": 404, "scan_changed": 409, "gone": 410, "too_large": 413, "not_document": 415,
            "unreadable": 422, "cloud_only": 423, "edit_too_large": 413, "not_utf8": 415, "not_writable": 423,

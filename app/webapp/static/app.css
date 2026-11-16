@@ -414,6 +414,15 @@ button.list-row .lr-name { font-weight: 600; }
 /* The groups, headers and rows are the vendored settings-group, linked after this file so its glyph size outranks the base .icon; this is only what the Settings sheet adds around them. A row's [hidden] needs an id-scoped rule because the row's own display: flex outranks the attribute. */
 #settingsDialog [hidden] { display: none; }
 .settings-groups { margin-top: var(--space-sm); }
+/* A part of a feature block that is switched off (state.js marks <html data-features-off="email ..."): hidden by its markup, wherever it sits. */
+:is(html[data-features-off~="email"] [data-feature="email"], html[data-features-off~="archive"] [data-feature="archive"],
+  html[data-features-off~="documents"] [data-feature="documents"], html[data-features-off~="screenshot"] [data-feature="screenshot"]) { display: none !important; }
+/* The Available features rows keep their hint lines whole: what the block covers, and why it can't run here. */
+.feature-row { align-items: flex-start; padding-block: 10px; }
+.feature-row .settings-row-hint { white-space: normal; overflow: visible; text-overflow: clip; }
+.feature-row .settings-row-hint:empty { display: none; }
+.feature-row .settings-row-hint[data-tone="attention"] { color: var(--attention-text); font-weight: 600; }
+.feature-row > .switch-slot { margin-top: 2px; }
 .settings-row > :is(.segmented, .switch-slot, .setting-text, .setting-action, .settings-row-time) { margin-left: auto; }
 .settings-row > .settings-row-time { width: 7.5em; }
 .settings-row > .setting-text { width: 9em; min-width: 0; }

@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src import features
 from src.atomic_write import atomic_write_text
 from src.snap import settings as snap_settings
 
@@ -94,6 +95,9 @@ DEFAULTS: dict[str, Any] = {
     # selects. The tray menu writes them; Settings switches only hold_to_capture. Each applies from the next capture,
     # except the hotkey, which applies at the next tray start.
     "snap": dict(snap_settings.DEFAULTS),
+    # Which feature blocks this machine runs (src/features.py): each on by default. A block switched off hides its UI,
+    # stops its background work and skips its backend calls. Machine-local, like the rest of this file.
+    "features": dict(features.DEFAULTS),
 }
 
 # The outlook keys the Settings screen switches; the rest of the block is edited in config.json.
@@ -167,6 +171,7 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     cfg["snap"] = snap_settings.clean(raw.get("snap"))
+    cfg["features"] = features.clean(raw.get("features"))
     return cfg
 
 
@@ -350,6 +355,8 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
         if key == "snap":
             value = _validate_snap(value)
+        if key == "features":
+            value = features.validate(value)
         if key == "quick_search":
             if not (isinstance(value, dict) and set(value) == {"open_folder"} and isinstance(value["open_folder"], bool)):
                 raise ValueError("quick_search takes open_folder, true or false")
@@ -418,7 +425,7 @@ def save(updates: dict[str, Any]) -> dict[str, Any]:
     current = _current_file()
     for key, value in clean.items():
         # Settings sets one outlook key; the folder and category names the file holds stay as they are.
-        if key in ("outlook", "snap"):
+        if key in ("outlook", "snap", "features"):
             held = current.get(key)
             value = {**(held if isinstance(held, dict) else {}), **value}
         current[key] = value

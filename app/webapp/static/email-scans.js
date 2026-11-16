@@ -3,8 +3,9 @@
 import { getJSON, postJSON, ApiError } from './api.js';
 import { bar, esc, fmtAgo, fmtNum, pct, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
+import { isOn, onFeaturesChange } from './state.js';
 
-const $ = (id) => document.getElementById(id);
+const $ =(id) => document.getElementById(id);
 // How often the card re-reads the run history while a run is going; the same cadence as the folder scans.
 const POLL_MS = 2000;
 
@@ -73,14 +74,21 @@ function render() {
 }
 
 export async function loadEmailScans() {
+  if (timer) clearTimeout(timer);
+  timer = null;
+  // The Email block off: the card is gone and nothing asks the server about the index, so no poll runs.
+  if (!isOn('email')) {
+    body = null;
+    render();
+    return;
+  }
   try {
     body = await getJSON('/api/email/status');
   } catch (e) {
     body = null;
   }
   render();
-  if (timer) clearTimeout(timer);
-  timer = body && body.running ? setTimeout(() => loadEmailScans(), POLL_MS) : null;
+  timer = body && body.running && isOn('email') ? setTimeout(() => loadEmailScans(), POLL_MS) : null;
 }
 
 async function start(root) {
@@ -110,6 +118,8 @@ async function showFailures() {
 }
 
 export function initEmailScans() {
+  // The block going off clears the card and the poll; going on reads the index's state again, with no restart.
+  onFeaturesChange(() => loadEmailScans());
   $('indexEmails').addEventListener('click', () => start(null));
   $('indexOne').addEventListener('click', () => start($('emailScope').value));
   $('emailInfo').addEventListener('click', () => $('emailInfoDialog').showModal());

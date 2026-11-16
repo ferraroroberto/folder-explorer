@@ -1,7 +1,7 @@
 /* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, every screenshot setting, remote access, the in-app schedule, and the folder lists for the scan and the email index. Each row of the pane shows its current value; a row with help text or a list opens its own sheet (settingDialog) holding the control, its note and its list. */
 
 import { getJSON, postJSON } from './api.js';
-import { readPref, state, writePref } from './state.js';
+import { readPref, state, writePref, setFeatures } from './state.js';
 import { fmtBytes } from './fmt.js';
 import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { showToast } from './_vendored/toast/toast.js';
@@ -25,6 +25,10 @@ let onRootsChanged = () => {};
 let onSearchChanged = () => {};
 // The four folder lists, built once in initSettings.
 const lists = {};
+// The feature blocks' switches by block key, built once in initSettings.
+const FEATURE_KEYS = ['email', 'archive', 'documents', 'screenshot'];
+const featureSwitches = {};
+const cap = (key) => key[0].toUpperCase() + key.slice(1);
 let config = null;
 // The last settings body shown, so a refused save puts the server's values back in the fields.
 let shown = null;
@@ -40,6 +44,8 @@ function render(body) {
   const cfg = body.config;
   const remote = body.remote;
   $('setupCard').hidden = body.config_file.exists;
+  renderFeatures(body.features);
+  setFeatures(body.features);
   renderValues(body);
   setSwitch(markdownSwitch, cfg.search.markdown);
   $('markdownSearchNote').textContent = cfg.search.markdown
@@ -102,6 +108,17 @@ function render(body) {
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
   setBasis(readPref('basis', 'size'));
+}
+
+/** The Available features rows: each block's switch, what it covers, and why it can't run on this machine. */
+function renderFeatures(list) {
+  for (const key of FEATURE_KEYS) {
+    const info = list.find((b) => b.key === key);
+    if (!info) continue;
+    setSwitch(featureSwitches[key], info.enabled);
+    $('featHint' + cap(key)).textContent = info.covers + (info.restart ? ' A change applies when ' + info.restart + ' next starts.' : '');
+    $('featWhy' + cap(key)).textContent = info.available ? '' : 'Not available here: ' + info.reason + '.';
+  }
 }
 
 const onOff = (on) => (on ? 'On' : 'Off');
@@ -277,9 +294,44 @@ function buildFolderLists() {
   });
 }
 
+/** The screenshot sheet's three switches, its menus and fields, and Open folder. */
+function buildSnapControls() {
+  snapHoldSwitch = switchEl(false, {
+    label: 'Hold to capture',
+    onToggle: (next) => saveSnap({ hold_to_capture: next }),
+  });
+  $('snapHoldSlot').appendChild(snapHoldSwitch);
+  snapClipboardSwitch = switchEl(true, {
+    label: 'Copy to clipboard',
+    onToggle: (next) => saveSnap({ copy_to_clipboard: next }),
+  });
+  $('snapClipboardSlot').appendChild(snapClipboardSwitch);
+  snapLoupeSwitch = switchEl(true, {
+    label: 'Show loupe',
+    onToggle: (next) => saveSnap({ show_loupe: next }),
+  });
+  $('snapLoupeSlot').appendChild(snapLoupeSwitch);
+  $('snapQuality').addEventListener('change', (e) => saveSnap({ jpeg_quality: Number(e.target.value) }));
+  $('snapPrefix').addEventListener('change', (e) => saveSnap({ file_prefix: e.target.value }));
+  $('snapHotkey').addEventListener('change', (e) => saveSnap({ hotkey: e.target.value }));
+  $('snapOpenFolder').addEventListener('click', openSnapFolder);
+}
+
+/** One switch per feature block: a saved change re-reads Search, whose modes follow the Email and Documents blocks. */
+function buildFeatureSwitches() {
+  for (const key of FEATURE_KEYS) {
+    featureSwitches[key] = switchEl(true, {
+      label: cap(key) + ' feature',
+      onToggle: async (next) => { if (await save({ features: { [key]: next } })) onSearchChanged(); },
+    });
+    $('featSlot' + cap(key)).appendChild(featureSwitches[key]);
+  }
+}
+
 export function initSettings(opts) {
   onRootsChanged = opts.onRootsChanged;
   onSearchChanged = opts.onSearchChanged;
+  buildFeatureSwitches();
   markdownSwitch = switchEl(true, {
     label: 'Documents search',
     onToggle: async (next) => { if (await save({ search: { markdown: next } })) onSearchChanged(); },
@@ -316,25 +368,7 @@ export function initSettings(opts) {
     },
   });
   $('trayClickSlot').appendChild(traySwitch);
-  snapHoldSwitch = switchEl(false, {
-    label: 'Hold to capture',
-    onToggle: (next) => saveSnap({ hold_to_capture: next }),
-  });
-  $('snapHoldSlot').appendChild(snapHoldSwitch);
-  snapClipboardSwitch = switchEl(true, {
-    label: 'Copy to clipboard',
-    onToggle: (next) => saveSnap({ copy_to_clipboard: next }),
-  });
-  $('snapClipboardSlot').appendChild(snapClipboardSwitch);
-  snapLoupeSwitch = switchEl(true, {
-    label: 'Show loupe',
-    onToggle: (next) => saveSnap({ show_loupe: next }),
-  });
-  $('snapLoupeSlot').appendChild(snapLoupeSwitch);
-  $('snapQuality').addEventListener('change', (e) => saveSnap({ jpeg_quality: Number(e.target.value) }));
-  $('snapPrefix').addEventListener('change', (e) => saveSnap({ file_prefix: e.target.value }));
-  $('snapHotkey').addEventListener('change', (e) => saveSnap({ hotkey: e.target.value }));
-  $('snapOpenFolder').addEventListener('click', openSnapFolder);
+  buildSnapControls();
   $('createConfig').addEventListener('click', createConfig);
   $('settingsDialog').querySelectorAll('[data-open]').forEach((row) => row.addEventListener('click', () => openSetting(row.dataset.open)));
   remoteSwitch = switchEl(false, { label: 'Remote access', onToggle: (next) => save({ remote_access: next }) });

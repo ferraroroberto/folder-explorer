@@ -6,14 +6,15 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
 from app.webapp.bind import resolve_bind
 from app.webapp.build import BUILD_INFO
-from app.webapp.routers.archive import archive_status
-from src import config, file_assoc, folder_lists, password, store
+from app.webapp.feature_gate import require
+from app.webapp.routers.archive import OFF_REASON, archive_status, bridge_off
+from src import config, features, file_assoc, folder_lists, password, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 from src.snap import settings as snap_settings
 from src.snap.folder import open_save_folder
@@ -42,6 +43,16 @@ def _index_bytes() -> int:
     return total
 
 
+def feature_blocks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every feature block's state; Outlook actions switched off for this instance (the e2e one) make the archive block unavailable."""
+    blocks = features.status(cfg)
+    if bridge_off():
+        for block in blocks:
+            if block["key"] == "archive":
+                block.update(available=False, reason=OFF_REASON)
+    return blocks
+
+
 def settings_body(pc: bool) -> dict[str, Any]:
     cfg = config.load()
     wanted = resolve_bind(cfg)
@@ -60,6 +71,7 @@ def settings_body(pc: bool) -> dict[str, Any]:
         "index_bytes": _index_bytes(),
         "archive": archive_status(cfg, pc),
         "config_file": {"exists": config.config_path().is_file()},
+        "features": feature_blocks(cfg),
         "md_assoc": {"state": file_assoc.state() if pc else "pc_only"},
     }
 
@@ -72,6 +84,12 @@ def healthz() -> dict[str, str]:
 @router.get("/api/version")
 def version() -> dict[str, str]:
     return BUILD_INFO.as_dict()
+
+
+@router.get("/api/features")
+def get_features() -> dict[str, Any]:
+    """Every feature block's state, which the page reads at start and after each switch to show or hide the block's parts."""
+    return {"features": feature_blocks(config.load())}
 
 
 @router.get("/api/config")
@@ -100,7 +118,7 @@ def create_config(request: Request) -> JSONResponse:
     return JSONResponse({**settings_body(is_pc_itself(request)), "created": created})
 
 
-@router.post("/api/snap/open-folder")
+@router.post("/api/snap/open-folder", dependencies=[Depends(require("screenshot"))])
 def post_snap_open_folder(request: Request) -> dict[str, str]:
     """Settings' Open folder for the screenshot save folder: File Explorer on this PC only, the folder named by config, never by the page."""
     if not is_pc_itself(request):
@@ -115,7 +133,7 @@ def post_snap_open_folder(request: Request) -> dict[str, str]:
     return {"status": "opened"}
 
 
-@router.post("/api/md-assoc")
+@router.post("/api/md-assoc", dependencies=[Depends(require("documents"))])
 def post_md_assoc(request: Request, body: dict[str, Any] = Body(...)) -> JSONResponse:
     """Settings' "Associate Markdown files with this app": ``{"on": bool}``, for this PC only; answers the state read back."""
     if not is_pc_itself(request):

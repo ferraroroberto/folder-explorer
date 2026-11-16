@@ -18,6 +18,7 @@
 /app/webapp/static/_vendored/row-menu
 /app/webapp/static/_vendored/segmented
 /app/webapp/static/_vendored/select-native
+/app/webapp/static/_vendored/settings-group
 /app/webapp/static/_vendored/sign-in
 /app/webapp/static/_vendored/switch
 /app/webapp/static/_vendored/text-size
@@ -51,6 +52,8 @@
 /src/password.py
 /src/pooled_http.py
 /src/runtime_data.py
+/src/shell_etag.py
+/src/subject_text.py
 /src/usage_log.py
 /tests/e2e/_e2e_live_guard.py
 /tests/e2e/_geometry.py

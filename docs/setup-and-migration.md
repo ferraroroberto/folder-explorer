@@ -15,7 +15,7 @@ The copy list was derived from the code, not from memory: every path the app rea
 - Optional, by feature (each is a block in Settings → Available features; a machine without one switches that block off and the rest runs unchanged):
   - **Email** needs `requirements-email.txt` (`extract-msg`, `rapidfuzz`).
   - **Outlook archive** needs `requirements-outlook.txt` (`pywin32`) and Outlook (classic).
-  - **Screenshot** and the tray need `requirements-tray.txt` (`pystray`, `pillow`, `pywin32`, `mss`) and a Tk-enabled Python.
+  - **Screenshot** and the tray need `requirements-tray.txt` (`pystray`, `pillow`, `pywin32`, `mss`) and a Tk-enabled Python. Without it `tray.bat` starts nothing (it has no console to say why); `start.bat` needs only `requirements.txt`.
   - Remote access from a phone needs Tailscale with HTTPS certificates turned on.
 
 **Steps**
@@ -37,7 +37,7 @@ The copy list was derived from the code, not from memory: every path the app rea
 7. Optional, the Outlook macro: set `FOLDER_EXPLORER_HOME` to `<repo>` for the user (Settings → Outlook macro prints the exact line) and import `assets\ArchiveMacro.bas` in Outlook.
 8. Optional, a nightly scan: a scheduler job that runs `& <repo>\.venv\Scripts\python.exe -m app.cli scan`, with Settings → Scan schedule left `off` so two schedules never double-run.
 
-**Update**: `git pull`, then `tray.bat --restart` (or stop and start `start.bat`). The page footer and `GET /api/version` show the running build; it should match `git rev-parse --short HEAD`.
+**Update**: `git pull`, then `tray.bat --restart` (or stop and start `start.bat`). `--restart` needs the shared `tray_lifecycle.ps1` that the fleet-config repo's install puts under `%USERPROFILE%\.claude\tray\`; on a machine without it, `tray.bat --restart` stops with an error, so quit the tray from its menu and run `tray.bat` again. The page footer and `GET /api/version` show the running build; it should match `git rev-parse --short HEAD`.
 
 ## Where the state lives
 

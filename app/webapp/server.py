@@ -9,7 +9,6 @@ file or an image beside it for the viewer, through ``src/docs/reader.py``. Start
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import mimetypes
 import os
@@ -18,7 +17,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 from starlette.types import Scope
@@ -41,6 +40,7 @@ from app.webapp.state import EMAILS, POOL, refresh_pool
 from src import config, scan_runner, store
 from src.compression import StreamSafeGZipMiddleware
 from src.roots import resolve_roots
+from src.shell_etag import shell_response
 from src.usage_log import usage_router
 
 logger = logging.getLogger(__name__)
@@ -50,21 +50,7 @@ logger = logging.getLogger(__name__)
 # revalidate daily. The shell always revalidates, or it would pin old URLs.
 _LONG_CACHE = "public, max-age=31536000, immutable"
 _DAY_CACHE = "public, max-age=86400"
-_SHELL_CACHE = "no-cache, must-revalidate"
 _DAILY_SUFFIXES = frozenset({".webmanifest", ".png", ".ico", ".svg"})
-
-
-def _shell_etag(html: str) -> str:
-    """A weak validator: the gzip layer re-encodes the body, so the sent bytes differ from the hashed text."""
-    return 'W/"' + hashlib.sha256(html.encode("utf-8")).hexdigest()[:32] + '"'
-
-
-def _etag_matches(if_none_match: str, etag: str) -> bool:
-    """Weak comparison over an ``If-None-Match`` list, as RFC 9110 prescribes for GET."""
-    if if_none_match.strip() == "*":
-        return True
-    bare = etag.removeprefix("W/")
-    return any(tag.strip().removeprefix("W/") == bare for tag in if_none_match.split(","))
 
 
 class CachingStaticFiles(StaticFiles):
@@ -121,12 +107,8 @@ def create_app() -> FastAPI:
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
 
     def shell(request: Request, page: str) -> Response:
-        html = BUILD_INFO.stamp_html((STATIC_DIR / page).read_text(encoding="utf-8"))
-        headers = {"Cache-Control": _SHELL_CACHE, "ETag": _shell_etag(html)}
         # The shell revalidates on every launch; an unchanged build answers with no body.
-        if _etag_matches(request.headers.get("if-none-match", ""), headers["ETag"]):
-            return Response(status_code=304, headers=headers)
-        return HTMLResponse(html, headers=headers)
+        return shell_response(request, BUILD_INFO.stamp_html((STATIC_DIR / page).read_text(encoding="utf-8")))
 
     @app.get("/", include_in_schema=False)
     def index(request: Request) -> Response:

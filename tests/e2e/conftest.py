@@ -28,9 +28,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from playwright.sync_api import BrowserContext
+from playwright.sync_api import Browser, BrowserContext, Page
 
 from tests.e2e._e2e_live_guard import require_disposable_instance
+from tests.e2e._port_pool import pytest_runtest_makereport, pytest_terminal_summary  # noqa: F401 — the hooks pytest looks for here
 from tests.e2e._scan_capture import NO_WINDOW, run_utf8
 from tests.email_fixture import build_email_index
 from tests.fixture_tree import add_docs, add_hidden, build_tree
@@ -63,21 +64,45 @@ def _desktop_only(request: pytest.FixtureRequest, browser_name: str) -> None:
         pytest.skip("desktop_only")
 
 
-@pytest.fixture(autouse=True)
-def _bounded_timeouts(context: BrowserContext) -> None:
-    context.set_default_timeout(_DEFAULT_TIMEOUT_MS)
-    context.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+@pytest.fixture(scope="session")
+def context(browser: Browser, browser_context_args: dict[str, Any]) -> Iterator[BrowserContext]:
+    """One browser context per projection, shared by every case.
 
-
-@pytest.fixture(autouse=True)
-def _no_held_handoff_poll(context: BrowserContext) -> None:
-    """Answer the page's hand-off poll at once with no mail, so a held poll never keeps the network busy.
-
-    The server holds that poll open for up to 25 s, and screenshot settling waits for an idle
-    network. A test that hands a mail over routes the poll on its page, which takes precedence.
+    A context of its own per case opens about six fresh sockets to the app, and every closed one
+    parks a loopback port pair in TIME_WAIT (``_port_pool.py``); one context keeps those sockets
+    and the HTTP cache warm across the run. ``page`` below hands each case a new tab and resets
+    what a context keeps between cases.
     """
-    context.route("**/api/archive/pending*", lambda route: route.fulfill(status=200, content_type="application/json",
-                                                                         body='{"mail": null}'))
+    shared = browser.new_context(**browser_context_args)
+    shared.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+    shared.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+    # The server holds the page's hand-off poll open for up to 25 s, and screenshot settling waits for an
+    # idle network. A test that hands a mail over routes the poll on its page, which takes precedence.
+    shared.route("**/api/archive/pending*", lambda route: route.fulfill(status=200, content_type="application/json",
+                                                                        body='{"mail": null}'))
+    yield shared
+    shared.close()
+
+
+def _reset_context_state(context: BrowserContext, page: Page, app_url: str) -> None:
+    """Drop what a case leaves in the shared context: other tabs, cookies, grants and the app's local storage."""
+    for other in context.pages:
+        if other is not page:
+            other.close()
+    page.goto(app_url + "/healthz")  # an app-origin document to clear that origin's storage from
+    page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
+    context.clear_cookies()
+    context.clear_permissions()
+
+
+@pytest.fixture
+def page(context: BrowserContext, app_url: str) -> Iterator[Page]:
+    tab = context.new_page()
+    try:
+        yield tab
+    finally:
+        _reset_context_state(context, tab, app_url)
+        tab.close()
 
 
 def _free_port() -> int:

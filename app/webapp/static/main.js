@@ -15,7 +15,7 @@ import { initArchive, startArchivePoll } from './archive.js';
 import { initDrop } from './doc-drop.js';
 import { openDropped, openIndexed } from './doc-sheet.js';
 import { wireThemeToggle } from './theme.js';
-import { paintFilterTrigger } from './filter-trigger.js';
+import { paintFilterTrigger } from './filters/filter-trigger.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';

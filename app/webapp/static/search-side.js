@@ -7,7 +7,7 @@
 import { LABEL, getOp, serialize, tokenize, withOp } from './query.js';
 import { S, $, box, effectiveMode, recent, recentOpen, shortFolder } from './search-state.js';
 import { esc, fmtNum, glyph, plural } from './fmt.js';
-import { paintFilterTrigger } from './filter-trigger.js';
+import { paintFilterTrigger } from './filters/filter-trigger.js';
 
 // --------------------------------------------------------------- chips
 

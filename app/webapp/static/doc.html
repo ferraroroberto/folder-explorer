@@ -126,7 +126,7 @@
     <path d="m15 18-6-6 6-6" />
   </symbol>
 </svg>
-<nav class="tabs" role="tablist" aria-label="Sections">
+<nav class="tabs" role="tablist" aria-label="Sections" data-surface="doc.nav">
   <button id="tabSearch" type="button" class="tab" data-tab="search" role="tab" aria-selected="false" data-track="doc-tab-search">
     <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
     <span class="tab-label">Search</span>
@@ -149,7 +149,7 @@
   </button>
 </nav>
 
-<main class="app doc-app">
+<main class="app doc-app" data-surface="doc.window">
   <div class="card home-head">
     <span class="home-title">
       <svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
@@ -171,7 +171,7 @@
     </div>
   </div>
   <div class="doc-layout">
-    <aside class="card doc-side" id="docOutline" aria-label="Outline and recent documents" hidden></aside>
+    <aside class="card doc-side" id="docOutline" aria-label="Outline and recent documents" data-surface="doc.side" hidden></aside>
     <div class="card doc-main" id="docBody"><p class="doc-loading" role="status">Loading…</p></div>
   </div>
 </main>

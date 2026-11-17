@@ -15,6 +15,7 @@ import { esc, glyph } from './fmt.js';
 export function confirmSheet({ title, text, actions, view }) {
   const d = document.createElement('dialog');
   d.className = 'detail-dialog doc-confirm';
+  d.dataset.surface = 'doc.confirm';
   // dynamic-id-exempt: every caller passes one fixed literal (doc-leave, doc-overwrite, doc-discard), so each sheet's id is constant
   d.dataset.trackView = view;
   d.setAttribute('aria-labelledby', view + '-title');

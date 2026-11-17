@@ -34,7 +34,7 @@ folder-explorer: a public disk-space explorer, read-only apart from mail filing 
 powershell -File scripts/verify-before-ship.ps1
 ```
 
-Byte-compile, the unit tests, the e2e suite (`tests/e2e`, Chromium desktop + WebKit iPhone, disposable instance on a free port; set `FOLDER_EXPLORER_E2E_AUTOBOOT=1` to run it alone), the runtime-write probe, and the ten ratchets (structure, instruction, doc refs, dead code, static, docs, comment, conventions, runtime write, usage track), each vendored byte-for-byte with an empty baseline. Exit 3 from a ratchet is "not confirmed", a failure. Never raise a baseline to get green.
+Byte-compile, the unit tests, the e2e suite (`tests/e2e`, Chromium desktop + WebKit iPhone, disposable instance on a free port; set `FOLDER_EXPLORER_E2E_AUTOBOOT=1` to run it alone), the runtime-write probe, and the eleven ratchets (structure, instruction, doc refs, dead code, static, docs, comment, conventions, runtime write, usage track, UX surface), each vendored byte-for-byte with an empty baseline. Exit 3 from a ratchet is "not confirmed", a failure. Never raise a baseline to get green.
 
 ## CI expectations
 
@@ -50,6 +50,8 @@ No `.github/workflows/`: the local gate is the contract. Report CI as **unknown*
   - /          (Search, Explore, Largest, Types and Scans tabs, the bottom nav, the Settings sheet)
 
 Each tab leads with its own vendored `home-head` (tab title + context line + theme toggle + Settings gear); the shared toolbar moves into the active tab after its header and is absent on Search and Scans. Search and Explore are declared wide views (`.fleet.toml` `[design] wide_views`). Tokens in `app/webapp/static/tokens.css` follow `~/.claude/design.md` + `design.dark.md`; `/design-sync` reports drift. Every control carries a constant `data-track`, every `<dialog>` a `data-track-view`.
+
+- **Surface map.** A change to what a person can see or do (a tab, sheet, dialog, menu, Settings row, gesture or key) updates its entry in `docs/ux-surfaces.yaml` (the single source; `python scripts/ux_surface_map.py` regenerates `docs/ux-surface-map.md`, which is never edited by hand) in the same change and keeps the surface root's `data-surface` id in step with its entry; `scripts/ux_surface_ratchet.py` holds the two together.
 
 ## Vendored components
 

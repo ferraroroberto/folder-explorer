@@ -122,13 +122,13 @@ The first tab searches **Folders**, **Documents** (Markdown and HTML files) or *
 powershell -File scripts\verify-before-ship.ps1
 ```
 
-Byte-compile, the unit tests, the browser suite (Chromium desktop and WebKit iPhone against a disposable instance over an invented tree), and the ten fleet ratchets. Needs `requirements-dev.txt` and Node (`npx`) for the static ratchet.
+Byte-compile, the unit tests, the browser suite (Chromium desktop and WebKit iPhone against a disposable instance over an invented tree), and the eleven fleet ratchets. Needs `requirements-dev.txt` and Node (`npx`) for the static ratchet.
 
 The last stdout line of a run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`, on a pass, a failed stage, a missing `.venv` and an unhandled error; exit codes are 0 and 1. Do not pipe the gate when its exit code matters (`| tail` reports `tail`'s status); a caller that must pipe asserts on that line, and a run without it is not a pass.
 
 ## Layout
 
-Where code goes: [docs/layout.md](docs/layout.md). Agent instructions: [CLAUDE.md](CLAUDE.md).
+Where code goes: [docs/layout.md](docs/layout.md). Every screen, sheet, menu, Settings row and key, each under a stable id: [docs/ux-surface-map.md](docs/ux-surface-map.md). Agent instructions: [CLAUDE.md](CLAUDE.md).
 
 ## License
 

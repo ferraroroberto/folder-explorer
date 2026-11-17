@@ -29,6 +29,18 @@ const TOUCH = window.matchMedia('(pointer: coarse)');
 
 let source = () => null;
 const menus = new Map();
+
+/** The vendored menu builds its own element, so the app stamps the surface id on what `attach` returns. */
+function surfaceMenu(ctl) {
+  const attach = ctl.attach;
+  ctl.attach = function (key, anchor, items, opts) {
+    const menu = attach(key, anchor, items, opts);
+    menu.dataset.surface = 'explore.row-menu';
+    return menu;
+  };
+  return ctl;
+}
+
 let press = null;
 
 const canOpen = () => !!(source() && source().can_open);
@@ -121,7 +133,7 @@ export function wireRowMenus(container) {
   if (!container || !c) return;
   let menu = menus.get(container.id);
   if (!menu) {
-    menu = createRowMenu();
+    menu = surfaceMenu(createRowMenu());
     menus.set(container.id, menu);
   }
   container.querySelectorAll('[data-kebab]').forEach((btn) => {

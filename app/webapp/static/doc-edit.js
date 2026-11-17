@@ -57,7 +57,7 @@ function shell() {
   const formats = FORMATS.map(([k, label, icon]) => '<button type="button" class="icon-button" data-format="' + k + '" aria-label="' + label +
     '" title="' + label + '" data-track="doc-format-' + k + '">' + glyph(icon) + '</button>').join('');
   const keys = KEYS.map((k) => '<button type="button" class="doc-key" data-key="' + esc(k) + '" data-track="doc-key">' + esc(k) + '</button>').join('');
-  return '<div class="doc-editor" data-pane="write"><div class="doc-edit-tools">' +
+  return '<div class="doc-editor" data-pane="write" data-surface="doc.editor"><div class="doc-edit-tools">' +
     '<div class="segmented doc-edit-panes" role="group" aria-label="Editor view">' +
     '<button type="button" class="segmented-item" aria-pressed="true" data-pane="write" data-track="doc-edit-write">Write</button>' +
     '<button type="button" class="segmented-item" aria-pressed="false" data-pane="preview" data-track="doc-edit-preview">Preview</button></div>' +

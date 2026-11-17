@@ -1,4 +1,4 @@
-<dialog class="detail-dialog" id="settingsDialog" data-track-view="settings-sheet">
+<dialog class="detail-dialog" id="settingsDialog" data-surface="settings.sheet" data-track-view="settings-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Settings</h2>
@@ -6,7 +6,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
       </button>
     </div>
-    <div class="row row-stack" id="setupCard" hidden>
+    <div class="row row-stack" id="setupCard" data-surface="settings.setup" hidden>
       <span>Set up folder-explorer</span>
       <p class="row-note">There is no config.json yet, so the built-in defaults are in use. Create it from config.example.json to keep your folders and settings in a file. An existing config.json is never overwritten.</p>
       <div class="row-line">
@@ -15,7 +15,7 @@
     </div>
     <div class="settings-groups">
       <h3 class="settings-overline" id="groupDisplay">Display</h3>
-      <section class="card settings-group" aria-labelledby="groupDisplay">
+      <section class="card settings-group" aria-labelledby="groupDisplay" data-surface="settings.display">
         <div class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
           <span class="settings-row-label">Text size</span>
@@ -35,7 +35,7 @@
         </div>
       </section>
       <h3 class="settings-overline" id="groupFeatures">Available features</h3>
-      <section class="card settings-group" aria-labelledby="groupFeatures">
+      <section class="card settings-group" aria-labelledby="groupFeatures" data-surface="settings.features">
         <label class="settings-row feature-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
           <span class="settings-row-text">
@@ -75,7 +75,7 @@
       </section>
       <p class="settings-footnote">Every block is on by default. A block that is off hides its screens, stops its background work and skips its calls; this machine's choice is kept in config.json, which is never committed.</p>
       <h3 class="settings-overline" id="groupScanning">Scanning</h3>
-      <section class="card settings-group" aria-labelledby="groupScanning">
+      <section class="card settings-group" aria-labelledby="groupScanning" data-surface="settings.scanning">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="schedule" data-track="open-setting-schedule">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
           <span class="settings-row-label">Scan schedule</span>
@@ -101,7 +101,7 @@
         </div>
       </section>
       <h3 class="settings-overline" id="groupEmail" data-feature="email">Email</h3>
-      <section class="card settings-group" aria-labelledby="groupEmail" data-feature="email">
+      <section class="card settings-group" aria-labelledby="groupEmail" data-surface="settings.email" data-feature="email">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="email-roots" data-track="open-setting-email-roots">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
           <span class="settings-row-label">Email folders</span>
@@ -122,7 +122,7 @@
         </button>
       </section>
       <h3 class="settings-overline" id="groupOutlook" data-feature="archive">Outlook archive</h3>
-      <section class="card settings-group" aria-labelledby="groupOutlook" data-feature="archive">
+      <section class="card settings-group" aria-labelledby="groupOutlook" data-surface="settings.outlook-group" data-feature="archive">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="outlook" data-track="open-setting-outlook">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
           <span class="settings-row-label">Outlook archiving</span>
@@ -137,7 +137,7 @@
         </button>
       </section>
       <h3 class="settings-overline" id="groupFiles">Files and documents</h3>
-      <section class="card settings-group" aria-labelledby="groupFiles">
+      <section class="card settings-group" aria-labelledby="groupFiles" data-surface="settings.files">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="markdown-search" data-feature="documents" data-track="open-setting-markdown-search">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
           <span class="settings-row-label">Documents search</span>
@@ -164,7 +164,7 @@
         </button>
       </section>
       <h3 class="settings-overline" id="groupTray">Tray and screenshot</h3>
-      <section class="card settings-group" aria-labelledby="groupTray">
+      <section class="card settings-group" aria-labelledby="groupTray" data-surface="settings.tray">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="tray-click" data-track="open-setting-tray-click">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
           <span class="settings-row-label">Tray click</span>
@@ -179,7 +179,7 @@
         </button>
       </section>
       <h3 class="settings-overline" id="groupRemote">Remote access</h3>
-      <section class="card settings-group" aria-labelledby="groupRemote">
+      <section class="card settings-group" aria-labelledby="groupRemote" data-surface="settings.remote-group">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote" data-track="open-setting-remote">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-lock"></use></svg>
           <span class="settings-row-label">Remote access</span>
@@ -191,7 +191,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="settingDialog" data-track-view="setting-sheet">
+<dialog class="detail-dialog" id="settingDialog" data-surface="settings.setting" data-track-view="setting-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1" id="settingTitle">Setting</h2>
@@ -200,7 +200,7 @@
       </button>
     </div>
 
-    <div data-setting="schedule" data-title="Scan schedule" hidden>
+    <div data-setting="schedule" data-title="Scan schedule" data-surface="settings.schedule" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
@@ -221,7 +221,7 @@
       <p class="settings-footnote" id="scheduleNote"></p>
     </div>
 
-    <div data-setting="roots" data-title="Folders to scan" hidden>
+    <div data-setting="roots" data-title="Folders to scan" data-surface="settings.roots" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder"></use></svg>
@@ -233,22 +233,22 @@
       <p class="settings-footnote" id="rootsNote"></p>
     </div>
 
-    <div data-setting="exclude" data-title="Skip these folders" hidden>
+    <div data-setting="exclude" data-title="Skip these folders" data-surface="settings.exclude" hidden>
       <p class="row-note setting-intro">The disk scan, folder search and the email index all leave them out. Each sits inside a folder to scan.</p>
       <div class="setting-editor" id="excludeEditor"></div>
     </div>
 
-    <div data-setting="email-roots" data-title="Email folders" hidden>
+    <div data-setting="email-roots" data-title="Email folders" data-surface="settings.email-roots" hidden>
       <p class="row-note setting-intro">The email index reads the .msg files in these folders. Each sits inside a folder to scan.</p>
       <div class="setting-editor" id="emailRootsEditor"></div>
     </div>
 
-    <div data-setting="email-exclude" data-title="Leave out of the email index" hidden>
+    <div data-setting="email-exclude" data-title="Leave out of the email index" data-surface="settings.email-exclude" hidden>
       <p class="row-note setting-intro">Folders inside an email folder that only the email index skips.</p>
       <div class="setting-editor" id="emailExcludeEditor"></div>
     </div>
 
-    <div data-setting="budget" data-title="Mail downloads per run" hidden>
+    <div data-setting="budget" data-title="Mail downloads per run" data-surface="settings.budget" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-download"></use></svg>
@@ -266,7 +266,7 @@
       <p class="settings-footnote" id="emailBudgetNote"></p>
     </div>
 
-    <div data-setting="outlook" data-title="Outlook archiving" hidden>
+    <div data-setting="outlook" data-title="Outlook archiving" data-surface="settings.outlook" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-flag"></use></svg>
@@ -286,7 +286,7 @@
       <p class="settings-footnote setting-after" id="outlookNote"></p>
     </div>
 
-    <div data-setting="markdown-search" data-title="Documents search" hidden>
+    <div data-setting="markdown-search" data-title="Documents search" data-surface="settings.markdown-search" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -297,7 +297,7 @@
       <p class="settings-footnote" id="markdownSearchNote"></p>
     </div>
 
-    <div data-setting="remote-html" data-title="Block remote content in HTML" hidden>
+    <div data-setting="remote-html" data-title="Block remote content in HTML" data-surface="settings.remote-html" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-globe"></use></svg>
@@ -308,7 +308,7 @@
       <p class="settings-footnote" id="blockRemoteHtmlNote"></p>
     </div>
 
-    <div data-setting="explorer-window" data-title="Reuse an open Explorer window" hidden>
+    <div data-setting="explorer-window" data-title="Reuse an open Explorer window" data-surface="settings.explorer-window" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-folder-open"></use></svg>
@@ -319,7 +319,7 @@
       <p class="settings-footnote" id="reuseExplorerNote"></p>
     </div>
 
-    <div data-setting="md-assoc" data-title="Associate Markdown files with this app" hidden>
+    <div data-setting="md-assoc" data-title="Associate Markdown files with this app" data-surface="settings.md-assoc" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
@@ -330,7 +330,7 @@
       <p class="settings-footnote" id="mdAssocNote"></p>
     </div>
 
-    <div data-setting="tray-click" data-title="Tray click opens Quick search" hidden>
+    <div data-setting="tray-click" data-title="Tray click opens Quick search" data-surface="settings.tray-click" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
@@ -341,7 +341,7 @@
       <p class="settings-footnote" id="trayClickNote"></p>
     </div>
 
-    <div data-setting="screenshot" data-title="Screenshot" hidden>
+    <div data-setting="screenshot" data-title="Screenshot" data-surface="settings.screenshot" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
@@ -407,7 +407,7 @@
       <p class="settings-footnote"><span class="mono snap-folder-path" id="snapFolderPath"></span><span id="snapFolderNote"></span></p>
     </div>
 
-    <div data-setting="remote" data-title="Remote access" hidden>
+    <div data-setting="remote" data-title="Remote access" data-surface="settings.remote" hidden>
       <section class="card settings-group">
         <label class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-lock"></use></svg>

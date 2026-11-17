@@ -1,0 +1,1306 @@
+# UX surface map: the single source for docs/ux-surface-map.md.
+#
+# Every screen, drill-in, menu, sheet, dialog, popover, Settings row, state, gesture and key a person can
+# reach in folder-explorer, one entry per surface. The convention is project-scaffolding's
+# docs/ux-surface-map.md. Edit this file, never the generated page; then run `python scripts/ux_surface_map.py`.
+#
+# A change that adds, removes, renames or reshapes a user-visible surface updates its entry here in the same
+# change, adds or removes the matching `data-surface` attribute in the code, and regenerates the page.
+
+app: folder-explorer
+
+notes: |
+  The checklist of everything a person can see and do in folder-explorer: every tab, sheet, dialog, menu, Settings row, state, gesture and key, with how it is reached, what is on it and what each control does. [README](../README.md) tells what the app is; this page is the exhaustive index, so a layout change can check every surface and not only the ones a reviewer happens to open.
+
+  **Keeping it true.** A change that adds, removes, renames or reshapes a user-visible surface (a tab, sheet, dialog, popover, menu, menu item, Settings row, gesture or key) updates its entry in `docs/ux-surfaces.yaml` in the same change and regenerates this page with `python scripts/ux_surface_map.py`; this page is never edited by hand. The rule is in `CLAUDE.md`.
+
+  **Ids.** `<area>.<surface>`, lowercase words joined by `.` or `-`, the same form the e2e `surface(page, "<id>")` hook takes. An id never changes when a title is reworded or entries are reordered, and one id names one surface even when it is drawn two ways (Explore's contents are a pane beside the tree on a wide desktop and a sheet elsewhere: both are `explore.contents`). The surface's root element carries the same id as `data-surface`; the vendored row menu builds its own element, so its call sites stamp the id on what `attach` returns. `scripts/ux_surface_ratchet.py` fails a surface root without an id, an id without an entry, an entry no element carries, an id on two roots, a link to an id with no entry and a page that is not what the map generates. It reads markup and JS, so the entries marked `none` are held by this map and the e2e walk alone.
+
+  ## Ground rules
+
+  **Five tabs, one gear.** The nav is Search · Explore · Largest · Types · Scans. Settings is the gear in each tab's header, one tap from every tab, and is not a tab. The `/doc` window is a page of its own with the same nav, but no tab is selected there.
+
+  **Layout bands.** The same markup, three placements:
+
+  | Band | Condition | Nav | Search preview and Explore contents |
+  | --- | --- | --- | --- |
+  | Phone | a touch pointer up to 520px | floating bottom pill, hidden under a sheet | a sheet over the tab |
+  | Narrow or mid window | a mouse below 1100px, or a touch device wider than 520px | an inline tab bar | a sheet over the tab |
+  | Wide | 1100px and up with a mouse | a left rail | a pane beside the list (Search) or the tree (Explore) |
+
+  Search and Explore span the window on a wide desktop; Largest, Types and Scans keep a single column.
+
+  **Input modes.** A mouse gets the keyboard hints (the `/` badge, the keys line under the results, the keyboard button) and a double-click on an Explore row. A touch screen has none of those: a tap opens a Markdown or HTML row, and everything else is in the row's kebab. Dropping a Markdown or HTML file on the window opens it on every device that can drag.
+
+  **Gating.** Four feature blocks (Settings, Available features) switch whole parts off: Email (the Emails mode, the Email index card, the Email settings group), Outlook archive (the Archive card, its group and its macro sheet), Documents (the Documents mode, the viewer, the editor and the drop target) and Screenshot (its settings row). An off block hides its screens and skips its background work.
+
+  **Who the viewer is.** On the PC itself the app opens files and folders for the caller. On any other device the menus say so and keep Copy path, and a request with no token is answered by the sign-in sheet.
+
+  **Where state lives.** The mode and the query ride the URL (`#search?mode=emails&q=…`). Per-device choices live in `localStorage`: theme, text size, the last tab, the root, the Search mode and an unsaved editor draft. Everything else (the shortlist, the saved searches, the recent documents) lives on the server.
+
+  **What this map leaves out.** The tray's own windows (the menu, Quick search, the Archive window and the region screenshot overlay) are desktop windows, not web pages; they are described in the README and docs/snap.md.
+
+  ## Deep links and URL state
+
+  | Form | Opens |
+  | --- | --- |
+  | `/` | the last tab, or Search on a fresh browser |
+  | `/#search?mode=<folders|docs|emails>&q=<text>` | the Search tab with that mode and query |
+  | `/doc?root=<key>&scan=<n>&id=<n>` | the document window on that file |
+  | `/doc?dropped=<token>` | the document window on a dropped file the scan does not have |
+
+  ## Empty, error and loading states
+
+  | Where | State | What shows |
+  | --- | --- | --- |
+  | Explore, Largest, Types | no root, a scan running for the first time, a root not on this PC, no scan yet | a centred message, and Scan now when a scan can start |
+  | Search | neither folder nor mail search is ready | a card naming each reason, with Open Settings |
+  | Search results | nothing matches | the mode's own sentence, with Clear search when there is a query |
+  | Search preview | no result picked | *Pick a result to preview it.* |
+  | Scans | no roots, a failed scan, a scan whose state cannot be told | the row's own status line in the attention or danger tone |
+  | Cleanup shortlist | nothing marked | *Nothing on the shortlist yet.* |
+  | A document | cloud-only, too large, moved, gone, not UTF-8, the connection down | the state block with its one action (see `doc.state`) |
+  | Any page | an action fails | a toast in the error tone |
+
+  ## Where this map was checked
+
+  Every surface above was opened on a disposable instance scanned over an invented tree, with the Outlook bridge and every desktop launch switched off, so the Archive card shows its not-ready state and no open action ran. Desktop was a 1440px window with a mouse; the phone was a 390 by 844 touch-emulated page; both themes were looked at. Not driven live, only read from the code: filing a real mail from the Archive sheet, the Outlook macro import, the Markdown association in the registry, the region screenshot overlay, and remote access with a certificate.
+
+walk:
+  date: 2026-11-17
+  build: 62c8fc0
+  widths: [390, 1440]
+  themes: [light, dark]
+
+areas:
+  - id: chrome
+    title: Chrome
+    notes: |
+      What every tab shares: the nav, the toolbar, the footer, toasts, the update banner, the sign-in sheet and the drop overlay.
+  - id: search
+    title: Search
+    notes: |
+      One box over folders, documents or emails, with a preview beside the results or in a sheet.
+  - id: explore
+    title: Explore
+  - id: largest
+    title: Largest
+  - id: types
+    title: Types
+  - id: scans
+    title: Scans
+  - id: doc
+    title: Documents
+    notes: |
+      The Markdown and HTML viewer and editor, in a sheet over the app and in its own window. Behind the Documents feature block.
+  - id: archive
+    title: Archive and Outlook macro
+    notes: |
+      Behind the Outlook archive feature block; the card shows on the PC only.
+  - id: settings
+    title: Settings
+    notes: |
+      The gear in every tab's header opens one sheet of groups; a row that holds a choice opens a second sheet over it with that setting. The Settings sheet has no commit: each setting saves as it changes.
+  - id: keys
+    title: Keys and gestures
+
+surfaces:
+  - id: chrome.nav
+    area: chrome
+    title: Nav
+    root: data-surface
+    reach:
+      - always on screen on the five tabs
+    holds:
+      - one tab each for Search, Explore, Largest, Types and Scans
+    does:
+      - switches the tab and remembers it on this device
+    why: the fleet navigation contract
+    phone: a floating pill at the bottom, hidden while a sheet is open
+    desktop: an inline tab bar, or a left rail from 1100px with a mouse
+    links:
+      - to: search.tab
+        via: Search
+      - to: explore.tab
+        via: Explore
+      - to: largest.tab
+        via: Largest
+      - to: types.tab
+        via: Types
+      - to: scans.tab
+        via: Scans
+
+  - id: chrome.toolbar
+    area: chrome
+    title: Toolbar
+    root: data-surface
+    reach:
+      - the top of Explore, Largest and Types; one toolbar that moves into the active tab
+    holds:
+      - "Root: the scanned root to show"
+      - "Totals by: Size or On disk, with an info button"
+      - "Type: the file type filter"
+      - "Scope: the folder the three tabs show, as a pill that jumps to Explore"
+    does:
+      - each choice reloads the three tabs for the same folder
+    states:
+      - absent on Search and Scans
+    links:
+      - to: explore.sizes-info
+        via: the info button beside Totals by
+      - to: explore.tab
+        via: Scope pill
+
+  - id: chrome.footer
+    area: chrome
+    title: Footer
+    root: data-surface
+    reach:
+      - the bottom of the page, under every tab
+    holds:
+      - the build the page runs (the git sha and when it was built)
+    states:
+      - "reads *Build: unknown* when the version cannot be read"
+
+  - id: app.update-banner
+    area: chrome
+    title: New-version notice
+    root: data-surface
+    holds:
+      - (stamped by the vendored build-watch component itself).
+      - "a banner offering Reload when the server moved to a newer build while the page stayed open; it never reloads by itself, so an unsaved draft survives"
+
+  - id: chrome.toast
+    area: chrome
+    title: Toast
+    root:
+      none: built by the vendored toast component, which stamps no id; one element appended to the body
+    reach:
+      - after an action (copied, opened, scan started or finished, saved) or an error
+    holds:
+      - one message line, in the error tone for a failure
+    states:
+      - a message with an action (Undo-style) stays up longer
+      - joins the top layer as a popover when a drop opened a sheet, so it shows above it
+
+  - id: chrome.sign-in
+    area: chrome
+    title: Sign-in sheet
+    root:
+      none: built by the vendored sign-in component, which stamps no id; a dialog appended to the body
+    reach:
+      - any request answered 401 from a device that is not the PC
+    holds:
+      - a password field and a sign-in button
+    does:
+      - trades the password for a token the page keeps, then repeats the request
+    states:
+      - "no close button and no Esc: the app cannot be used signed out"
+      - wrong password, locked out for a while, or not set up each say so
+
+  - id: chrome.drop-overlay
+    area: chrome
+    title: Drop overlay
+    root: data-surface
+    reach:
+      - dragging a file over the app window or the document window
+    holds:
+      - "*Drop a Markdown or HTML file to open it* and a line on what opens"
+    does:
+      - the drop opens an indexed document for editing, or any other as read-only, in its own window
+    states:
+      - absent while the Documents block is off
+    why: it is a popover in the top layer so it shows above an open sheet
+    links:
+      - to: doc.window
+        via: a drop
+
+  - id: search.tab
+    area: search
+    title: Search tab
+    root: data-surface
+    reach:
+      - nav, Search
+      - "`/#search?mode=…&q=…`"
+      - the default tab on a fresh browser
+    holds:
+      - the header (title, a status line, the theme toggle, the Settings gear)
+      - a Folders / Documents / Emails switch, shown when more than one mode is ready
+      - the search box, with a keyboard button and a `/` badge on a mouse
+      - the active operator chips under the box
+      - the saved searches and Bookmark query
+      - the filters, refine, results and preview parts
+    does:
+      - typing searches after a short pause; Enter, a chip, a filter or a facet searches at once
+      - a mode switch keeps each mode's own query
+      - Bookmark query saves the box as a named search; a saved chip runs it, its × forgets it
+    states:
+      - "the header status counts the results, or says *Search is off* or *Some filters left out*"
+    links:
+      - to: search.off
+        via: no mode ready
+      - to: search.recent
+        via: an empty box
+      - to: search.filters
+        via: Filters or Display
+      - to: search.refine
+        via: Refine
+      - to: search.results
+        via: results
+      - to: search.keys
+        via: keyboard button
+      - to: archive.card
+        via: Emails on the PC
+      - to: settings.sheet
+        via: gear
+
+  - id: search.off
+    area: search
+    title: Search not set up
+    root: data-surface
+    reach:
+      - neither the folder index nor the email index is ready
+    holds:
+      - a sentence naming each reason
+      - Open Settings
+    links:
+      - to: settings.sheet
+        via: Open Settings
+
+  - id: search.recent
+    area: search
+    title: Recent searches
+    root: data-surface
+    reach:
+      - an empty search box in a mode that has recent queries
+    holds:
+      - a foldable Recent bar with the count and Clear
+      - each recent query, with a × to drop it
+    does:
+      - a recent query fills the box and searches; Clear empties the list for the mode; the bar folds it and the choice is kept
+    states:
+      - hidden while the box has text
+
+  - id: search.filters
+    area: search
+    title: Filters and display options
+    root: data-surface
+    reach:
+      - the Filters card beside the results (Emails), or Display (Folders)
+      - hidden in Documents
+    holds:
+      - "Emails: Date (Any, 30 days, This year, Range with After and Before), From, To, Cc, Subject or topic, Attachment name, In folder, Size, Has an attachment, Flagged only"
+      - "Folders: Hide leading levels (a stepper), One result per folder of people, Show OneDrive folders once"
+    does:
+      - every filter writes its operator into the box and the box searches, so the two never disagree
+      - the folder options save to config.json
+    phone: folded under a title row with an icon toggle
+    desktop: open beside the results
+
+  - id: search.refine
+    area: search
+    title: Refine
+    root: data-surface
+    reach:
+      - the Refine card (Emails only)
+    holds:
+      - facet chips for Sender, Folder, Year and Has (Attachments, Flagged), each with its count
+    does:
+      - a chip adds or removes its operator in the box
+    states:
+      - "*Nothing to refine yet.* when the results have no facets"
+    phone: folded
+    desktop: open
+
+  - id: search.results
+    area: search
+    title: Results
+    root: data-surface
+    reach:
+      - the results card under the box
+    holds:
+      - the count and, for Emails, a Best match / Newest sort
+      - one row per result (a mail, a folder or a document) as a listbox
+      - Show next results
+      - on a mouse, a keys line naming the shortcuts
+    does:
+      - a row selects it and shows its preview; on a phone it opens the sheet
+      - j and k move, Enter opens the preview sheet (see keys.search)
+    states:
+      - "a folder box with no text asks for part of a folder name"
+      - "no match says so, with Clear search"
+      - notes above the rows say what a filter left out or that a root needs a rescan
+    links:
+      - to: search.preview
+        via: a result
+      - to: doc.sheet
+        via: a Documents row on a phone, or View
+      - to: keys.search
+        via: keys line
+
+  - id: search.preview
+    area: search
+    title: Preview
+    root: data-surface
+    reach:
+      - the pane beside the results on a wide desktop
+      - a sheet over the tab on a phone or a narrow window
+    holds:
+      - "a mail: subject, flags, From, To, Cc, Date, Folder, Size, attachments, the indexed preview, Show all, then Open in Outlook, Show folder, Open folder, Copy path and Find in mailbox"
+      - "a folder: its name and path, Size, On disk, Files and Root or People, then Open in File Explorer, Show in Explore and Copy path"
+      - "a document: its name, folder, size and modified time, then View, Edit here, Open in new window, Show in Explore, Copy path and Open in default app"
+    does:
+      - "Show all reads the whole mail in a child process; an HTML mail draws in a sandboxed frame with a Light or Dark look button and a Load remote images switch (off by default)"
+      - the open actions work on the PC; elsewhere a line says so
+    states:
+      - "Show all: idle, loading, a read error with Try again for a timeout, or not set up"
+      - "an online-only mail says it downloads from OneDrive"
+      - "*Pick a result to preview it.* when nothing is selected"
+    why: the preview reads the index; only Show all opens a mail, one at a time
+    links:
+      - to: doc.sheet
+        via: View or Edit here
+      - to: doc.window
+        via: Open in new window
+      - to: explore.tab
+        via: Show in Explore or Show folder
+      - to: archive.sheet
+        via: the Archive card
+
+  - id: search.keys
+    area: search
+    title: Keyboard sheet
+    root: data-surface
+    reach:
+      - the keyboard button beside the mode switch (mouse only)
+    holds:
+      - the shortcut table for Search
+    does:
+      - closes with ×, Esc or a tap outside
+    links:
+      - to: keys.search
+        via: the table
+
+  - id: explore.tab
+    area: explore
+    title: Explore tab
+    root: data-surface
+    reach:
+      - nav, Explore
+      - a Scope pill, Show in Explore, Show folder, the shortlist's show button, or a root row on Scans
+    holds:
+      - the header
+      - the toolbar
+      - four summary cells (Total size or On disk, files and folders, online-only, On this PC)
+      - the folder tree and the selected folder's contents
+    does:
+      - a tree row selects its folder; the twisty opens or closes it
+    states:
+      - the tree and the contents load lazily, one folder at a time
+    desktop: the tree and the contents sit side by side from 1100px with a mouse
+    links:
+      - to: chrome.toolbar
+        via: toolbar
+      - to: explore.tree
+        via: Folders
+      - to: explore.contents
+        via: a folder
+      - to: explore.empty
+        via: no scan
+      - to: settings.sheet
+        via: gear
+
+  - id: explore.empty
+    area: explore
+    title: Explore with nothing to show
+    root: data-surface
+    reach:
+      - no root is set, a first scan is running, the root is not on this PC, or it has no scan yet
+    holds:
+      - a message, and Scan now when a scan can start
+    does:
+      - Scan now starts a scan of that root
+    links:
+      - to: scans.tab
+        via: a running scan
+
+  - id: explore.tree
+    area: explore
+    title: Folder tree
+    root: data-surface
+    reach:
+      - the Folders card in Explore
+    holds:
+      - a header with the file count and the column heads (Name, Share, Size, Files)
+      - one row per folder with a twisty, its size, files, share and a bar; a hidden folder carries a mark
+      - "*and N smaller folders* at the end of a level that has more"
+    does:
+      - a row selects the folder; the twisty expands it
+    links:
+      - to: explore.contents
+        via: a row
+
+  - id: explore.contents
+    area: explore
+    title: Folder contents
+    root: data-surface
+    reach:
+      - the pane beside the tree on a wide desktop
+      - a sheet that opens when a folder is chosen on a phone or a narrow window
+    holds:
+      - the folder's path, size and file count
+      - an In this folder / All nested files switch
+      - a Hidden items switch, when the scan can tell hidden items apart, and a note on what the sizes include
+      - column heads and one row per item (type, modified, share, size, a bar, an online-only cloud mark), each with a kebab
+    does:
+      - a folder row selects it; a document row opens in the viewer on a tap (touch) or a double-click
+      - Hidden items hides or shows hidden entries without changing the sizes
+    states:
+      - "*This folder is empty.* or *Nothing here matches the type filter.*"
+      - "*The N biggest of M items.* when the list is cut"
+      - the sheet closes by itself when the window grows to the wide band
+    links:
+      - to: explore.row-menu
+        via: a row's kebab
+      - to: doc.sheet
+        via: a Markdown or HTML row
+
+  - id: explore.row-menu
+    area: explore
+    title: Row menu
+    root: data-surface
+    reach:
+      - the kebab on a row in the contents (pane or sheet)
+    holds:
+      - "a folder: Open in File Explorer, Copy path"
+      - "a Markdown or HTML file (Documents on): View, Edit here, Open in new window, Open in default app, Show in File Explorer, Copy path"
+      - "any other file: Open, Edit, Show in File Explorer, Copy path"
+    does:
+      - the Windows actions run on the PC only and read nothing from the file
+      - Copy path works on every device
+    states:
+      - "off the PC a line at the top says *Opening files and folders works on the PC*"
+    links:
+      - to: doc.sheet
+        via: View or Edit here
+      - to: doc.window
+        via: Open in new window
+
+  - id: explore.sizes-info
+    area: explore
+    title: Size and On disk
+    root: data-surface
+    reach:
+      - the info button beside Totals by in the toolbar
+    holds:
+      - what Size and On disk mean, and that an online-only file takes no space until it is opened
+
+  - id: largest.tab
+    area: largest
+    title: Largest tab
+    root: data-surface
+    reach:
+      - nav, Largest
+    holds:
+      - the header and the toolbar
+      - a Cleanup shortlist row with its count and size
+      - Top 10 files for the selected folder, each with its rank, path, share, size and a bookmark
+      - Top percentile with a Top 1% / 5% / 10% switch, the share of the space they hold and where they are
+    does:
+      - the bookmark marks or unmarks a file for the shortlist
+    states:
+      - "*No files in this folder.* or *No files match the type filter.*"
+    links:
+      - to: chrome.toolbar
+        via: toolbar
+      - to: largest.shortlist
+        via: Cleanup shortlist
+      - to: largest.empty
+        via: no scan
+      - to: settings.sheet
+        via: gear
+
+  - id: largest.empty
+    area: largest
+    title: Largest with nothing to show
+    root: data-surface
+    reach:
+      - the same cases as explore.empty
+    holds:
+      - a message, and Scan now when a scan can start
+
+  - id: largest.shortlist
+    area: largest
+    title: Cleanup shortlist
+    root: data-surface
+    reach:
+      - the Cleanup shortlist row on Largest or on Types
+    holds:
+      - the count and total size
+      - one row per marked file with its folder, size, Show in Explore and Remove
+      - "*Marking a file only lists it here. Nothing is moved or deleted.*"
+    does:
+      - Show in Explore closes the sheet and opens the file's folder
+      - Remove takes the file off the list
+    states:
+      - "*Nothing on the shortlist yet.* when empty"
+      - a file the latest scan no longer has stays listed as gone
+    why: the list lives on the server so the phone and the PC share it, and it is a list only
+    links:
+      - to: explore.tab
+        via: Show in Explore
+
+  - id: types.tab
+    area: types
+    title: Types tab
+    root: data-surface
+    reach:
+      - nav, Types
+    holds:
+      - the header and the toolbar
+      - a Cleanup shortlist row
+      - By file type, with a share bar, a Filter types box and one row per extension (files, share, size)
+      - a filter line with Clear filter while a type is set
+    does:
+      - a type row sets the filter for every tab; tapping it again clears it
+    states:
+      - "*And N smaller types.* when the list is cut"
+    links:
+      - to: chrome.toolbar
+        via: toolbar
+      - to: largest.shortlist
+        via: Cleanup shortlist
+      - to: types.empty
+        via: no scan
+      - to: settings.sheet
+        via: gear
+
+  - id: types.empty
+    area: types
+    title: Types with nothing to show
+    root: data-surface
+    reach:
+      - the same cases as explore.empty
+    holds:
+      - a message, and Scan now when a scan can start
+
+  - id: scans.tab
+    area: scans
+    title: Scans tab
+    root: data-surface
+    reach:
+      - nav, Scans
+    holds:
+      - the header, whose status line says what is scanning or when the last scan finished
+      - Scan roots, with a help button and one row per root (its kind, status line and a refresh button)
+      - Rescan all roots
+      - the Email index card (Email block on)
+      - a line naming the roots being scanned
+    does:
+      - a root row opens that root in Explore; its refresh button rescans it
+      - the page polls every two seconds while a scan runs
+    states:
+      - "*Not scanned yet*, *Folder not found*, *Last scan failed* or *stopped early*, and *Cannot tell whether a scan is running* each in the attention tone"
+      - the buttons are disabled while a scan runs or its state is unknown
+    links:
+      - to: scans.info
+        via: help button
+      - to: scans.email
+        via: Email index
+      - to: explore.tab
+        via: a root row
+      - to: settings.sheet
+        via: gear
+
+  - id: scans.info
+    area: scans
+    title: How scanning works
+    root: data-surface
+    reach:
+      - the help button beside Scan roots
+    holds:
+      - how a scan reads folder listings only, replaces the index when it finishes and never follows links
+
+  - id: scans.email
+    area: scans
+    title: Email index card
+    root: data-surface
+    reach:
+      - the Email index card on Scans (Email block on)
+    holds:
+      - the indexed count
+      - stat cells for Indexed, New or changed, Downloaded, Waiting for budget and Failed reads
+      - a note on what is set up
+      - an Email folder select with Index this folder, and Index emails now
+      - Recent runs, with a progress bar and counts for a live run
+    does:
+      - Failed reads opens the list of failed files
+      - the card polls while an index run is going
+    states:
+      - "*No email folders yet*, *Not set up here*, *Indexing is off here* and *Cannot tell whether an index run is going* disable the buttons and say why"
+      - "*No runs yet.* before the first run"
+    links:
+      - to: scans.email-info
+        via: help button
+      - to: scans.failures
+        via: Failed reads
+
+  - id: scans.email-info
+    area: scans
+    title: What the email stage reads
+    root: data-surface
+    reach:
+      - the help button on the Email index card
+    holds:
+      - which files the stage reads, that an online-only file is downloaded, that files are opened read-only and that a failed file is not read again until it changes
+
+  - id: scans.failures
+    area: scans
+    title: Failed reads
+    root: data-surface
+    reach:
+      - the Failed reads cell of the Email index card
+    holds:
+      - the newest failed files with each reason, and how many there are in all
+    states:
+      - "*No failed reads.*"
+
+  - id: doc.sheet
+    area: doc
+    title: Document sheet
+    root: data-surface
+    reach:
+      - View or Edit here from the Search preview or an Explore row menu
+      - a tap on a Markdown or HTML row on a touch screen, or a double-click
+      - a dropped file inside the app
+    holds:
+      - a header with Back, the file's name, an outline button, Save (in Edit), Open in new window and ×
+      - a View / Edit switch and the file's place
+      - the document, or the editor
+    does:
+      - a relative link to another scanned document opens in the same sheet, and Back returns
+      - an HTML page draws in a frame sandboxed without allow-same-origin
+      - Esc in Edit goes back to View; closing with unsaved changes asks first
+    states:
+      - "a dropped file the scan does not have is shown read-only with a note"
+      - a state block when it cannot show (see doc.state)
+    why: the sheet never sends a path; every document is named by root, scan id and item id
+    links:
+      - to: doc.outline
+        via: outline button
+      - to: doc.editor
+        via: Edit
+      - to: doc.state
+        via: a refusal
+      - to: doc.confirm
+        via: closing with unsaved changes
+      - to: doc.window
+        via: Open in new window
+
+  - id: doc.outline
+    area: doc
+    title: Outline popover
+    root: data-surface
+    reach:
+      - the outline button in the document sheet's header, when the document has headings
+    holds:
+      - the document's headings as in-page links, indented by level
+    does:
+      - a heading scrolls the document to it and closes the popover
+    states:
+      - "*No headings*"
+
+  - id: doc.state
+    area: doc
+    title: Why a document can't show
+    root:
+      none: a block drawn inside the document sheet or window in place of the document
+    reach:
+      - the file is cloud-only, too large, moved, gone, not a Markdown or HTML file, not UTF-8, unreadable, the scan was renumbered, or the connection is down
+    holds:
+      - the refusal's sentence and a line saying what to do
+      - one action where one helps (Download and open, Open Explore or Reload)
+    does:
+      - "Download and open is the one tap that brings a cloud-only file to the PC"
+    why: a cloud-only file is never opened without that tap, so nothing hydrates by accident
+    links:
+      - to: explore.tab
+        via: Open Explore
+
+  - id: doc.editor
+    area: doc
+    title: Document editor
+    root: data-surface
+    reach:
+      - Edit in the document sheet or window, or Edit here
+    holds:
+      - a Write / Preview switch (a narrow window), a formatting toolbar for Markdown, a status line and Discard
+      - the source, with a live preview beside it on a wide desktop
+      - a row of Markdown keys above the keyboard on a phone
+    does:
+      - Save, or Ctrl+S, writes the file after checking it has not changed on disk
+      - the draft stays on this device until it is saved or discarded
+    states:
+      - an HTML file is plain source with a framed preview and no Markdown tools
+      - a file over 1 MB, not UTF-8 or not editable opens read-only
+    links:
+      - to: doc.conflict
+        via: Save on a changed file
+      - to: doc.confirm
+        via: Discard
+
+  - id: doc.conflict
+    area: doc
+    title: Changed on disk
+    root: data-surface
+    reach:
+      - Save when the file changed on disk since the editor opened it
+    holds:
+      - "*Changed on disk since you opened it* and that the text is not lost"
+      - Compare, Copy my text, Load theirs and Overwrite theirs…
+      - a line diff of the two copies after Compare
+    does:
+      - Overwrite theirs… asks first and keeps the replaced copy as a backup in the app's data folder
+    links:
+      - to: doc.confirm
+        via: Overwrite theirs…
+
+  - id: doc.confirm
+    area: doc
+    title: Confirm sheet
+    root: data-surface
+    reach:
+      - leaving the editor with unsaved changes (Discard, Keep draft or Save)
+      - Discard in the editor (*Discard your changes?*)
+      - Overwrite theirs… on the conflict screen (*Overwrite the copy on disk?*)
+    holds:
+      - one question, its choices and ×
+    does:
+      - × or a tap outside backs out and changes nothing
+    why: it is built on demand and opens above an open sheet, so the sheet and the window share one copy
+
+  - id: doc.window
+    area: doc
+    title: Document window
+    root: data-surface
+    reach:
+      - Open in new window from the sheet, an Explore row menu or the Search preview
+      - "`/doc?root=…&scan=…&id=…`, a bookmark or the Markdown Open with handler"
+      - a dropped file opened from the app
+    holds:
+      - the header (the file's name, its folder, an outline button, Save, the theme toggle)
+      - a View / Edit switch
+      - the document or the editor, with the outline and recent documents beside it
+    does:
+      - the nav leads back into the app on a tab, asking first when there are unsaved changes
+      - Esc in Edit goes back to View
+    states:
+      - a dropped file shows read-only with no address of its own and hides the mode switch
+      - an address that names no document says so
+      - the browser asks before the window closes with unsaved changes
+    desktop: the outline sits beside the text from 1100px with a mouse; elsewhere it is a popover under the header
+    links:
+      - to: doc.nav
+        via: nav
+      - to: doc.side
+        via: outline and recent
+      - to: doc.editor
+        via: Edit
+      - to: doc.state
+        via: a refusal
+      - to: doc.confirm
+        via: leaving with unsaved changes
+
+  - id: doc.nav
+    area: doc
+    title: Nav in the document window
+    root: data-surface
+    reach:
+      - the top of the document window
+    holds:
+      - the five tabs, none selected
+    does:
+      - a tab opens the app on that tab
+    links:
+      - to: search.tab
+        via: Search
+      - to: explore.tab
+        via: Explore
+
+  - id: doc.side
+    area: doc
+    title: Outline and recent documents
+    root: data-surface
+    reach:
+      - the sidebar of the document window (a popover under the header on a narrow window)
+    holds:
+      - the outline, when the document has headings
+      - Recent, the documents opened last, which the server shares across windows and devices
+    does:
+      - a recent document opens in this window
+
+  - id: archive.card
+    area: archive
+    title: Archive card
+    root: data-surface
+    reach:
+      - Search, Emails mode, on the PC with the Outlook archive block on
+    holds:
+      - an Archive the open mail row with a line saying what it archives
+    does:
+      - opens the Archive sheet on the mail open or selected in Outlook (classic)
+    states:
+      - the line names why it is not ready, in the attention tone, and the row is disabled
+      - after filing it says where the last mail went
+    links:
+      - to: archive.sheet
+        via: the row
+
+  - id: archive.sheet
+    area: archive
+    title: Archive sheet
+    root: data-surface
+    reach:
+      - the Archive card
+      - the Archive button in Outlook, which hands the mail over while the page is visible
+    holds:
+      - the mail (subject, sender, date, attachments, a foldable preview)
+      - "Already archived as … with an Archive a copy anyway switch, when it is"
+      - Suggested folders, each with a score, the reasons and an Open in File Explorer button, and an info line on how they are ranked
+      - a Find a folder box with its results, a step into subfolders, Archive here and Open in File Explorer
+      - Current Explorer folder
+      - the Outlook category, a Date prefix choice and the name it would save as
+      - a footer line about the Outlook macro
+      - the Archive to … button
+    does:
+      - filing saves the mail into the chosen folder, closes the sheet and toasts where it went
+    states:
+      - "*Couldn't open the mail*, with Try again unless the macro opened it"
+      - "*Finding folders…* while the ranking runs, or *No folder matches this mail yet.*"
+      - a folder outside the email folders cannot be filed to
+      - the button says Archiving… while it works and Pick a folder with no choice
+    links:
+      - to: archive.macro
+        via: the macro info button
+
+  - id: archive.macro
+    area: archive
+    title: Outlook macro sheet
+    root: data-surface
+    reach:
+      - Settings, Outlook macro
+      - the macro info button on the Archive sheet
+    holds:
+      - what the Archive button in Outlook does
+      - a Prefer the window over the web app switch
+      - four numbered steps (set the folder, import the macro, add it to the ribbon, restart Outlook), each with its command or text in a copyable listing
+    does:
+      - Copy copies a listing
+    states:
+      - on another device the first step says to open the sheet on the PC itself
+
+  - id: settings.sheet
+    area: settings
+    title: Settings sheet
+    root: data-surface
+    reach:
+      - the gear in any tab's header
+    holds:
+      - the first-run card, when there is no config.json
+      - the groups Display, Available features, Scanning, Email, Outlook archive, Files and documents, Tray and screenshot and Remote access
+    does:
+      - closes with ×, Esc or a tap outside
+    links:
+      - to: settings.setup
+        via: no config.json
+      - to: settings.display
+        via: Display
+      - to: settings.features
+        via: Available features
+      - to: settings.scanning
+        via: Scanning
+      - to: settings.email
+        via: Email
+      - to: settings.outlook-group
+        via: Outlook archive
+      - to: settings.files
+        via: Files and documents
+      - to: settings.tray
+        via: Tray and screenshot
+      - to: settings.remote-group
+        via: Remote access
+
+  - id: settings.setup
+    area: settings
+    title: Set up folder-explorer
+    root: data-surface
+    reach:
+      - the top of the Settings sheet while there is no config.json
+    holds:
+      - a note that the built-in defaults are in use
+      - Create config.json
+    does:
+      - creates config.json from config.example.json and never overwrites an existing one
+
+  - id: settings.display
+    area: settings
+    title: Display group
+    root: data-surface
+    holds:
+      - Text size, Small, Default or Large
+      - Totals by, the default basis, Size or On disk
+    does:
+      - each applies at once; text size is kept on this device, the basis in config.json
+
+  - id: settings.features
+    area: settings
+    title: Available features group
+    root: data-surface
+    holds:
+      - a switch each for Email, Outlook archive, Documents and Screenshot, with what each does and why one is not available here
+      - a footnote on how a block that is off behaves
+    does:
+      - a block that is off hides its screens, stops its background work and skips its calls, with no restart
+
+  - id: settings.scanning
+    area: settings
+    title: Scanning group
+    root: data-surface
+    holds:
+      - Scan schedule, Folders to scan and Skipped folders, each showing its value and opening a sheet
+      - Index on this PC, the disk space the indexes use
+    links:
+      - to: settings.schedule
+        via: Scan schedule
+      - to: settings.roots
+        via: Folders to scan
+      - to: settings.exclude
+        via: Skipped folders
+
+  - id: settings.email
+    area: settings
+    title: Email group
+    root: data-surface
+    reach:
+      - the Settings sheet, Email block on
+    holds:
+      - Email folders, Left out of the index and Mail downloads, each showing its value and opening a sheet
+    links:
+      - to: settings.email-roots
+        via: Email folders
+      - to: settings.email-exclude
+        via: Left out of the index
+      - to: settings.budget
+        via: Mail downloads
+
+  - id: settings.outlook-group
+    area: settings
+    title: Outlook archive group
+    root: data-surface
+    reach:
+      - the Settings sheet, Outlook archive block on
+    holds:
+      - Outlook archiving, showing Category and Move when they are on
+      - Outlook macro, showing Ready or Not ready
+    links:
+      - to: settings.outlook
+        via: Outlook archiving
+      - to: archive.macro
+        via: Outlook macro
+
+  - id: settings.files
+    area: settings
+    title: Files and documents group
+    root: data-surface
+    holds:
+      - Documents search and Remote content, with the Documents block on
+      - Explorer window
+      - Markdown files, on the PC only and with the Documents block on
+    links:
+      - to: settings.markdown-search
+        via: Documents search
+      - to: settings.remote-html
+        via: Remote content
+      - to: settings.explorer-window
+        via: Explorer window
+      - to: settings.md-assoc
+        via: Markdown files
+
+  - id: settings.tray
+    area: settings
+    title: Tray and screenshot group
+    root: data-surface
+    holds:
+      - Tray click, showing Quick search or Open app
+      - Screenshot, showing the hotkey, with the Screenshot block on
+    links:
+      - to: settings.tray-click
+        via: Tray click
+      - to: settings.screenshot
+        via: Screenshot
+
+  - id: settings.remote-group
+    area: settings
+    title: Remote access group
+    root: data-surface
+    holds:
+      - Remote access, showing On or Off
+    links:
+      - to: settings.remote
+        via: Remote access
+
+  - id: settings.setting
+    area: settings
+    title: Setting sheet
+    root: data-surface
+    reach:
+      - any Settings row that holds a choice
+    holds:
+      - the one setting's control and note (see the entries below), under its own title
+    does:
+      - closes with ×, Esc or a tap outside, and the Settings sheet is under it
+
+  - id: settings.schedule
+    area: settings
+    title: Scan schedule
+    root: data-surface
+    reach:
+      - Settings, Scanning, Scan schedule
+    holds:
+      - Schedule, Off, Every night or Every hour
+      - Nightly scan time, for Every night
+      - a note
+    does:
+      - saves as it changes
+
+  - id: settings.roots
+    area: settings
+    title: Folders to scan
+    root: data-surface
+    reach:
+      - Settings, Scanning, Folders to scan
+    holds:
+      - an All drives and OneDrive switch
+      - the folder list, when it is off, with its add field
+      - a note
+    does:
+      - the list adds a path and saves at once; a row's kebab removes it
+    links:
+      - to: settings.folder-menu
+        via: a row's kebab
+
+  - id: settings.exclude
+    area: settings
+    title: Skipped folders
+    root: data-surface
+    reach:
+      - Settings, Scanning, Skipped folders
+    holds:
+      - the folders the disk scan, the folder search and the email index all leave out, with an add field
+    links:
+      - to: settings.folder-menu
+        via: a row's kebab
+
+  - id: settings.email-roots
+    area: settings
+    title: Email folders
+    root: data-surface
+    reach:
+      - Settings, Email, Email folders
+    holds:
+      - the folders whose .msg files the email index reads, with an add field
+    links:
+      - to: settings.folder-menu
+        via: a row's kebab
+
+  - id: settings.email-exclude
+    area: settings
+    title: Left out of the email index
+    root: data-surface
+    reach:
+      - Settings, Email, Left out of the index
+    holds:
+      - the folders inside an email folder that only the email index skips, with an add field
+    links:
+      - to: settings.folder-menu
+        via: a row's kebab
+
+  - id: settings.budget
+    area: settings
+    title: Mail downloads per run
+    root: data-surface
+    reach:
+      - Settings, Email, Mail downloads
+    holds:
+      - Download limit, No limit, None (local only), 512 MB, 2 GB or 5 GB
+      - a note on what a run does at the limit
+
+  - id: settings.outlook
+    area: settings
+    title: Outlook archiving
+    root: data-surface
+    reach:
+      - Settings, Outlook archive, Outlook archiving
+    holds:
+      - an Outlook category switch and its note
+      - a Move to archive folder switch and its note
+      - a closing note
+
+  - id: settings.markdown-search
+    area: settings
+    title: Documents search
+    root: data-surface
+    reach:
+      - Settings, Files and documents, Documents search
+    holds:
+      - a Documents search switch and its note
+
+  - id: settings.remote-html
+    area: settings
+    title: Block remote content in HTML
+    root: data-surface
+    reach:
+      - Settings, Files and documents, Remote content
+    holds:
+      - a Block remote content switch and its note
+
+  - id: settings.explorer-window
+    area: settings
+    title: Reuse an open Explorer window
+    root: data-surface
+    reach:
+      - Settings, Files and documents, Explorer window
+    holds:
+      - a Reuse an open window switch and its note
+
+  - id: settings.md-assoc
+    area: settings
+    title: Associate Markdown files with this app
+    root: data-surface
+    reach:
+      - Settings, Files and documents, Markdown files (the PC only)
+    holds:
+      - an Open with this app switch and a note saying what the registry holds
+    states:
+      - the row is hidden off the PC
+      - the switch is disabled when the state cannot be read, and the note says so
+
+  - id: settings.tray-click
+    area: settings
+    title: Tray click opens Quick search
+    root: data-surface
+    reach:
+      - Settings, Tray and screenshot, Tray click
+    holds:
+      - an Opens Quick search switch and its note
+
+  - id: settings.screenshot
+    area: settings
+    title: Screenshot
+    root: data-surface
+    reach:
+      - Settings, Tray and screenshot, Screenshot (Screenshot block on)
+    holds:
+      - Hold to capture, Copy to clipboard and Show loupe switches
+      - JPEG quality, File prefix and Hotkey
+      - Save folder, with Open folder on the PC
+      - a note under each
+    does:
+      - every setting applies from the next capture, except the hotkey, which applies when the tray next starts
+      - the save folder is changed from the tray menu or config.json, never from this page
+
+  - id: settings.remote
+    area: settings
+    title: Remote access
+    root: data-surface
+    reach:
+      - Settings, Remote access
+    holds:
+      - a Remote access switch and a note on the address and sign-in it opens
+
+  - id: settings.folder-menu
+    area: settings
+    title: Folder row menu
+    root: data-surface
+    reach:
+      - the kebab on a row of any folder list
+    holds:
+      - Remove
+    does:
+      - Remove asks first
+    links:
+      - to: settings.folder-remove
+        via: Remove
+
+  - id: settings.folder-remove
+    area: settings
+    title: Remove this folder?
+    root: data-surface
+    reach:
+      - Remove in a folder list's row menu
+    holds:
+      - the folder's path
+      - "*Only the list changes: the folder and everything in it stay on disk.*"
+      - Remove
+    does:
+      - × or a tap outside backs out and changes nothing
+
+  - id: keys.search
+    area: keys
+    title: Search keys
+    root:
+      none: keyboard paths on the Search tab, with no element of their own; the keyboard sheet lists them
+    reach:
+      - the Search tab, with focus outside a field and no sheet open
+    holds:
+      - "/ goes to the search box; the down arrow moves from the box into the results"
+      - "j and k move between results; Enter opens the preview sheet"
+      - "a shows all of a mail; o opens it in Outlook (this PC); e opens the folder in File Explorer (this PC); f shows the folder in Explore; c copies the path"
+      - Esc goes back to the search box
+    states:
+      - "Documents: e opens in the default app (this PC); Folders: e opens in File Explorer (this PC)"
+
+  - id: keys.doc
+    area: keys
+    title: Document keys
+    root:
+      none: keyboard paths in the viewer and editor, with no element of their own
+    reach:
+      - the document sheet and window
+    holds:
+      - Esc in Edit goes back to View
+      - Ctrl+S or Cmd+S saves the editor
+    links:
+      - to: doc.editor
+        via: Edit
+
+  - id: keys.double-click
+    area: keys
+    title: Open a row
+    root:
+      none: a gesture on Explore's contents rows, with no element of its own
+    reach:
+      - a double-click on a row (a mouse), a tap on a Markdown or HTML row (touch)
+    holds:
+      - a folder row opens in File Explorer and a file in its default app, on the PC only
+      - a Markdown or HTML row opens in the document sheet on every device
+    links:
+      - to: doc.sheet
+        via: a Markdown or HTML row
+
+  - id: keys.drop-file
+    area: keys
+    title: Drop a file
+    root:
+      none: a gesture on the window; the overlay it shows is chrome.drop-overlay
+    reach:
+      - dragging a Markdown or HTML file onto the app window or the document window
+    holds:
+      - a file the scan has opens as an indexed document, with Edit
+      - any other opens read-only from the text the page read, with a note saying why
+      - anything else is refused with a toast
+    links:
+      - to: chrome.drop-overlay
+        via: the drag
+      - to: doc.window
+        via: the drop

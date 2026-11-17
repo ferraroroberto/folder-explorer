@@ -57,7 +57,7 @@
 </head>
 <body>
 <!--include parts/icon-sprite.html-->
-<nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="search">
+<nav class="tabs" role="tablist" aria-label="Sections" data-active-tab="search" data-surface="chrome.nav">
   <button id="tabSearch" type="button" class="tab active" data-tab="search" role="tab" aria-selected="true" aria-controls="paneSearch" data-track="tab-search">
     <svg class="tab-icon" aria-hidden="true" focusable="false"><use href="#i-search"></use></svg>
     <span class="tab-label">Search</span>
@@ -81,7 +81,7 @@
 </nav>
 
 <main class="app">
-  <section id="paneSearch" class="pane" role="tabpanel" aria-labelledby="tabSearch" aria-label="Search">
+  <section id="paneSearch" class="pane" role="tabpanel" aria-labelledby="tabSearch" aria-label="Search" data-surface="search.tab">
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -95,7 +95,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
       </button>
     </div>
-    <div class="card search-off" id="searchOff" hidden>
+    <div class="card search-off" id="searchOff" data-surface="search.off" hidden>
       <div class="empty-state">
         <svg class="icon empty-state-icon" aria-hidden="true"><use href="#i-search"></use></svg>
         <p class="empty-state-message" id="searchOffText"></p>
@@ -121,11 +121,11 @@
         </label>
         <div class="query-chips" id="queryChips" aria-label="Active filters"></div>
         <div class="saved-row" id="savedRow"></div>
-        <div class="recent-list" id="recentList" hidden></div>
+        <div class="recent-list" id="recentList" data-surface="search.recent" hidden></div>
       </div>
 
       <aside class="search-side">
-        <div class="card action-list outlook-card" id="outlookCard" data-feature="archive" hidden>
+        <div class="card action-list outlook-card" id="outlookCard" data-surface="archive.card" data-feature="archive" hidden>
           <ul class="action-rows">
             <li class="action-row">
               <button type="button" class="action-row-main" id="openArchive" aria-haspopup="dialog" data-track="archive-open">
@@ -139,17 +139,17 @@
             </li>
           </ul>
         </div>
-        <div class="card card--collapsible side-card" id="filtersCard">
+        <div class="card card--collapsible side-card" id="filtersCard" data-surface="search.filters">
           <div class="side-head"><span class="card-title" id="filtersTitle">Filters</span><span class="summary-meta" id="filtersMeta"></span><button type="button" class="icon-button side-toggle-icon" id="filtersToggle" aria-expanded="false" aria-controls="filtersBody" aria-label="Show filters" data-track="filters-toggle"><svg class="icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg></button></div>
           <div class="side-body" id="filtersBody" hidden></div>
         </div>
-        <div class="card card--collapsible side-card" id="facetsCard">
+        <div class="card card--collapsible side-card" id="facetsCard" data-surface="search.refine">
           <button type="button" class="side-toggle" aria-expanded="false" aria-controls="facetsBody" data-track="facets-toggle"><span class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Refine</span><span class="summary-meta" id="facetsMeta"></span><svg class="icon summary-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
           <div class="side-body" id="facetsBody" hidden></div>
         </div>
       </aside>
 
-      <div class="card results-card">
+      <div class="card results-card" data-surface="search.results">
         <div class="card-head">
           <h2 class="card-title" id="resultsTitle"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</h2>
           <span class="card-head-meta num" id="resultsMeta"></span>
@@ -159,11 +159,12 @@
         <p class="keys-line kbd-only" id="keysLine"></p>
       </div>
 
-      <div class="card preview-card" id="previewDock" aria-live="polite"></div>
+      <!-- duplicate-surface-exempt: the wide desktop's pane for the one preview surface a phone gets as #previewDialog below -->
+      <div class="card preview-card" id="previewDock" data-surface="search.preview" aria-live="polite"></div>
     </div>
   </section>
 
-  <section id="paneExplore" class="pane" role="tabpanel" aria-labelledby="tabExplore" aria-label="Explore" hidden>
+  <section id="paneExplore" class="pane" role="tabpanel" aria-labelledby="tabExplore" aria-label="Explore" data-surface="explore.tab" hidden>
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>
@@ -177,7 +178,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>
       </button>
     </div>
-    <div class="card toolbar" id="toolbar">
+    <div class="card toolbar" id="toolbar" data-surface="chrome.toolbar">
       <label class="tb-field">
         <span class="tb-label">Root</span>
         <select class="select-native" id="rootSelect" data-track="root-select" aria-label="Scan root"></select>
@@ -206,7 +207,7 @@
     <div class="pane-body">
       <div class="summary" id="summary"></div>
       <div class="explore-split">
-        <div class="card tree-card">
+        <div class="card tree-card" data-surface="explore.tree">
           <div class="card-head">
             <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Folders</h2>
             <span class="card-head-meta" id="treeMeta"></span>
@@ -214,13 +215,14 @@
           <div class="col-head tree-cols" aria-hidden="true"><span>Name</span><span></span><span>Share</span><span>Size</span><span>Files</span></div>
           <ul class="tree" id="tree"></ul>
         </div>
-        <div class="card contents-card" id="contentsDock"></div>
+        <!-- duplicate-surface-exempt: the wide desktop's pane for the one contents surface a phone gets as #contentsDialog below -->
+        <div class="card contents-card" id="contentsDock" data-surface="explore.contents"></div>
       </div>
     </div>
-    <div class="pane-empty" hidden></div>
+    <div class="pane-empty" data-surface="explore.empty" hidden></div>
   </section>
 
-  <section id="paneLargest" class="pane" role="tabpanel" aria-labelledby="tabLargest" aria-label="Largest" hidden>
+  <section id="paneLargest" class="pane" role="tabpanel" aria-labelledby="tabLargest" aria-label="Largest" data-surface="largest.tab" hidden>
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-crown"></use></svg>
@@ -267,10 +269,10 @@
         <div id="pctBody"></div>
       </div>
     </div>
-    <div class="pane-empty" hidden></div>
+    <div class="pane-empty" data-surface="largest.empty" hidden></div>
   </section>
 
-  <section id="paneTypes" class="pane" role="tabpanel" aria-labelledby="tabTypes" aria-label="Types" hidden>
+  <section id="paneTypes" class="pane" role="tabpanel" aria-labelledby="tabTypes" aria-label="Types" data-surface="types.tab" hidden>
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-layout-grid"></use></svg>
@@ -310,10 +312,10 @@
         <ul class="rows" id="typesList"></ul>
       </div>
     </div>
-    <div class="pane-empty" hidden></div>
+    <div class="pane-empty" data-surface="types.empty" hidden></div>
   </section>
 
-  <section id="paneScans" class="pane" role="tabpanel" aria-labelledby="tabScans" aria-label="Scans" hidden>
+  <section id="paneScans" class="pane" role="tabpanel" aria-labelledby="tabScans" aria-label="Scans" data-surface="scans.tab" hidden>
     <div class="card home-head">
       <span class="home-title">
         <svg class="icon" aria-hidden="true"><use href="#i-refresh-cw"></use></svg>
@@ -339,7 +341,7 @@
         <button type="button" class="button-tint" id="rescanAll" data-track="rescan-all">Rescan all roots</button>
       </div>
     </div>
-    <div class="card" id="emailCard" data-feature="email" hidden>
+    <div class="card" id="emailCard" data-surface="scans.email" data-feature="email" hidden>
       <div class="card-head">
         <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Email index</h2>
         <span class="card-head-meta" id="emailMeta"></span>
@@ -362,12 +364,13 @@
     <p class="scans-note" id="scansNote"></p>
   </section>
 
-  <footer class="page-foot">
+  <footer class="page-foot" data-surface="chrome.footer">
     <p id="buildReadout"></p>
   </footer>
 </main>
 
-<dialog class="detail-dialog wide-dialog" id="previewDialog" data-track-view="preview-sheet">
+<!-- duplicate-surface-exempt: the phone's sheet for the one preview surface a wide desktop gets as #previewDock above -->
+<dialog class="detail-dialog wide-dialog" id="previewDialog" data-surface="search.preview" data-track-view="preview-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1" id="previewDialogTitle">Email</h2>
@@ -379,7 +382,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog wide-dialog" id="archiveDialog" data-track-view="archive-sheet">
+<dialog class="detail-dialog wide-dialog" id="archiveDialog" data-surface="archive.sheet" data-track-view="archive-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Archive mail</h2>
@@ -392,7 +395,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog wide-dialog" id="macroDialog" data-track-view="macro-sheet">
+<dialog class="detail-dialog wide-dialog" id="macroDialog" data-surface="archive.macro" data-track-view="macro-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Outlook macro</h2>
@@ -460,7 +463,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="keysDialog" data-track-view="keys-sheet">
+<dialog class="detail-dialog" id="keysDialog" data-surface="search.keys" data-track-view="keys-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Keyboard</h2>
@@ -483,7 +486,8 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog contents-dialog" id="contentsDialog" data-track-view="contents-sheet">
+<!-- duplicate-surface-exempt: the phone's sheet for the one contents surface a wide desktop gets as #contentsDock above -->
+<dialog class="detail-dialog contents-dialog" id="contentsDialog" data-surface="explore.contents" data-track-view="contents-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1" id="contentsDialogTitle">Folder</h2>
@@ -495,7 +499,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog doc-dialog" id="docDialog" data-track-view="doc-sheet" aria-labelledby="docDialogTitle">
+<dialog class="detail-dialog doc-dialog" id="docDialog" data-surface="doc.sheet" data-track-view="doc-sheet" aria-labelledby="docDialogTitle">
   <div class="detail-card doc-card">
     <div class="detail-header doc-header">
       <button type="button" class="icon-button doc-tool" id="docBack" aria-label="Back to the previous document" title="Back" data-track="doc-back" hidden>
@@ -520,14 +524,14 @@
       </div>
       <p class="doc-where" id="docWhere"></p>
     </div>
-    <div class="doc-outline-pop" id="docOutline" hidden></div>
+    <div class="doc-outline-pop" id="docOutline" data-surface="doc.outline" hidden></div>
     <div class="doc-scroll" id="docSheetBody"></div>
   </div>
 </dialog>
 
 <!--include parts/settings-dialogs.html-->
 
-<dialog class="detail-dialog" id="folderRemoveDialog" data-track-view="folder-remove-sheet">
+<dialog class="detail-dialog" id="folderRemoveDialog" data-surface="settings.folder-remove" data-track-view="folder-remove-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Remove this folder?</h2>
@@ -545,7 +549,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="emailInfoDialog" data-track-view="email-info-sheet">
+<dialog class="detail-dialog" id="emailInfoDialog" data-surface="scans.email-info" data-track-view="email-info-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">What the email stage reads</h2>
@@ -562,7 +566,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog contents-dialog" id="shortlistDialog" data-track-view="shortlist-sheet">
+<dialog class="detail-dialog contents-dialog" id="shortlistDialog" data-surface="largest.shortlist" data-track-view="shortlist-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Cleanup shortlist</h2>
@@ -576,7 +580,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog wide-dialog" id="failuresDialog" data-track-view="failures-sheet">
+<dialog class="detail-dialog wide-dialog" id="failuresDialog" data-surface="scans.failures" data-track-view="failures-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Failed reads</h2>
@@ -588,7 +592,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="infoDialog" data-track-view="sizes-sheet">
+<dialog class="detail-dialog" id="infoDialog" data-surface="explore.sizes-info" data-track-view="sizes-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">Size and On disk</h2>
@@ -604,7 +608,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="scanInfoDialog" data-track-view="scan-info-sheet">
+<dialog class="detail-dialog" id="scanInfoDialog" data-surface="scans.info" data-track-view="scan-info-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1">How scanning works</h2>

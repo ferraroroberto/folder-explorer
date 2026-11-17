@@ -13,8 +13,8 @@ from urllib.parse import urlencode
 
 from playwright.sync_api import Page, Route, expect
 
-from tests.e2e._geometry import assert_no_overlap
 from tests.e2e._filters import choose_root
+from tests.e2e._geometry import assert_no_overlap
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.fixture_tree import DOCS_FOLDER
 

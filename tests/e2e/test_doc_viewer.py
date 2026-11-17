@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._geometry import assert_no_overlap
+from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.fixture_tree import DOCS_FOLDER
 
@@ -52,8 +53,7 @@ def test_a_markdown_row_opens_in_the_document_sheet(page: Page, app_url: str, br
     errors = _errors(page)
     page.goto(app_url + "/")
     page.locator('.tab[data-tab="explore"]').click()
-    media = page.eval_on_selector("#rootSelect", "s => [...s.options].find(o => o.text.startsWith('Media disk')).value")
-    page.locator("#rootSelect").select_option(media)
+    choose_root(page, "Media disk")
     page.locator(".tree-main", has_text=DOCS_FOLDER).click()
     rows = page.locator("#contentsDialog" if browser_name == "webkit" else "#contentsDock")
     guide = rows.locator(".list-row", has_text="guide.md")
@@ -188,8 +188,7 @@ def test_search_lists_every_document_and_a_row_opens_the_viewer(page: Page, app_
     expect(rows.filter(has_text="watering.md").locator(".rr-snip")).to_contain_text(DOCS_FOLDER + " › sub")
     expect(rows.filter(has_text="journal.md").locator(".chip")).to_have_text("Online-only")
     expect(rows.filter(has_text="guide.md").locator(".chip")).to_have_count(0)
-    expect(page.locator("#facetsCard")).to_be_hidden()
-    expect(page.locator("#filtersCard")).to_be_hidden()
+    expect(page.locator("#searchFiltersOpen")).to_be_hidden()
     assert page.evaluate("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")
 
     def clean() -> None:

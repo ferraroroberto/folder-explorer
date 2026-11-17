@@ -26,7 +26,7 @@ kbd {
   line-height: 1;
 }
 @media (pointer: coarse), (max-width: 699px) { .kbd-only { display: none !important; } }
-.search-layout[hidden], .search-off[hidden], .recent-list[hidden], .ff-pair[hidden], .side-card[hidden], #modeSeg[hidden], #modeSeg .segmented-item[hidden] { display: none; }
+.search-layout[hidden], .search-off[hidden], .recent-list[hidden], .ff-pair[hidden], #modeSeg[hidden], #modeSeg .segmented-item[hidden] { display: none; }
 .wide-dialog { width: min(640px, 92vw); }
 .chip.tone-attention { background: color-mix(in srgb, var(--attention) 16%, transparent); color: var(--attention-text); }
 .chip.tone-danger { background: color-mix(in srgb, var(--deficit) 16%, transparent); color: var(--danger-text); }
@@ -41,6 +41,8 @@ kbd {
 .search-modes { display: flex; align-items: center; gap: var(--space-md); }
 .search-modes .segmented { flex: 1; max-width: 320px; }
 .search-modes .icon-button { margin-left: auto; }
+.search-bar { display: flex; align-items: center; gap: var(--space-sm); }
+.search-bar .search-field { flex: 1 1 auto; min-width: 0; }
 .search-field {
   display: flex;
   align-items: center;
@@ -147,33 +149,16 @@ kbd {
 .recent-count { font-weight: 400; font-variant-numeric: tabular-nums; }
 .recent-head[aria-expanded="true"] .summary-chevron { transform: rotate(90deg); }
 
-/* ---------------------------------------------- collapsible side cards */
-.card--collapsible { padding: 0; }
-.side-toggle {
-  font: inherit;
-  line-height: normal;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-height: var(--row-md);
-  padding: 0 14px;
-  list-style: none;
-  cursor: pointer;
-}
-.side-toggle[aria-expanded="true"] { border-bottom: 1px solid var(--line-muted); }
-.side-body[hidden] { display: none; }
-.summary-meta { margin-left: auto; color: var(--muted); font-size: var(--font-body-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ------------------------------------------------------- Filters & sort sheet */
 .summary-chevron { width: var(--icon-inline); height: var(--icon-inline); color: var(--muted); transition: transform 0.15s ease; }
-.side-toggle[aria-expanded="true"] .summary-chevron { transform: rotate(90deg); }
-/* The Filters card opens from its glyph-only icon-button, with the title and the active count beside it. */
-.side-head { display: flex; align-items: center; gap: var(--space-sm); min-height: var(--row-md); padding: 0 6px 0 14px; }
-.side-head:has(.side-toggle-icon[aria-expanded="true"]) { border-bottom: 1px solid var(--line-muted); }
-.side-body { padding: 12px 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.filters-group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.filters-group:empty, .filters-group[hidden], #sortGroup[hidden], .facet-section[hidden] { display: none; }
+#sortGroup, .facet-section { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.facet-section { border-bottom: 0; }
+.filters-group:not(:empty) { padding: 12px 0; }
+.facet-section > .filters-group { padding: 0; }
+.facet-section > .ff-label { margin: 0; font-size: var(--font-label); font-weight: 600; }
+#sortGroup .ff-label { font-size: var(--font-label); font-weight: 600; }
 
 /* Filter fields */
 .ff { display: grid; gap: 6px; min-width: 0; }
@@ -190,9 +175,6 @@ kbd {
 
 /* --------------------------------------------------------------- results */
 .results-card { padding-bottom: var(--space-sm); }
-.results-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm); margin: 10px 0 var(--space-xs); }
-.results-tools:empty { display: none; }
-.results-tools .tb-label { font-size: var(--font-label); }
 .stepper { display: inline-flex; align-items: center; gap: 2px; }
 .stepper .num { min-width: 1.6em; text-align: center; font-weight: 700; }
 .results { margin-top: var(--space-xs); }
@@ -311,15 +293,17 @@ kbd {
   .search-card { grid-area: box; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--gap); }
   .search-card > .search-modes { grid-column: 1; }
   .search-card > .search-modes .segmented { width: 340px; }
-  .search-card > .search-field { grid-column: 2; }
+  .search-card > .search-bar { grid-column: 2; }
   .search-card > .query-chips, .search-card > .saved-row, .search-card > .recent-list { grid-column: 1 / -1; }
   .search-side { grid-area: side; min-height: 0; overflow: auto; display: grid; align-content: start; gap: var(--gap); }
   /* The Markdown list has no filters or facets, so its side column would be empty: results and preview take the width. */
   .search-layout[data-mode="docs"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); grid-template-areas: "box box" "results preview"; }
   .search-layout[data-mode="docs"] .search-side { display: none; }
+  /* Without the Archive card the side column would be empty: results and preview take the width. */
+  .search-layout:not(:has(#outlookCard:not([hidden]))) { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); grid-template-areas: "box box" "results preview"; }
+  .search-layout:not(:has(#outlookCard:not([hidden]))) .search-side { display: none; }
   .results-card { grid-area: results; min-height: 0; overflow: auto; }
   .preview-card { grid-area: preview; display: block; min-height: 0; overflow: auto; }
-  .search-side .side-toggle, .search-side .side-head { min-height: var(--row-sm); }
 }
 @media (max-width: 1099px), (pointer: coarse) {
   .search-side { display: grid; gap: var(--gap); }

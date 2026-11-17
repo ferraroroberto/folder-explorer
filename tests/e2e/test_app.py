@@ -6,6 +6,7 @@ from typing import Any
 
 from playwright.sync_api import Page, expect
 
+from tests.e2e._filters import close_filters, open_filters
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._shot import settle
 
@@ -102,7 +103,10 @@ def test_tree_selecting_a_folder_shows_its_contents_and_the_basis_switches_total
     expect(page.locator("#topList .list-row").first).to_contain_text("river-01.mp4")
     _tab(page, "explore")
     expect(page.locator("#summary .stat-label").first).to_have_text("Total size")
+    open_filters(page)
     page.locator('#basisSeg [data-value="disk"]').click()
+    expect(page.locator("#filtersOpen")).to_have_attribute("aria-label", "Filters & sort, 1 on: totals by on disk")
+    close_filters(page)
     expect(page.locator("#summary .stat-label").first).to_have_text("On disk")
 
 

@@ -6,7 +6,8 @@
 
 import { LABEL, getOp, serialize, tokenize, withOp } from './query.js';
 import { S, $, box, effectiveMode, recent, recentOpen, shortFolder } from './search-state.js';
-import { esc, fmtNum, glyph } from './fmt.js';
+import { esc, fmtNum, glyph, plural } from './fmt.js';
+import { paintFilterTrigger } from './filter-trigger.js';
 
 // --------------------------------------------------------------- chips
 
@@ -118,21 +119,37 @@ function dateMode(toks) {
   return after || before || nt ? 'range' : 'any';
 }
 
+/** The sheet's settings that differ from their default, one phrase each: the box's operators and a newest-first sort, or the folder display options. */
+function activeFilters(mode) {
+  if (mode === 'folders') {
+    const fs = S.status.folder_search;
+    return [].concat(
+      fs.skip_levels ? ['hiding ' + plural(fs.skip_levels, 'level')] : [],
+      fs.prune_people ? [] : ['every folder of people'],
+      fs.onedrive_prevails ? [] : ['OneDrive folders under their drives'],
+    );
+  }
+  if (mode !== 'emails') return [];
+  return tokenize(box().value).filter((t) => t.key).map((t) => (t.neg ? 'not ' : '') + LABEL[t.key].toLowerCase() + ' ' + t.val)
+    .concat(S.sort === 'newest' ? ['newest first'] : []);
+}
+
 export function renderFilters() {
   const mode = effectiveMode();
-  $('filtersCard').hidden = mode === 'docs';
+  // Documents has nothing to filter or sort, so its tab keeps the search field alone.
+  $('searchFiltersOpen').hidden = mode === 'docs';
   if (builtFor !== mode) {
     builtFor = mode;
     $('filtersBody').innerHTML = mode === 'folders' ? folderOptionsHtml() : mode === 'emails' ? emailFiltersHtml() : '';
   }
-  $('filtersTitle').textContent = mode === 'folders' ? 'Display' : 'Filters';
-  $('filtersToggle').setAttribute('aria-label', mode === 'folders' ? 'Show display settings' : 'Show filters');
+  paintFilterTrigger($('searchFiltersOpen'), activeFilters(mode));
+  $('sortGroup').hidden = mode !== 'emails';
+  $('sortSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === S.sort)));
   if (mode === 'folders') {
     const fs = S.status.folder_search;
     $('skipVal').textContent = String(fs.skip_levels);
     setSwitchState('pruneSwitch', fs.prune_people);
     setSwitchState('onedriveSwitch', fs.onedrive_prevails);
-    $('filtersMeta').textContent = fs.skip_levels ? 'Hiding ' + fs.skip_levels + (fs.skip_levels === 1 ? ' level' : ' levels') : 'Full paths';
     return;
   }
   if (mode !== 'emails') return;
@@ -147,8 +164,6 @@ export function renderFilters() {
   const dm = dateMode(toks);
   $('fDateSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === dm)));
   $('fRange').hidden = dm !== 'range';
-  const n = toks.filter((t) => t.key).length;
-  $('filtersMeta').textContent = n ? n + ' on' : 'None';
 }
 
 /** The box after the date segment ``value`` was picked. */
@@ -174,12 +189,12 @@ function facetChip(op, val, label, count, pressed, track, own = false) {
 
 export function renderFacets() {
   const f = S.facets;
-  const card = $('facetsCard');
-  card.hidden = effectiveMode() !== 'emails';
-  if (card.hidden) return;
-  if (!f) { $('facetsBody').innerHTML = '<p class="row-note">Nothing to refine yet.</p>'; $('facetsMeta').textContent = ''; return; }
+  const group = $('facetsGroup');
+  group.hidden = effectiveMode() !== 'emails';
+  if (group.hidden) return;
+  if (!f) { $('facetsBody').innerHTML = '<p class="row-note">Nothing to refine yet.</p>'; return; }
   const toks = tokenize(box().value);
-  const group = (title, items) => (items.length ? '<div class="facet-group"><span class="facet-title">' + title + '</span><div class="facet-chips">' + items.join('') + '</div></div>' : '');
+  const section = (title, items) => (items.length ? '<div class="facet-group"><span class="facet-title">' + title + '</span><div class="facet-chips">' + items.join('') + '</div></div>' : '');
   const from = getOp(toks, 'from');
   const inF = getOp(toks, 'in');
   const senders = f.senders.map((s) => facetChip('from', s.value, s.name || s.value, s.count, from === s.value, 'facet-sender', true));
@@ -189,9 +204,8 @@ export function renderFacets() {
   const more = [];
   if (f.attachments) more.push(facetChip('has', 'attachment', 'Attachments', f.attachments, getOp(toks, 'has') === 'attachment', 'facet-attachments'));
   if (f.flagged) more.push(facetChip('is', 'flagged', 'Flagged', f.flagged, getOp(toks, 'is') === 'flagged', 'facet-flagged'));
-  $('facetsBody').innerHTML = (group('Sender', senders) + group('Folder', folders) + group('Year', years) + group('Has', more)) ||
+  $('facetsBody').innerHTML = (section('Sender', senders) + section('Folder', folders) + section('Year', years) + section('Has', more)) ||
     '<p class="row-note">Nothing to refine yet.</p>';
-  $('facetsMeta').textContent = f.senders.length ? f.senders.length + (f.senders.length === 1 ? ' sender' : ' senders') : '';
 }
 
 /** The box after a facet chip was tapped: on adds its operator, off takes it away. */

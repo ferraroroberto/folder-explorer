@@ -51,16 +51,28 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  /* The rows sit a full spacing step apart so the scope pill's expanded hit area stays clear of the select above it. */
-  gap: var(--space-md);
+  gap: var(--space-sm);
   padding: var(--space-sm) 14px;
 }
-.tb-field, .tb-scope { display: inline-flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.tb-scope { display: flex; align-items: center; gap: var(--space-sm); flex: 1 1 auto; min-width: 0; }
 /* The info button's hit area reaches 8px past its box, so it sits that far from the segmented control. */
 .tb-inline { display: inline-flex; align-items: center; gap: calc((var(--hit-min) - var(--icon-btn-box, 28px)) / 2); }
 .tb-label { font-size: var(--font-label); font-weight: 600; color: var(--muted); white-space: nowrap; }
-.toolbar .select-native { max-width: 190px; }
-.tb-scope { flex: 1 1 100%; }
+
+/* The Filters & sort trigger (Explore, Largest, Types and Search): the glyph at rest; with settings on, the count beside it on the accent tint, so a narrowed list is never mistaken for the whole. */
+.filter-open { flex: none; --icon-btn-box: var(--row-sm); }
+.filter-open[hidden] { display: none; }
+.filter-open.has-value { width: auto; gap: 6px; padding: 0 10px; color: var(--accent-text); background: var(--accent-soft); }
+.filter-count { font-size: var(--font-label); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* The Filters & sort sheet: the title and the Clear / Done footer stay put and the settings between them scroll, so the sheet fits a short phone. */
+.detail-dialog.filters-dialog { overflow: hidden; }
+.filters-dialog[open] { display: flex; flex-direction: column; }
+.filters-dialog .detail-card { display: flex; flex-direction: column; min-height: 0; max-height: inherit; }
+.filters-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.filters-actions { flex: none; position: static; display: grid; grid-template-columns: 1fr 2fr; gap: var(--space-sm); margin: 14px -18px -18px; }
+.filters-actions .button-tint { min-height: 48px; }
+.filters-body .row:first-child { border-top: 0; }
 
 .reference-pill {
   font: inherit;

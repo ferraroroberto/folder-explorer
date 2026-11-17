@@ -66,8 +66,8 @@ Walked 2026-11-17 against build `62c8fc0`, at widths 390, 1440, themes light, da
 
 | Area | Surfaces |
 |---|---|
-| [Chrome](#chrome) | 7 |
-| [Search](#search) | 8 |
+| [Chrome](#chrome) | 8 |
+| [Search](#search) | 7 |
 | [Explore](#explore) | 6 |
 | [Largest](#largest) | 3 |
 | [Types](#types) | 2 |
@@ -85,12 +85,13 @@ What every tab shares: the nav, the toolbar, the footer, toasts, the update bann
 flowchart LR
   s0["Nav"]
   s1["Toolbar"]
-  s2["Footer"]
-  s3["New-version notice"]
-  s4["Toast"]
-  s5["Sign-in sheet"]
-  s6["Drop overlay"]
-  s7(["Search tab · Search"])
+  s2["Filters and sort"]
+  s3["Footer"]
+  s4["New-version notice"]
+  s5["Toast"]
+  s6["Sign-in sheet"]
+  s7["Drop overlay"]
+  s8(["Search tab · Search"])
   s15(["Explore tab · Explore"])
   s21(["Largest tab · Largest"])
   s24(["Types tab · Types"])
@@ -98,18 +99,19 @@ flowchart LR
   s20(["Size and On disk · Explore"])
   s37(["Document window · Documents"])
   s73(["Drop a file · Keys and gestures"])
-  s0 -->|"Search"| s7
+  s0 -->|"Search"| s8
   s0 -->|"Explore"| s15
   s0 -->|"Largest"| s21
   s0 -->|"Types"| s24
   s0 -->|"Scans"| s26
-  s1 -->|"the info button beside Totals by"| s20
+  s1 -->|"the Filters & sort button"| s2
   s1 -->|"Scope pill"| s15
-  s6 -->|"a drop"| s37
+  s2 -->|"the info button beside Totals by"| s20
+  s7 -->|"a drop"| s37
   s15 -->|"toolbar"| s1
   s21 -->|"toolbar"| s1
   s24 -->|"toolbar"| s1
-  s73 -->|"the drag"| s6
+  s73 -->|"the drag"| s7
 ```
 
 ### `chrome.nav` Nav
@@ -133,15 +135,27 @@ flowchart LR
 - **Root:** `data-surface`
 - **Reach:** the top of Explore, Largest and Types; one toolbar that moves into the active tab
 - **Holds:**
-  - Root: the scanned root to show
-  - Totals by: Size or On disk, with an info button
-  - Type: the file type filter
   - Scope: the folder the three tabs show, as a pill that jumps to Explore
-- **Does:** each choice reloads the three tabs for the same folder
+  - a Filters & sort button that shows how many settings differ from their default, and names them for a screen reader
 - **States:** absent on Search and Scans
 - **Leads to:**
-  - [Size and On disk](#exploresizes-info-size-and-on-disk) (the info button beside Totals by)
+  - [Filters and sort](#chromefilters-filters-and-sort) (the Filters & sort button)
   - [Explore tab](#exploretab-explore-tab) (Scope pill)
+
+### `chrome.filters` Filters and sort
+
+- **Root:** `data-surface`
+- **Reach:** the Filters & sort button in the toolbar of Explore, Largest and Types
+- **Holds:**
+  - Scan root: the scanned root to show
+  - Totals by: Size or On disk, with an info button
+  - File type: the file type filter
+  - Clear and Done
+- **Does:**
+  - each choice applies as it changes and reloads the three tabs for the same folder
+  - Clear returns to the first root, every type and Totals by Size
+- **States:** the title and the Clear and Done footer stay in view while the settings scroll
+- **Leads to:** [Size and On disk](#exploresizes-info-size-and-on-disk) (the info button beside Totals by)
 
 ### `chrome.footer` Footer
 
@@ -192,11 +206,10 @@ One box over folders, documents or emails, with a preview beside the results or 
 
 ```mermaid
 flowchart LR
-  s7["Search tab"]
-  s8["Search not set up"]
-  s9["Recent searches"]
-  s10["Filters and display options"]
-  s11["Refine"]
+  s8["Search tab"]
+  s9["Search not set up"]
+  s10["Recent searches"]
+  s11["Filters and sort"]
   s12["Results"]
   s13["Preview"]
   s14["Keyboard sheet"]
@@ -209,16 +222,15 @@ flowchart LR
   s15(["Explore tab · Explore"])
   s41(["Archive sheet · Archive and Outlook macro"])
   s38(["Nav in the document window · Documents"])
-  s0 -->|"Search"| s7
-  s7 -->|"no mode ready"| s8
-  s7 -->|"an empty box"| s9
-  s7 -->|"Filters or Display"| s10
-  s7 -->|"Refine"| s11
-  s7 -->|"results"| s12
-  s7 -->|"keyboard button"| s14
-  s7 -->|"Emails on the PC"| s40
-  s7 -->|"gear"| s43
-  s8 -->|"Open Settings"| s43
+  s0 -->|"Search"| s8
+  s8 -->|"no mode ready"| s9
+  s8 -->|"an empty box"| s10
+  s8 -->|"the Filters & sort button"| s11
+  s8 -->|"results"| s12
+  s8 -->|"keyboard button"| s14
+  s8 -->|"Emails on the PC"| s40
+  s8 -->|"gear"| s43
+  s9 -->|"Open Settings"| s43
   s12 -->|"a result"| s13
   s12 -->|"a Documents row on a phone, or View"| s31
   s12 -->|"keys line"| s70
@@ -227,7 +239,7 @@ flowchart LR
   s13 -->|"Show in Explore or Show folder"| s15
   s13 -->|"the Archive card"| s41
   s14 -->|"the table"| s70
-  s38 -->|"Search"| s7
+  s38 -->|"Search"| s8
 ```
 
 ### `search.tab` Search tab
@@ -240,10 +252,10 @@ flowchart LR
 - **Holds:**
   - the header (title, a status line, the theme toggle, the Settings gear)
   - a Folders / Documents / Emails switch, shown when more than one mode is ready
-  - the search box, with a keyboard button and a `/` badge on a mouse
+  - the search box, with a Filters & sort button beside it (hidden in Documents) and a keyboard button and a `/` badge on a mouse
   - the active operator chips under the box
   - the saved searches and Bookmark query
-  - the filters, refine, results and preview parts
+  - the results and preview parts
 - **Does:**
   - typing searches after a short pause; Enter, a chip, a filter or a facet searches at once
   - a mode switch keeps each mode's own query
@@ -252,8 +264,7 @@ flowchart LR
 - **Leads to:**
   - [Search not set up](#searchoff-search-not-set-up) (no mode ready)
   - [Recent searches](#searchrecent-recent-searches) (an empty box)
-  - [Filters and display options](#searchfilters-filters-and-display-options) (Filters or Display)
-  - [Refine](#searchrefine-refine) (Refine)
+  - [Filters and sort](#searchfilters-filters-and-sort) (the Filters & sort button)
   - [Results](#searchresults-results) (results)
   - [Keyboard sheet](#searchkeys-keyboard-sheet) (keyboard button)
   - [Archive card](#archivecard-archive-card) (Emails on the PC)
@@ -278,37 +289,32 @@ flowchart LR
 - **Does:** a recent query fills the box and searches; Clear empties the list for the mode; the bar folds it and the choice is kept
 - **States:** hidden while the box has text
 
-### `search.filters` Filters and display options
+### `search.filters` Filters and sort
 
 - **Root:** `data-surface`
 - **Reach:**
-  - the Filters card beside the results (Emails), or Display (Folders)
+  - the Filters & sort button beside the search box, which shows how many settings differ from their default
   - hidden in Documents
 - **Holds:**
-  - Emails: Date (Any, 30 days, This year, Range with After and Before), From, To, Cc, Subject or topic, Attachment name, In folder, Size, Has an attachment, Flagged only
+  - Emails: Sort (Best match, Newest), Date (Any, 30 days, This year, Range with After and Before), From, To, Cc, Subject or topic, Attachment name, In folder, Size, Has an attachment, Flagged only
+  - Emails, Refine: facet chips for Sender, Folder, Year and Has (Attachments, Flagged), each with its count
   - Folders: Hide leading levels (a stepper), One result per folder of people, Show OneDrive folders once
+  - Clear and Done
 - **Does:**
   - every filter writes its operator into the box and the box searches, so the two never disagree
+  - a facet chip adds or removes its operator in the box
   - the folder options save to config.json
-- **Phone:** folded under a title row with an icon toggle
-- **Desktop:** open beside the results
-
-### `search.refine` Refine
-
-- **Root:** `data-surface`
-- **Reach:** the Refine card (Emails only)
-- **Holds:** facet chips for Sender, Folder, Year and Has (Attachments, Flagged), each with its count
-- **Does:** a chip adds or removes its operator in the box
-- **States:** *Nothing to refine yet.* when the results have no facets
-- **Phone:** folded
-- **Desktop:** open
+  - Clear takes the operators out of the box and sorts by best match, or restores the folder options
+- **States:**
+  - *Nothing to refine yet.* when the results have no facets
+  - the title and the Clear and Done footer stay in view while the settings scroll
 
 ### `search.results` Results
 
 - **Root:** `data-surface`
 - **Reach:** the results card under the box
 - **Holds:**
-  - the count and, for Emails, a Best match / Newest sort
+  - the count
   - one row per result (a mail, a folder or a document) as a listbox
   - Show next results
   - on a mouse, a keys line naming the shortcuts
@@ -368,6 +374,7 @@ flowchart LR
   s20["Size and On disk"]
   s0(["Nav · Chrome"])
   s1(["Toolbar · Chrome"])
+  s2(["Filters and sort · Chrome"])
   s13(["Preview · Search"])
   s43(["Settings sheet · Settings"])
   s26(["Scans tab · Scans"])
@@ -377,8 +384,8 @@ flowchart LR
   s33(["Why a document can't show · Documents"])
   s38(["Nav in the document window · Documents"])
   s0 -->|"Explore"| s15
-  s1 -->|"the info button beside Totals by"| s20
   s1 -->|"Scope pill"| s15
+  s2 -->|"the info button beside Totals by"| s20
   s13 -->|"Show in Explore or Show folder"| s15
   s15 -->|"toolbar"| s1
   s15 -->|"Folders"| s17
@@ -405,7 +412,7 @@ flowchart LR
   - a Scope pill, Show in Explore, Show folder, the shortlist's show button, or a root row on Scans
 - **Holds:**
   - the header
-  - the toolbar
+  - the toolbar (the Scope pill and the Filters & sort button)
   - four summary cells (Total size or On disk, files and folders, online-only, On this PC)
   - the folder tree and the selected folder's contents
 - **Does:** a tree row selects its folder; the twisty opens or closes it
@@ -478,7 +485,7 @@ flowchart LR
 ### `explore.sizes-info` Size and On disk
 
 - **Root:** `data-surface`
-- **Reach:** the info button beside Totals by in the toolbar
+- **Reach:** the info button beside Totals by in the Filters & sort sheet
 - **Holds:** what Size and On disk mean, and that an online-only file takes no space until it is opened
 
 ## Largest
@@ -681,17 +688,17 @@ flowchart LR
   s37["Document window"]
   s38["Nav in the document window"]
   s39["Outline and recent documents"]
-  s6(["Drop overlay · Chrome"])
+  s7(["Drop overlay · Chrome"])
   s12(["Results · Search"])
   s13(["Preview · Search"])
   s18(["Folder contents · Explore"])
   s19(["Row menu · Explore"])
   s15(["Explore tab · Explore"])
-  s7(["Search tab · Search"])
+  s8(["Search tab · Search"])
   s71(["Document keys · Keys and gestures"])
   s72(["Open a row · Keys and gestures"])
   s73(["Drop a file · Keys and gestures"])
-  s6 -->|"a drop"| s37
+  s7 -->|"a drop"| s37
   s12 -->|"a Documents row on a phone, or View"| s31
   s13 -->|"View or Edit here"| s31
   s13 -->|"Open in new window"| s37
@@ -712,7 +719,7 @@ flowchart LR
   s37 -->|"Edit"| s34
   s37 -->|"a refusal"| s33
   s37 -->|"leaving with unsaved changes"| s36
-  s38 -->|"Search"| s7
+  s38 -->|"Search"| s8
   s38 -->|"Explore"| s15
   s71 -->|"Edit"| s34
   s72 -->|"a Markdown or HTML row"| s31
@@ -858,10 +865,10 @@ flowchart LR
   s40["Archive card"]
   s41["Archive sheet"]
   s42["Outlook macro sheet"]
-  s7(["Search tab · Search"])
+  s8(["Search tab · Search"])
   s13(["Preview · Search"])
   s49(["Outlook archive group · Settings"])
-  s7 -->|"Emails on the PC"| s40
+  s8 -->|"Emails on the PC"| s40
   s13 -->|"the Archive card"| s41
   s40 -->|"the row"| s41
   s41 -->|"the macro info button"| s42
@@ -948,15 +955,15 @@ flowchart LR
   s67["Remote access"]
   s68["Folder row menu"]
   s69["Remove this folder?"]
-  s7(["Search tab · Search"])
-  s8(["Search not set up · Search"])
+  s8(["Search tab · Search"])
+  s9(["Search not set up · Search"])
   s15(["Explore tab · Explore"])
   s21(["Largest tab · Largest"])
   s24(["Types tab · Types"])
   s26(["Scans tab · Scans"])
   s42(["Outlook macro sheet · Archive and Outlook macro"])
-  s7 -->|"gear"| s43
-  s8 -->|"Open Settings"| s43
+  s8 -->|"gear"| s43
+  s9 -->|"Open Settings"| s43
   s15 -->|"gear"| s43
   s21 -->|"gear"| s43
   s24 -->|"gear"| s43
@@ -1245,13 +1252,13 @@ flowchart LR
   s14(["Keyboard sheet · Search"])
   s34(["Document editor · Documents"])
   s31(["Document sheet · Documents"])
-  s6(["Drop overlay · Chrome"])
+  s7(["Drop overlay · Chrome"])
   s37(["Document window · Documents"])
   s12 -->|"keys line"| s70
   s14 -->|"the table"| s70
   s71 -->|"Edit"| s34
   s72 -->|"a Markdown or HTML row"| s31
-  s73 -->|"the drag"| s6
+  s73 -->|"the drag"| s7
   s73 -->|"the drop"| s37
 ```
 
@@ -1305,13 +1312,13 @@ flowchart LR
 | [Nav](#chromenav-nav) | Largest | [Largest tab](#largesttab-largest-tab) |
 | [Nav](#chromenav-nav) | Types | [Types tab](#typestab-types-tab) |
 | [Nav](#chromenav-nav) | Scans | [Scans tab](#scanstab-scans-tab) |
-| [Toolbar](#chrometoolbar-toolbar) | the info button beside Totals by | [Size and On disk](#exploresizes-info-size-and-on-disk) |
+| [Toolbar](#chrometoolbar-toolbar) | the Filters & sort button | [Filters and sort](#chromefilters-filters-and-sort) |
 | [Toolbar](#chrometoolbar-toolbar) | Scope pill | [Explore tab](#exploretab-explore-tab) |
+| [Filters and sort](#chromefilters-filters-and-sort) | the info button beside Totals by | [Size and On disk](#exploresizes-info-size-and-on-disk) |
 | [Drop overlay](#chromedrop-overlay-drop-overlay) | a drop | [Document window](#docwindow-document-window) |
 | [Search tab](#searchtab-search-tab) | no mode ready | [Search not set up](#searchoff-search-not-set-up) |
 | [Search tab](#searchtab-search-tab) | an empty box | [Recent searches](#searchrecent-recent-searches) |
-| [Search tab](#searchtab-search-tab) | Filters or Display | [Filters and display options](#searchfilters-filters-and-display-options) |
-| [Search tab](#searchtab-search-tab) | Refine | [Refine](#searchrefine-refine) |
+| [Search tab](#searchtab-search-tab) | the Filters & sort button | [Filters and sort](#searchfilters-filters-and-sort) |
 | [Search tab](#searchtab-search-tab) | results | [Results](#searchresults-results) |
 | [Search tab](#searchtab-search-tab) | keyboard button | [Keyboard sheet](#searchkeys-keyboard-sheet) |
 | [Search tab](#searchtab-search-tab) | Emails on the PC | [Archive card](#archivecard-archive-card) |

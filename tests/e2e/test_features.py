@@ -11,6 +11,7 @@ from typing import Callable, Iterator
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
+from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e.conftest import LIVE_PORT
 from tests.fixture_tree import DOCS_FOLDER
@@ -96,8 +97,7 @@ def _docs_rows(page: Page, browser_name: str) -> Locator:
     page.locator('.tab[data-tab="explore"]').click()
     # The first root's tree finishes drawing before the root changes, so its answer can never land over the second root's.
     expect(page.locator("#tree .tree-row").first).to_be_visible()
-    media = page.eval_on_selector("#rootSelect", "s => [...s.options].find(o => o.text.startsWith('Media disk')).value")
-    page.locator("#rootSelect").select_option(media)
+    choose_root(page, "Media disk")
     page.locator(".tree-main", has_text=DOCS_FOLDER).click()
     rows = page.locator("#contentsDialog" if browser_name == "webkit" else "#contentsDock")
     expect(rows.locator(".list-row", has_text="guide.md")).to_be_visible()

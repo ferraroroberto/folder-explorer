@@ -114,11 +114,16 @@
             <svg class="icon" aria-hidden="true"><use href="#i-keyboard"></use></svg>
           </button>
         </div>
-        <label class="search-field">
-          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
-          <input type="search" id="q" autocomplete="off" spellcheck="false" aria-label="Search" enterkeyhint="search" data-track="search-input">
-          <kbd class="kbd-only" aria-hidden="true">/</kbd>
-        </label>
+        <div class="search-bar">
+          <label class="search-field">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+            <input type="search" id="q" autocomplete="off" spellcheck="false" aria-label="Search" enterkeyhint="search" data-track="search-input">
+            <kbd class="kbd-only" aria-hidden="true">/</kbd>
+          </label>
+          <button type="button" class="icon-button filter-open" id="searchFiltersOpen" aria-haspopup="dialog" aria-label="Filters &amp; sort" title="Filters &amp; sort" data-track="filters-toggle">
+            <svg class="icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg><span class="filter-count" hidden></span>
+          </button>
+        </div>
         <div class="query-chips" id="queryChips" aria-label="Active filters"></div>
         <div class="saved-row" id="savedRow"></div>
         <div class="recent-list" id="recentList" data-surface="search.recent" hidden></div>
@@ -139,14 +144,6 @@
             </li>
           </ul>
         </div>
-        <div class="card card--collapsible side-card" id="filtersCard" data-surface="search.filters">
-          <div class="side-head"><span class="card-title" id="filtersTitle">Filters</span><span class="summary-meta" id="filtersMeta"></span><button type="button" class="icon-button side-toggle-icon" id="filtersToggle" aria-expanded="false" aria-controls="filtersBody" aria-label="Show filters" data-track="filters-toggle"><svg class="icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg></button></div>
-          <div class="side-body" id="filtersBody" hidden></div>
-        </div>
-        <div class="card card--collapsible side-card" id="facetsCard" data-surface="search.refine">
-          <button type="button" class="side-toggle" aria-expanded="false" aria-controls="facetsBody" data-track="facets-toggle"><span class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-layout-grid"></use></svg>Refine</span><span class="summary-meta" id="facetsMeta"></span><svg class="icon summary-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg></button>
-          <div class="side-body" id="facetsBody" hidden></div>
-        </div>
       </aside>
 
       <div class="card results-card" data-surface="search.results">
@@ -154,7 +151,6 @@
           <h2 class="card-title" id="resultsTitle"><svg class="icon" aria-hidden="true"><use href="#i-mail"></use></svg>Emails</h2>
           <span class="card-head-meta num" id="resultsMeta"></span>
         </div>
-        <div class="results-tools" id="resultsTools"></div>
         <ul class="rows results" id="results" role="listbox" aria-label="Results"></ul>
         <p class="keys-line kbd-only" id="keysLine"></p>
       </div>
@@ -162,6 +158,35 @@
       <!-- duplicate-surface-exempt: the wide desktop's pane for the one preview surface a phone gets as #previewDialog below -->
       <div class="card preview-card" id="previewDock" data-surface="search.preview" aria-live="polite"></div>
     </div>
+
+    <dialog class="detail-dialog filters-dialog" id="searchFiltersDialog" data-surface="search.filters" data-track-view="search-filters-sheet" aria-labelledby="searchFiltersTitle">
+      <div class="detail-card">
+        <div class="detail-header">
+          <h2 tabindex="-1" id="searchFiltersTitle">Filters &amp; sort</h2>
+          <button type="button" class="icon-button detail-close" aria-label="Close" data-track="search-filters-close" data-close>
+            <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+          </button>
+        </div>
+        <div class="filters-body">
+          <div class="ff" id="sortGroup" hidden>
+            <span class="ff-label">Sort</span>
+            <span class="segmented" role="group" aria-label="Sort" id="sortSeg">
+              <button type="button" class="segmented-item" aria-pressed="true" data-value="relevance" data-track="sort-relevance">Best match</button>
+              <button type="button" class="segmented-item" aria-pressed="false" data-value="newest" data-track="sort-newest">Newest</button>
+            </span>
+          </div>
+          <div class="filters-group" id="filtersBody"></div>
+          <div class="facet-section" id="facetsGroup" hidden>
+            <h3 class="ff-label">Refine</h3>
+            <div class="filters-group" id="facetsBody"></div>
+          </div>
+        </div>
+        <div class="detail-actions filters-actions">
+          <button type="button" class="button-tint" id="searchFiltersClear" data-track="search-filters-clear">Clear</button>
+          <button type="button" class="button-primary" data-track="search-filters-done" data-close>Done</button>
+        </div>
+      </div>
+    </dialog>
   </section>
 
   <section id="paneExplore" class="pane" role="tabpanel" aria-labelledby="tabExplore" aria-label="Explore" data-surface="explore.tab" hidden>
@@ -179,30 +204,13 @@
       </button>
     </div>
     <div class="card toolbar" id="toolbar" data-surface="chrome.toolbar">
-      <label class="tb-field">
-        <span class="tb-label">Root</span>
-        <select class="select-native" id="rootSelect" data-track="root-select" aria-label="Scan root"></select>
-      </label>
-      <div class="tb-field">
-        <span class="tb-label">Totals by</span>
-        <span class="tb-inline">
-          <span class="segmented" role="group" aria-label="Totals by" id="basisSeg">
-            <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="basis-size">Size</button>
-            <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="basis-disk">On disk</button>
-          </span>
-          <button type="button" class="icon-button" id="basisInfo" aria-label="About Size and On disk" title="About Size and On disk" data-track="basis-info">
-            <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
-          </button>
-        </span>
-      </div>
-      <label class="tb-field">
-        <span class="tb-label">Type</span>
-        <select class="select-native" id="typeSelect" data-track="type-select" aria-label="File type filter"></select>
-      </label>
       <div class="tb-scope">
         <span class="tb-label">Scope</span>
         <button type="button" class="reference-pill" id="scopePill" data-track="scope-pill"></button>
       </div>
+      <button type="button" class="icon-button filter-open" id="filtersOpen" aria-haspopup="dialog" aria-label="Filters &amp; sort" title="Filters &amp; sort" data-track="filters-open">
+        <svg class="icon" aria-hidden="true"><use href="#i-sliders-horizontal"></use></svg><span class="filter-count" hidden></span>
+      </button>
     </div>
     <div class="pane-body">
       <div class="summary" id="summary"></div>
@@ -589,6 +597,43 @@
       </button>
     </div>
     <div id="failuresBody"></div>
+  </div>
+</dialog>
+
+<dialog class="detail-dialog filters-dialog" id="filtersDialog" data-surface="chrome.filters" data-track-view="filters-sheet" aria-labelledby="filtersDialogTitle">
+  <div class="detail-card">
+    <div class="detail-header">
+      <h2 tabindex="-1" id="filtersDialogTitle">Filters &amp; sort</h2>
+      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="filters-close" data-close>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="filters-body">
+      <div class="row">
+        <span>Scan root</span>
+        <select class="select-native" id="rootSelect" data-track="root-select" aria-label="Scan root"></select>
+      </div>
+      <div class="row">
+        <span>Totals by</span>
+        <span class="tb-inline">
+          <span class="segmented" role="group" aria-label="Totals by" id="basisSeg">
+            <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="basis-size">Size</button>
+            <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="basis-disk">On disk</button>
+          </span>
+          <button type="button" class="icon-button" id="basisInfo" aria-label="About Size and On disk" title="About Size and On disk" data-track="basis-info">
+            <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
+          </button>
+        </span>
+      </div>
+      <div class="row">
+        <span>File type</span>
+        <select class="select-native" id="typeSelect" data-track="type-select" aria-label="File type filter"></select>
+      </div>
+    </div>
+    <div class="detail-actions filters-actions">
+      <button type="button" class="button-tint" id="filtersClear" data-track="filters-clear">Clear</button>
+      <button type="button" class="button-primary" data-track="filters-done" data-close>Done</button>
+    </div>
   </div>
 </dialog>
 

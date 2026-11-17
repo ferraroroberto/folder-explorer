@@ -42,6 +42,7 @@ folder-explorer/
 │                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
 │                           #   doc-drop.js takes a Markdown or HTML file dropped on the window (drop-files.js its DOM-free request builders,
 │                           #   doc-handoff.js hands a rendered one to the /doc window it opens in)
+│           ├── filters/        # filter-trigger.js: the Filters & sort button's count badge and accessible name, shared by the Explore and Search sheets
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier

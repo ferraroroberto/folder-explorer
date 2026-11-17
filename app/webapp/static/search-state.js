@@ -37,13 +37,6 @@ export const box = () => $('q');
 const MARK_START = String.fromCharCode(0xe000);
 const MARK_END = String.fromCharCode(0xe001);
 
-/** Open or close a side card: its toggle's aria-expanded and its body's hidden move together. */
-export function setOpen(card, open) {
-  const btn = $(card).querySelector('.side-toggle, .side-toggle-icon');
-  btn.setAttribute('aria-expanded', String(open));
-  $(btn.getAttribute('aria-controls')).hidden = !open;
-}
-
 /** Text without the server's match markers, for a title attribute. */
 export const plain = (text) => (text || '').split(MARK_START).join('').split(MARK_END).join('');
 

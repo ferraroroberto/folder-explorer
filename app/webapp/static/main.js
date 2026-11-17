@@ -15,6 +15,7 @@ import { initArchive, startArchivePoll } from './archive.js';
 import { initDrop } from './doc-drop.js';
 import { openDropped, openIndexed } from './doc-sheet.js';
 import { wireThemeToggle } from './theme.js';
+import { paintFilterTrigger } from './filters/filter-trigger.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
@@ -68,12 +69,28 @@ async function renderToolbar() {
     (r.current ? '' : ' disabled') + '>' + esc(r.name) + ' (' + esc(r.kind) + ')</option>').join('');
   $('basisSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === state.basis)));
   updateScope();
+  paintFilters();
   const r = rootInfo();
   if (!r || !r.current) { $('typeSelect').innerHTML = '<option value="*">All types</option>'; return; }
   const exts = await typeOptions();
   if (state.type !== null && !exts.includes(state.type)) exts.unshift(state.type);
   $('typeSelect').innerHTML = '<option value="*">All types</option>' + exts.map((x) => '<option value="' + esc(x) + '"' +
     (x === state.type ? ' selected' : '') + '>' + esc(extLabel(x)) + '</option>').join('');
+  paintFilters();
+}
+
+/** The sheet's settings that differ from their default, one phrase each: the first root, every type, totals by size. */
+function activeFilters() {
+  const out = [];
+  const r = rootInfo();
+  if (r && state.roots.length && state.root !== state.roots[0].key) out.push('scan root ' + r.name);
+  if (state.type !== null) out.push('file type ' + extLabel(state.type));
+  if (state.basis !== 'size') out.push('totals by on disk');
+  return out;
+}
+
+function paintFilters() {
+  paintFilterTrigger($('filtersOpen'), activeFilters());
 }
 
 function updateScope() {
@@ -241,6 +258,19 @@ function wireClicks(nav) {
   document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 }
 
+/** Back to the defaults: the first root, every type, totals by size. */
+function clearFilters() {
+  if (!activeFilters().length) return;
+  const first = state.roots[0];
+  state.type = null;
+  state.basis = 'size';
+  if (first && state.root !== first.key) {
+    state.root = first.key;
+    writePref('root', state.root);
+    resetRoot();
+  } else resetKeepFolder();
+}
+
 /** The type filter or basis changed: reload every view for the same folder. */
 function resetKeepFolder() {
   const keep = state.folder;
@@ -268,6 +298,8 @@ function wireToolbar(nav) {
     writePref('root', state.root);
     resetRoot();
   });
+  $('filtersOpen').addEventListener('click', () => $('filtersDialog').showModal());
+  $('filtersClear').addEventListener('click', clearFilters);
   $('scopePill').addEventListener('click', () => nav.setTab('explore'));
   $('clearFilter').addEventListener('click', () => { state.type = null; resetKeepFolder(); });
   $('pctSeg').addEventListener('click', (e) => {

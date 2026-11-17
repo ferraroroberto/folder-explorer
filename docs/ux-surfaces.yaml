@@ -137,19 +137,35 @@ surfaces:
     reach:
       - the top of Explore, Largest and Types; one toolbar that moves into the active tab
     holds:
-      - "Root: the scanned root to show"
-      - "Totals by: Size or On disk, with an info button"
-      - "Type: the file type filter"
       - "Scope: the folder the three tabs show, as a pill that jumps to Explore"
-    does:
-      - each choice reloads the three tabs for the same folder
+      - "a Filters & sort button that shows how many settings differ from their default, and names them for a screen reader"
     states:
       - absent on Search and Scans
     links:
-      - to: explore.sizes-info
-        via: the info button beside Totals by
+      - to: chrome.filters
+        via: the Filters & sort button
       - to: explore.tab
         via: Scope pill
+
+  - id: chrome.filters
+    area: chrome
+    title: Filters and sort
+    root: data-surface
+    reach:
+      - the Filters & sort button in the toolbar of Explore, Largest and Types
+    holds:
+      - "Scan root: the scanned root to show"
+      - "Totals by: Size or On disk, with an info button"
+      - "File type: the file type filter"
+      - Clear and Done
+    does:
+      - each choice applies as it changes and reloads the three tabs for the same folder
+      - Clear returns to the first root, every type and Totals by Size
+    states:
+      - the title and the Clear and Done footer stay in view while the settings scroll
+    links:
+      - to: explore.sizes-info
+        via: the info button beside Totals by
 
   - id: chrome.footer
     area: chrome
@@ -226,10 +242,10 @@ surfaces:
     holds:
       - the header (title, a status line, the theme toggle, the Settings gear)
       - a Folders / Documents / Emails switch, shown when more than one mode is ready
-      - the search box, with a keyboard button and a `/` badge on a mouse
+      - the search box, with a Filters & sort button beside it (hidden in Documents) and a keyboard button and a `/` badge on a mouse
       - the active operator chips under the box
       - the saved searches and Bookmark query
-      - the filters, refine, results and preview parts
+      - the results and preview parts
     does:
       - typing searches after a short pause; Enter, a chip, a filter or a facet searches at once
       - a mode switch keeps each mode's own query
@@ -242,9 +258,7 @@ surfaces:
       - to: search.recent
         via: an empty box
       - to: search.filters
-        via: Filters or Display
-      - to: search.refine
-        via: Refine
+        via: the Filters & sort button
       - to: search.results
         via: results
       - to: search.keys
@@ -283,34 +297,24 @@ surfaces:
 
   - id: search.filters
     area: search
-    title: Filters and display options
+    title: Filters and sort
     root: data-surface
     reach:
-      - the Filters card beside the results (Emails), or Display (Folders)
+      - the Filters & sort button beside the search box, which shows how many settings differ from their default
       - hidden in Documents
     holds:
-      - "Emails: Date (Any, 30 days, This year, Range with After and Before), From, To, Cc, Subject or topic, Attachment name, In folder, Size, Has an attachment, Flagged only"
+      - "Emails: Sort (Best match, Newest), Date (Any, 30 days, This year, Range with After and Before), From, To, Cc, Subject or topic, Attachment name, In folder, Size, Has an attachment, Flagged only"
+      - "Emails, Refine: facet chips for Sender, Folder, Year and Has (Attachments, Flagged), each with its count"
       - "Folders: Hide leading levels (a stepper), One result per folder of people, Show OneDrive folders once"
+      - Clear and Done
     does:
       - every filter writes its operator into the box and the box searches, so the two never disagree
+      - a facet chip adds or removes its operator in the box
       - the folder options save to config.json
-    phone: folded under a title row with an icon toggle
-    desktop: open beside the results
-
-  - id: search.refine
-    area: search
-    title: Refine
-    root: data-surface
-    reach:
-      - the Refine card (Emails only)
-    holds:
-      - facet chips for Sender, Folder, Year and Has (Attachments, Flagged), each with its count
-    does:
-      - a chip adds or removes its operator in the box
+      - Clear takes the operators out of the box and sorts by best match, or restores the folder options
     states:
       - "*Nothing to refine yet.* when the results have no facets"
-    phone: folded
-    desktop: open
+      - the title and the Clear and Done footer stay in view while the settings scroll
 
   - id: search.results
     area: search
@@ -319,7 +323,7 @@ surfaces:
     reach:
       - the results card under the box
     holds:
-      - the count and, for Emails, a Best match / Newest sort
+      - the count
       - one row per result (a mail, a folder or a document) as a listbox
       - Show next results
       - on a mouse, a keys line naming the shortcuts
@@ -390,7 +394,7 @@ surfaces:
       - a Scope pill, Show in Explore, Show folder, the shortlist's show button, or a root row on Scans
     holds:
       - the header
-      - the toolbar
+      - the toolbar (the Scope pill and the Filters & sort button)
       - four summary cells (Total size or On disk, files and folders, online-only, On this PC)
       - the folder tree and the selected folder's contents
     does:
@@ -491,7 +495,7 @@ surfaces:
     title: Size and On disk
     root: data-surface
     reach:
-      - the info button beside Totals by in the toolbar
+      - the info button beside Totals by in the Filters & sort sheet
     holds:
       - what Size and On disk mean, and that an online-only file takes no space until it is opened
 

@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 import pytest
 from playwright.sync_api import FrameLocator, Page, Request, expect
 
+from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.fixture_tree import PAGES_FOLDER
 
@@ -98,9 +99,7 @@ def test_an_html_row_opens_in_the_sheet_walled_off_and_in_its_own_window(page: P
     page.evaluate("() => localStorage.setItem('folder-explorer.probe', '1')")
     assert "probe=" in page.evaluate("() => document.cookie")
     page.locator('.tab[data-tab="explore"]').click()
-    expect(page.locator("#rootSelect option", has_text="Media disk")).to_have_count(1)
-    media = page.eval_on_selector("#rootSelect", "s => [...s.options].find(o => o.text.startsWith('Media disk')).value")
-    page.locator("#rootSelect").select_option(media)
+    choose_root(page, "Media disk")
     rows = page.locator("#contentsDialog" if browser_name == "webkit" else "#contentsDock")
     # The tree lists only the largest folders; the small pages folder is reached from the root's contents.
     if browser_name == "webkit":

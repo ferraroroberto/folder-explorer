@@ -86,9 +86,9 @@ def test_email_search_refines_previews_and_acts_on_the_mail(page: Page, app_url:
     rows = page.locator("#results .result-row")
     expect(rows).to_have_count(3)
     expect(rows.first.locator("mark").first).to_have_text("budget", ignore_case=True)
-    if browser_name == "webkit":
-        page.locator("#facetsCard .side-toggle").click()
+    page.locator("#searchFiltersOpen").click()
     page.locator('.facet[data-op="is"]').click()
+    page.locator('#searchFiltersDialog [data-track="search-filters-done"]').click()
     expect(page.locator(".qchip")).to_have_count(1)
     expect(page.locator("#q")).to_have_value("budget is:flagged")
     expect(rows).to_have_count(1)

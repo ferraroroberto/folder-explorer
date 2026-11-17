@@ -7,9 +7,9 @@
 
 import { getJSON, postJSON, api } from './api.js';
 import { writePref } from './state.js';
-import { withOp } from './query.js';
+import { serialize, tokenize, withOp } from './query.js';
 import {
-  S, $, WIDE, box, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, readyModes, setOpen, setRecentOpen, shortFolder,
+  S, $, WIDE, box, clearRecent, dropRecent, effectiveMode, hl, mailDate, marked, plain, pushRecent, readyModes, setRecentOpen, shortFolder,
 } from './search-state.js';
 import {
   FIELD_OPS, renderChips, renderFacets, renderFilters, renderRecent, renderSaved, resetFilters, toggled, withDate,
@@ -53,7 +53,6 @@ function renderChrome() {
   $('searchOn').dataset.mode = mode || '';
   box().placeholder = ui.placeholder;
   $('resultsTitle').innerHTML = glyph(ui.glyph) + ui.title;
-  if (WIDE.matches) { setOpen('filtersCard', true); setOpen('facetsCard', true); }
   renderOutlookCard(st, mode);
   $('searchOff').hidden = !!mode;
   $('searchOn').hidden = !mode;
@@ -117,14 +116,8 @@ function keysLine(mode) {
 function renderResults() {
   const mode = effectiveMode();
   const q = box().value.trim();
-  const tools = $('resultsTools');
   const more = S.results.length < S.total && mode !== 'folders';
   $('resultsMeta').textContent = plural(S.total, MODE_UI[mode].noun);
-  if (mode === 'emails') {
-    tools.innerHTML = '<span class="segmented" role="group" aria-label="Sort" id="sortSeg">' +
-      '<button type="button" class="segmented-item" aria-pressed="' + (S.sort === 'relevance') + '" data-value="relevance" data-track="sort-relevance">Best match</button>' +
-      '<button type="button" class="segmented-item" aria-pressed="' + (S.sort === 'newest') + '" data-value="newest" data-track="sort-newest">Newest</button></span>';
-  } else tools.innerHTML = '';
   const notes = S.notes.map((n) => '<li class="search-note">' + glyph('info') + '<span>' + esc(n) + '</span></li>').join('');
   let rows;
   if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Every word must match.', false);
@@ -245,6 +238,13 @@ async function saveFolderOptions(update) {
   runSearch();
 }
 
+/** Every sheet setting back to its default: the box without its operators and a best-match sort, or the folder display options. */
+function clearSearchFilters() {
+  if (effectiveMode() === 'folders') { saveFolderOptions({ skip_levels: 0, prune_people: true, onedrive_prevails: true }); return; }
+  S.sort = 'relevance';
+  setBox(serialize(tokenize(box().value).filter((t) => !t.key)));
+}
+
 function setMode(mode) {
   pushRecent(effectiveMode(), box().value);
   S.mode = mode;
@@ -282,7 +282,8 @@ const CLICKS = [
   ['#pruneSwitch', () => saveFolderOptions({ prune_people: !S.status.folder_search.prune_people })],
   ['#onedriveSwitch', () => saveFolderOptions({ onedrive_prevails: !S.status.folder_search.onedrive_prevails })],
   ['#keysInfo', () => $('keysDialog').showModal()],
-  ['.side-toggle, .side-toggle-icon', (el) => setOpen(el.closest('.side-card').id, el.getAttribute('aria-expanded') !== 'true')],
+  ['#searchFiltersOpen', () => $('searchFiltersDialog').showModal()],
+  ['#searchFiltersClear', () => clearSearchFilters()],
 ];
 
 function wire() {

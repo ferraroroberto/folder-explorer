@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 
 from playwright.sync_api import Locator, Page, expect
 
+from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.fixture_tree import DOCS_FOLDER
 
@@ -60,8 +61,7 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
     loc = _journal(page, app_url)
     page.goto(app_url + "/")
     page.locator('.tab[data-tab="explore"]').click()
-    media = page.eval_on_selector("#rootSelect", "s => [...s.options].find(o => o.text.startsWith('Media disk')).value")
-    page.locator("#rootSelect").select_option(media)
+    choose_root(page, "Media disk")
     page.locator(".tree-main", has_text=DOCS_FOLDER).click()
     rows = page.locator("#contentsDialog" if browser_name == "webkit" else "#contentsDock")
     journal = rows.locator(".list-row", has_text="journal.md")

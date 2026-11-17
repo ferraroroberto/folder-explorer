@@ -28,7 +28,7 @@ function diffHtml(theirs, mine) {
  * ``onLoadTheirs()`` and ``onOverwrite()``.
  */
 export function showConflict(slot, c) {
-  slot.innerHTML = '<div class="doc-conflict" role="alert"><p class="doc-conflict-title">' + glyph('triangle-alert') +
+  slot.innerHTML = '<div class="doc-conflict" role="alert" data-surface="doc.conflict"><p class="doc-conflict-title">' + glyph('triangle-alert') +
     '<span>Changed on disk since you opened it</span></p><p class="doc-conflict-text">Your text is still here and has not been saved.</p>' +
     '<div class="doc-conflict-actions">' +
     '<button type="button" class="button-surface" data-conflict="compare" aria-expanded="false" data-track="doc-conflict-compare">Compare</button>' +

@@ -13,6 +13,17 @@ import { esc, glyph } from './fmt.js';
 // The row's title: a path's last folder, which a long path would otherwise cut off.
 const folderName = (p) => p.split(/[\\/]/).filter(Boolean).pop() || p;
 
+/** The vendored menu builds its own element, so the app stamps the surface id on what `attach` returns. */
+function surfaceMenu(ctl) {
+  const attach = ctl.attach;
+  ctl.attach = function (key, anchor, items, opts) {
+    const menu = attach(key, anchor, items, opts);
+    menu.dataset.surface = 'settings.folder-menu';
+    return menu;
+  };
+  return ctl;
+}
+
 /** Ask before a remove: the one confirm sheet every list shares. */
 function confirmRemove(path) {
   const d = document.getElementById('folderRemoveDialog');
@@ -47,7 +58,7 @@ export function folderList(host, { name, label, empty, onSave }) {
   const form = host.querySelector('.folder-add');
   const input = form.querySelector('input');
   const error = host.querySelector('.folder-error');
-  const menu = createRowMenu();
+  const menu = surfaceMenu(createRowMenu());
   let paths = [];
 
   async function commit(next) {

@@ -905,7 +905,7 @@ surfaces:
 
   - id: settings.sheet
     area: settings
-    title: Settings sheet
+    title: Settings page
     root: data-surface
     reach:
       - the gear in any tab's header
@@ -913,7 +913,7 @@ surfaces:
       - the first-run card, when there is no config.json
       - the groups Display, Available features, Scanning, Email, Outlook archive, Files and documents, Tray and screenshot and Remote access
     does:
-      - closes with ×, Esc or a tap outside
+      - opens as the full Settings page over the tab and closes with × or Esc
     links:
       - to: settings.setup
         via: no config.json

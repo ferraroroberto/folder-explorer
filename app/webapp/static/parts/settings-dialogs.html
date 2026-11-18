@@ -1,20 +1,20 @@
-<dialog class="detail-dialog" id="settingsDialog" data-surface="settings.sheet" data-track-view="settings-sheet">
-  <div class="detail-card">
-    <div class="detail-header">
-      <h2 tabindex="-1">Settings</h2>
-      <button type="button" class="icon-button detail-close" aria-label="Close" data-track="settings-close" data-close>
-        <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
-      </button>
-    </div>
-    <div class="row row-stack" id="setupCard" data-surface="settings.setup" hidden>
+<dialog class="settings-page" id="settingsDialog" data-surface="settings.sheet" data-track-view="settings-sheet" aria-labelledby="settingsTitle">
+  <header class="settings-page-head">
+    <h2 class="settings-page-title" id="settingsTitle" tabindex="-1">Settings</h2>
+    <button type="button" class="icon-button settings-page-close" aria-label="Close settings" data-track="settings-close" data-close>
+      <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+    </button>
+  </header>
+  <div class="settings-page-body">
+    <section class="card settings-group settings-setup" id="setupCard" data-surface="settings.setup" hidden>
       <span>Set up folder-explorer</span>
       <p class="row-note">There is no config.json yet, so the built-in defaults are in use. Create it from config.example.json to keep your folders and settings in a file. An existing config.json is never overwritten.</p>
       <div class="row-line">
         <button type="button" class="button-tint" id="createConfig" data-track="create-config">Create config.json</button>
       </div>
-    </div>
+    </section>
     <div class="settings-groups">
-      <h3 class="settings-overline" id="groupDisplay">Display</h3>
+      <h3 class="settings-group-label" id="groupDisplay">Display</h3>
       <section class="card settings-group" aria-labelledby="groupDisplay" data-surface="settings.display">
         <div class="settings-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-file-text"></use></svg>
@@ -34,7 +34,7 @@
           </div>
         </div>
       </section>
-      <h3 class="settings-overline" id="groupFeatures">Available features</h3>
+      <h3 class="settings-group-label" id="groupFeatures">Available features</h3>
       <section class="card settings-group" aria-labelledby="groupFeatures" data-surface="settings.features">
         <label class="settings-row feature-row">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
@@ -74,7 +74,7 @@
         </label>
       </section>
       <p class="settings-footnote">Every block is on by default. A block that is off hides its screens, stops its background work and skips its calls; this machine's choice is kept in config.json, which is never committed.</p>
-      <h3 class="settings-overline" id="groupScanning">Scanning</h3>
+      <h3 class="settings-group-label" id="groupScanning">Scanning</h3>
       <section class="card settings-group" aria-labelledby="groupScanning" data-surface="settings.scanning">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="schedule" data-track="open-setting-schedule">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-clock"></use></svg>
@@ -100,7 +100,7 @@
           <span class="settings-row-value" id="indexSize"></span>
         </div>
       </section>
-      <h3 class="settings-overline" id="groupEmail" data-feature="email">Email</h3>
+      <h3 class="settings-group-label" id="groupEmail" data-feature="email">Email</h3>
       <section class="card settings-group" aria-labelledby="groupEmail" data-surface="settings.email" data-feature="email">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="email-roots" data-track="open-setting-email-roots">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mail"></use></svg>
@@ -121,7 +121,7 @@
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
       </section>
-      <h3 class="settings-overline" id="groupOutlook" data-feature="archive">Outlook archive</h3>
+      <h3 class="settings-group-label" id="groupOutlook" data-feature="archive">Outlook archive</h3>
       <section class="card settings-group" aria-labelledby="groupOutlook" data-surface="settings.outlook-group" data-feature="archive">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="outlook" data-track="open-setting-outlook">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-archive"></use></svg>
@@ -136,7 +136,7 @@
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
       </section>
-      <h3 class="settings-overline" id="groupFiles">Files and documents</h3>
+      <h3 class="settings-group-label" id="groupFiles">Files and documents</h3>
       <section class="card settings-group" aria-labelledby="groupFiles" data-surface="settings.files">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="markdown-search" data-feature="documents" data-track="open-setting-markdown-search">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-search"></use></svg>
@@ -163,7 +163,7 @@
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
       </section>
-      <h3 class="settings-overline" id="groupTray">Tray and screenshot</h3>
+      <h3 class="settings-group-label" id="groupTray">Tray and screenshot</h3>
       <section class="card settings-group" aria-labelledby="groupTray" data-surface="settings.tray">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="tray-click" data-track="open-setting-tray-click">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-mouse-pointer-2"></use></svg>
@@ -178,7 +178,7 @@
           <svg class="icon settings-row-chevron" aria-hidden="true"><use href="#i-chevron-right"></use></svg>
         </button>
       </section>
-      <h3 class="settings-overline" id="groupRemote">Remote access</h3>
+      <h3 class="settings-group-label" id="groupRemote">Remote access</h3>
       <section class="card settings-group" aria-labelledby="groupRemote" data-surface="settings.remote-group">
         <button type="button" class="settings-row" aria-haspopup="dialog" data-open="remote" data-track="open-setting-remote">
           <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-lock"></use></svg>
@@ -191,7 +191,7 @@
   </div>
 </dialog>
 
-<dialog class="detail-dialog" id="settingDialog" data-surface="settings.setting" data-track-view="setting-sheet">
+<dialog class="detail-dialog settings-sheet" id="settingDialog" data-surface="settings.setting" data-track-view="setting-sheet">
   <div class="detail-card">
     <div class="detail-header">
       <h2 tabindex="-1" id="settingTitle">Setting</h2>
@@ -199,6 +199,7 @@
         <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
       </button>
     </div>
+    <div class="settings-sheet-body">
 
     <div data-setting="schedule" data-title="Scan schedule" data-surface="settings.schedule" hidden>
       <section class="card settings-group">
@@ -417,5 +418,7 @@
       </section>
       <p class="settings-footnote" id="remoteNote"></p>
     </div>
+    </div>
+    <div class="detail-actions"><button type="button" class="button-primary detail-save-btn" data-close data-track="setting-done">Done</button></div>
   </div>
 </dialog>

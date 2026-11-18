@@ -255,7 +255,8 @@ function wireClicks(nav) {
       default: break;
     }
   });
-  document.querySelectorAll('dialog').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
+  // A tap outside a sheet closes it; the Settings page fills the screen, so a tap on its canvas is not outside.
+  document.querySelectorAll('dialog:not(.settings-page)').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 }
 
 /** Back to the defaults: the first root, every type, totals by size. */

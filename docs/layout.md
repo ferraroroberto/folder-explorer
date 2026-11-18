@@ -32,7 +32,7 @@ folder-explorer/
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the document viewer), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
 │       │                       #   versioned search and flagged-mail API other apps call, docs/service-api.md), archive_v1 (the archive
-│       │                       #   verbs over HTTP, each run as the CLI's child), shortlist (the cleanup shortlist: files marked in Largest, in state.sqlite3)
+│       │                       #   verbs over HTTP, each run as the CLI's child), explorer_v1 (the front File Explorer folder, for a caller on this PC), shortlist (the cleanup shortlist: files marked in Largest, in state.sqlite3)
 │       └── static/             # the PWA: index.html, one ES module per view, app.css, tokens.css, icons;
 │                           #   state.js also holds the page's view of the feature blocks (`isOn`, and `data-features-off` on `<html>`, which app.css reads to hide a block's `[data-feature]` parts);
                           #   parts/icon-sprite.html is the inline icon sprite and parts/settings-dialogs.html the Settings page and its setting sheet, each spliced into index.html where its include line stands;

@@ -1,6 +1,6 @@
 # Service API (v1)
 
-folder-explorer is the fleet's one folder and email search and its one archive. Another app on this PC calls it over HTTP instead of keeping its own index or spawning its CLI. Search comes first, then the flagged-mail list; the archive verbs follow, under [Archive](#archive). The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them, flagged mail included.
+folder-explorer is the fleet's one folder and email search and its one archive. Another app on this PC calls it over HTTP instead of keeping its own index or spawning its CLI. Search comes first, then the flagged-mail list and the front File Explorer folder; the archive verbs follow, under [Archive](#archive). The contract below is version 1: a field is only ever added to it, never renamed or removed, while `schema_version` stays 1. `src/search_api.py` owns the states and hit shapes; `tests/test_search_api_v1.py` pins them, flagged mail included.
 
 ## Calling it
 
@@ -144,6 +144,23 @@ Mails come oldest first (`date_sent`, then `id`), so a backlog drains in arrival
 | `preview` | the full indexed text preview, not the 200-character snippet the search hits carry |
 
 An index with no `flag_status` column (one built before flags were read) answers `not-configured` with that in `reason`, never an empty list; re-indexing the email folders adds the column.
+
+## `GET /api/v1/explorer/folder`
+
+The folder shown in the foremost File Explorer window, for an app that wants "the folder I have open" (a task's Folder field). It answers a caller on this PC only, reads no file and writes nothing; the one read of the windows lives in `src/explorer_window.py`, which the Archive sheet's own route also uses, and `tests/test_explorer_api_v1.py` pins the answers with the read faked. Unlike the sheet's route it does not keep to the email folders: any folder answers. It is not the search envelope: there is no `reason` on success, and every failure is `state: "error"` with its own `code`.
+
+```json
+{"schema_version": 1, "state": "ok", "folder_path": "D:\\Projects\\Alpha"}
+```
+
+| `code` | HTTP | When |
+| --- | --- | --- |
+| none (`state: "ok"`) | 200 | `folder_path` is the absolute path of the front folder window |
+| `no_explorer_folder` | 404 | the shell answered and no File Explorer window shows a folder; a window with no filesystem path (This PC, Network, Control Panel, Recycle Bin) does not count, so a made-up path is never answered |
+| `explorer_unavailable` | 502 | Windows could not be asked which folders are open; try again, it is not "nothing is open" |
+| `not_this_pc` | 403 | the caller is not on this PC; no window is read |
+
+An error carries `reason` in plain text for a person.
 
 ## Archive
 

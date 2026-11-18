@@ -8,6 +8,9 @@
  * (Save or Ctrl+S): it sends the version the editor opened, and a file that
  * changed on disk since then stops at the conflict screen instead of being
  * overwritten. Until it is saved or discarded, a draft stays on this device.
+ * A document is named by root, scan id and item id and saved through the server,
+ * or, for a dropped file no scan has, held by its browser file handle and saved
+ * through that (local-doc.js); the editor itself is the same for both.
  */
 
 import { api } from './api.js';
@@ -18,6 +21,7 @@ import { askLeave, confirmSheet } from './doc-confirm.js';
 import { hideConflict, showConflict } from './doc-conflict.js';
 import { drawDoc, releaseDoc, stateHtml } from './doc-view.js';
 import { addEditorIcons } from './doc-icons.js';
+import { localSource } from './localdoc/local-doc.js';
 import { caretLine, formatEdit, highlightSource } from './md-source.js';
 import { showToast } from './_vendored/toast/toast.js';
 
@@ -34,16 +38,14 @@ const FORMATS = [
 // Six keys plus link and indent: eight across a phone keep each key over the 44px touch floor.
 const KEYS = ['#', '*', '_', '`', '-', '>'];
 
-const draftKey = (loc) => APP + '.draft:' + loc.root + ':' + loc.scan_id + ':' + loc.id;
-
-function readDraft(loc) {
-  try { return JSON.parse(localStorage.getItem(draftKey(loc)) || 'null'); } catch (e) { return null; }
+function readDraft(key) {
+  try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
 }
 
-function writeDraft(loc, draft) {
+function writeDraft(key, draft) {
   try {
-    if (draft) localStorage.setItem(draftKey(loc), JSON.stringify(draft));
-    else localStorage.removeItem(draftKey(loc));
+    if (draft) localStorage.setItem(key, JSON.stringify(draft));
+    else localStorage.removeItem(key);
   } catch (e) { /* storage is off: the draft lives only in this page until it is saved */ }
 }
 
@@ -51,6 +53,28 @@ const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Typ
 
 async function json(res) {
   try { return await res.json(); } catch (e) { return null; }
+}
+
+/** What a request to the server answered: ``{res, body}``, with no ``res`` when it never answered. */
+async function ask(request) {
+  try {
+    const res = await request;
+    return { res, body: await json(res) };
+  } catch (e) {
+    return { res: null, body: null };
+  }
+}
+
+/** The editor's side of a document the scan has: named by root, scan id and item id, read and saved by the server. */
+function serverSource(loc) {
+  const where = { root: loc.root, scan_id: loc.scan_id, id: loc.id };
+  return {
+    draftKey: () => APP + '.draft:' + loc.root + ':' + loc.scan_id + ':' + loc.id,
+    previewDoc: (body) => ({ ...body, root: loc.root, scan_id: loc.scan_id }),
+    source: () => ask(api('/api/doc/source?' + new URLSearchParams({ root: loc.root, scan: String(loc.scan_id), id: String(loc.id) }))),
+    render: (text) => ask(post('/api/doc/render', { ...where, text })),
+    save: (text, version, overwrite) => ask(post('/api/doc/save', { ...where, text, version, overwrite: !!overwrite })),
+  };
 }
 
 function shell() {
@@ -75,11 +99,10 @@ function shell() {
 
 /** One open editor: its file, the copy on disk, the version a save is checked against, and its elements. */
 class Editor {
-  constructor(mount, loc, hooks) {
+  constructor(mount, src, hooks) {
     this.mount = mount;
-    this.loc = loc;
+    this.src = src;
     this.hooks = hooks;
-    this.where = { root: loc.root, scan_id: loc.scan_id, id: loc.id };
     this.disk = null;
     this.version = '';
     this.ready = false;
@@ -96,8 +119,11 @@ class Editor {
 
   status(text) { if (this.el.status) this.el.status.textContent = text; }
 
+  /** The draft's place: a local file's holds the version of the copy it was made against, so a changed file never gets a stale draft. */
+  draftKey() { return this.src.draftKey(this.disk ? this.disk.version : ''); }
+
   keepDraft() {
-    if (this.ready) writeDraft(this.loc, this.dirty() ? { text: this.el.ta.value, version: this.version, at: Date.now() } : null);
+    if (this.ready) writeDraft(this.draftKey(), this.dirty() ? { text: this.el.ta.value, version: this.version, at: Date.now() } : null);
   }
 
   changed() {
@@ -129,15 +155,13 @@ class Editor {
 
   async renderPreview() {
     const mine = ++this.seq;
-    let res;
-    try { res = await post('/api/doc/render', { ...this.where, text: this.el.ta.value }); } catch (e) { return; }
-    const body = await json(res);
-    if (mine !== this.seq || this.closed) return;
+    const { res, body } = await this.src.render(this.el.ta.value);
+    if (!res || mine !== this.seq || this.closed) return;
     if (!res.ok) {
       this.el.preview.innerHTML = stateHtml(refusal(res.status, body));
       return;
     }
-    drawDoc(this.el.preview, { ...body, root: this.loc.root, scan_id: this.loc.scan_id }, true);
+    drawDoc(this.el.preview, this.src.previewDoc(body), true);
     this.follow();
   }
 
@@ -173,11 +197,13 @@ class Editor {
       theirs: typeof body.text === 'string' ? body.text : null,
       mine: () => this.el.ta.value,
       onLoadTheirs: () => {
+        writeDraft(this.draftKey(), null);
         this.disk = { text: body.text, version: body.version };
         this.setText(body.text, body.version);
         this.status('Showing the copy on disk');
       },
       onOverwrite: () => { this.version = body.version; this.save(true); },
+      backup: !this.src.local,
     });
   }
 
@@ -187,17 +213,13 @@ class Editor {
     this.saving = true;
     this.status('Saving…');
     const text = this.el.ta.value;
-    let res = null;
-    try {
-      res = await post('/api/doc/save', { ...this.where, text, version: this.version, overwrite: !!overwrite });
-    } catch (e) { res = null; }
-    const body = res ? await json(res) : null;
+    const { res, body } = await this.src.save(text, this.version, overwrite);
     this.saving = false;
     if (res && res.ok) {
+      writeDraft(this.draftKey(), null);
       this.disk = { text, version: body.version };
       this.version = body.version;
       hideConflict(this.el.slot);
-      writeDraft(this.loc, null);
       this.changed();
       this.status('Saved');
       showToast('Saved');
@@ -211,7 +233,7 @@ class Editor {
   }
 
   dropChanges() {
-    writeDraft(this.loc, null);
+    writeDraft(this.draftKey(), null);
     if (this.ready) this.setText(this.disk.text, this.disk.version);
     this.status('');
   }
@@ -282,19 +304,9 @@ class Editor {
     }
   }
 
-  async fetchSource() {
-    const query = new URLSearchParams({ root: this.loc.root, scan: String(this.loc.scan_id), id: String(this.loc.id) });
-    try {
-      const res = await api('/api/doc/source?' + query);
-      return { res, body: await json(res) };
-    } catch (e) {
-      return { res: null, body: null };
-    }
-  }
-
   async load() {
     this.mount.innerHTML = '<p class="doc-loading" role="status">Loading the source…</p>';
-    const { res, body } = await this.fetchSource();
+    const { res, body } = await this.src.source();
     if (this.closed) return;
     if (!res || !res.ok || !body || !body.editable) {
       this.mount.innerHTML = stateHtml(res ? refusal(res.status, body) : NO_ANSWER);
@@ -310,7 +322,7 @@ class Editor {
     this.el.root.dataset.kind = this.html ? 'html' : 'markdown';
     this.disk = { text: body.text, version: body.version };
     this.ready = true;
-    const draft = readDraft(this.loc);
+    const draft = readDraft(this.draftKey());
     const restored = draft && typeof draft.text === 'string' && draft.text !== body.text;
     // A draft made against an older copy keeps that copy's version, so its Save stops at the conflict screen.
     this.setText(restored ? draft.text : body.text, restored ? draft.version : body.version);
@@ -347,15 +359,21 @@ class Editor {
   }
 }
 
+/** The hooks both hosts give an editor: the Save button follows unsaved changes and goes when the file can't be edited. */
+export const saveButtonHooks = (button) => ({
+  onDirty: (dirty) => { button.disabled = !dirty; },
+  onReady: (editable) => { if (!editable) button.hidden = true; },
+});
+
 /**
- * Open the editor for ``loc`` (``{root, scan_id, id}``) in ``mount``.
+ * Open the editor for ``loc`` in ``mount``: ``{root, scan_id, id}`` for a document the scan has, or ``{handle, name}`` for a dropped file's handle.
  * ``hooks.onDirty(dirty)`` follows unsaved changes; ``hooks.onReady(editable)``
  * says whether the file opened for editing. The host calls ``save()``,
  * ``dirty()``, ``leave()`` (resolves true when it may go), ``keepDraft()``
  * (before the page unloads) and ``close()``.
  */
 export function openEditor(mount, loc, hooks) {
-  const editor = new Editor(mount, loc, hooks);
+  const editor = new Editor(mount, loc.handle ? { ...localSource(loc.handle, loc.name), local: true } : serverSource(loc), hooks);
   editor.load();
   return editor;
 }

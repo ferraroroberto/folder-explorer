@@ -6,6 +6,8 @@
  * (``/doc?dropped=<token>``), over ``postMessage`` between the two same-origin
  * windows. The text is never in the address, and the page gives it out once,
  * to the window it opened; a reload of that window finds nothing and says so.
+ * A file the browser gave a handle for (local-doc.js) goes with it in the same
+ * message: a handle is structured-cloneable between same-origin windows.
  */
 
 export const DROPPED_PARAM = 'dropped';
@@ -29,19 +31,25 @@ function listen() {
     if (e.origin !== location.origin || !m || m.type !== ASK || !e.source) return;
     const mine = held.get(m.token);
     // A token is given once, and only to the window it was made for.
-    const doc = mine && mine.win === e.source ? mine.doc : null;
-    if (doc) held.delete(m.token);
-    e.source.postMessage({ type: GIVE, token: m.token, doc }, location.origin);
+    const given = mine && mine.win === e.source ? mine : null;
+    if (given) held.delete(m.token);
+    const reply = { type: GIVE, token: m.token, doc: given ? given.doc : null, handle: given ? given.handle : null };
+    try {
+      e.source.postMessage(reply, location.origin);
+    } catch (err) {
+      // A handle the browser won't clone still leaves the document to read.
+      e.source.postMessage({ ...reply, handle: null }, location.origin);
+    }
   });
 }
 
 const newToken = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
 
-/** Point ``win`` (a window this page opened) at the /doc view of ``doc``, which it will ask this page for. */
-export function handOff(win, doc) {
+/** Point ``win`` (a window this page opened) at the /doc view of ``doc`` and its file ``handle``, if the browser gave one, which it will ask this page for. */
+export function handOff(win, doc, handle) {
   listen();
   const token = newToken();
-  held.set(token, { win, doc });
+  held.set(token, { win, doc, handle: handle || null });
   setTimeout(() => held.delete(token), KEEP_MS);
   win.location.href = '/doc?' + DROPPED_PARAM + '=' + token;
 }
@@ -49,7 +57,7 @@ export function handOff(win, doc) {
 /** The token a /doc address carries for a dropped file, or null. */
 export const droppedToken = (href) => new URL(href, location.origin).searchParams.get(DROPPED_PARAM);
 
-/** The new window's side: the rendered document the opener holds for ``token``, or null when it can't give it. */
+/** The new window's side: ``{doc, handle}`` the opener holds for ``token`` (``handle`` is null when the browser gave none), or null when it can't give it. */
 export function fetchDropped(token) {
   return new Promise((resolve) => {
     const opener = window.opener;
@@ -58,14 +66,14 @@ export function fetchDropped(token) {
       return;
     }
     let timer = null;
-    const done = (doc) => {
+    const done = (given) => {
       clearTimeout(timer);
       window.removeEventListener('message', on);
-      resolve(doc);
+      resolve(given);
     };
     function on(e) {
       const m = e.data;
-      if (e.source === opener && e.origin === location.origin && m && m.type === GIVE && m.token === token) done(m.doc || null);
+      if (e.source === opener && e.origin === location.origin && m && m.type === GIVE && m.token === token) done(m.doc ? { doc: m.doc, handle: m.handle || null } : null);
     }
     window.addEventListener('message', on);
     timer = setTimeout(() => done(null), WAIT_MS);

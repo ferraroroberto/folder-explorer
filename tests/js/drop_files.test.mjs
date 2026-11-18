@@ -1,7 +1,7 @@
 // What a dropped Markdown or HTML file sends: its name, size, modified time and the SHA-256 of its bytes (then its text), never a path.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DROP_MAX_BYTES, dragHasFiles, isDocumentName, matchBody, pickDrop, renderBody, toHex, whyNote } from '../../app/webapp/static/drop-files.js';
+import { DROP_MAX_BYTES, dragHasFiles, fileItemFor, isDocumentName, matchBody, noHandleNote, pickDrop, renderBody, toHex, whyNote } from '../../app/webapp/static/drop-files.js';
 
 // A browser File carries more than the page needs; a Chromium build may add a path-like property too.
 const file = (name, size = 10, extra = {}) => ({ name, size, lastModified: 1700000000123.7, type: '', webkitRelativePath: 'folder/' + name, path: 'C:\\invented\\' + name, ...extra });
@@ -63,4 +63,20 @@ test('only a drag of files shows the drop target', () => {
   assert.equal(dragHasFiles({ types: ['text/plain', 'Files'] }), true);
   assert.equal(dragHasFiles({ types: ['text/plain', 'text/uri-list'] }), false);
   assert.equal(dragHasFiles(null), false);
+});
+
+test('the item to ask for a handle is the one that carries the dropped file', () => {
+  const a = file('a.png');
+  const b = file('b.md');
+  const items = [{ kind: 'string' }, { kind: 'file', id: 'a' }, { kind: 'file', id: 'b' }];
+  assert.equal(fileItemFor({ files: [a, b], items }, b).id, 'b');
+  assert.equal(fileItemFor({ files: [a, b], items }, a).id, 'a');
+  assert.equal(fileItemFor({ files: [a, b], items }, file('c.md')), null);
+  assert.equal(fileItemFor({ files: [a], items: [] }, a), null);
+  assert.equal(fileItemFor(null, a), null);
+});
+
+test('a drop with no handle says why, by whether the browser could have given one', () => {
+  assert.match(noHandleNote(true), /no file to save back to/);
+  assert.match(noHandleNote(false), /Chrome or Edge/);
 });

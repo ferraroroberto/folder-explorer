@@ -4,10 +4,13 @@
  * file is looked up by what the page knows: name, size, modified time and a
  * SHA-256 of the bytes (``POST /api/doc/dropped/match``). The one file on this
  * PC with those bytes, scanned or not, opens like any other document, with
- * Edit; otherwise the page reads the text and has it rendered read-only
- * (``POST /api/doc/dropped/render``) and a toast says why. A drop of anything
- * else says so in a toast. The host decides how each opens: ``host.open(loc)`` for an
- * indexed document, ``host.show(doc)`` for a rendered one. A host with
+ * Edit; otherwise the page reads the text and has it rendered
+ * (``POST /api/doc/dropped/render``). Where the browser gave the drop a file
+ * handle (Chrome and Edge on a PC) the rendered document opens with Edit and
+ * saves through that handle (local-doc.js); without one it is read-only and a
+ * toast says why. A drop of anything else says so in a toast. The host decides
+ * how each opens: ``host.open(loc)`` for an indexed document,
+ * ``host.show(doc, handle)`` for a rendered one. A host with
  * ``ownWindow`` opens each in a new /doc window, like Explore's "Open in new
  * window"; if the browser blocks that window, the same two calls show it in
  * place and a toast says why.
@@ -15,7 +18,8 @@
 
 import { api } from './api.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
-import { dragHasFiles, matchBody, pickDrop, renderBody, toHex, whyNote } from './drop-files.js';
+import { dragHasFiles, fileItemFor, matchBody, noHandleNote, pickDrop, toHex, whyNote } from './drop-files.js';
+import { handleFrom, handlesSupported, renderDropped } from './localdoc/local-doc.js';
 import { docUrl } from './doc-view.js';
 import { handOff } from './doc-handoff.js';
 import { glyph } from './fmt.js';
@@ -46,8 +50,11 @@ async function digest(file) {
   }
 }
 
-/** What a dropped ``file`` is: ``{kind: 'indexed', loc}``, ``{kind: 'dropped', doc, note}`` or ``{kind: 'refused', message}``. */
-export async function resolveDrop(file) {
+/**
+ * What a dropped ``file`` is: ``{kind: 'indexed', loc}``, ``{kind: 'dropped', doc, handle, note}`` (``handle`` is null when it can't be edited)
+ * or ``{kind: 'refused', message}``. ``handling`` is the pending answer of ``handleFrom`` for the drop's item.
+ */
+export async function resolveDrop(file, handling) {
   const found = await post('/api/doc/dropped/match', matchBody(file, await digest(file)));
   if (!found.ok) return { kind: 'refused', message: found.message };
   if (found.body.match) return { kind: 'indexed', loc: { ...found.body.match, name: file.name } };
@@ -57,8 +64,11 @@ export async function resolveDrop(file) {
   } catch (e) {
     return { kind: 'refused', message: 'The browser could not read the dropped file' };
   }
-  const shown = await post('/api/doc/dropped/render', renderBody(file, text));
-  return shown.ok ? { kind: 'dropped', doc: shown.body, note: whyNote(found.body.why) } : { kind: 'refused', message: shown.message };
+  const [shown, handle] = await Promise.all([renderDropped(file.name, text), handling]);
+  if (!shown.ok) return { kind: 'refused', message: shown.message };
+  // With a handle the file is the reader's to edit, so there is nothing to explain.
+  const note = handle ? '' : [whyNote(found.body.why), noHandleNote(handlesSupported())].filter(Boolean).join(' ');
+  return { kind: 'dropped', doc: shown.body, handle: handle || null, note };
 }
 
 function overlay() {
@@ -66,8 +76,9 @@ function overlay() {
   el.className = 'drop-overlay';
   el.dataset.surface = 'chrome.drop-overlay';
   el.setAttribute('aria-hidden', 'true');
+  const text = handlesSupported() ? 'It opens for editing, wherever the file is.' : 'It opens for editing when the scan has it, and read-only when it doesn\'t.';
   el.innerHTML = '<div class="drop-card">' + glyph('file-text') + '<p class="drop-title">Drop a Markdown or HTML file to open it</p>' +
-    '<p class="drop-text">It opens for editing when the scan has it, and read-only when it doesn\'t.</p></div>';
+    '<p class="drop-text">' + text + '</p></div>';
   // The top layer keeps it above an open sheet; a browser without popovers shows it as a fixed layer.
   if (typeof el.showPopover === 'function') el.setAttribute('popover', 'manual');
   document.body.appendChild(el);
@@ -90,7 +101,7 @@ function toastAboveSheet(message) {
 /** Show a resolved drop in the window ``popup`` that was opened for it; false when it can't (the caller closes the window). */
 function showInWindow(popup, r) {
   if (r.kind === 'indexed') popup.location.href = docUrl(r.loc);
-  else if (r.kind === 'dropped') handOff(popup, r.doc);
+  else if (r.kind === 'dropped') handOff(popup, r.doc, r.handle);
   else return false;
   if (r.note) showToast(r.note);
   return true;
@@ -138,16 +149,18 @@ export function initDrop(host) {
     if (!picked.file) { showToast(picked.message, 'error'); return; }
     if (busy) return;
     busy = true;
+    // Asked now: a drag item is dead once this event has been handled.
+    const handling = handleFrom(fileItemFor(e.dataTransfer, picked.file), picked.file.name);
     // Opened now, while the drop still counts as the reader's own act, and pointed at the file once it is resolved.
     const popup = host.ownWindow ? window.open('', '_blank') : null;
     try {
-      const r = await resolveDrop(picked.file);
+      const r = await resolveDrop(picked.file, handling);
       if (popup && showInWindow(popup, r)) return;
       if (popup) popup.close();
       if (r.kind === 'refused') showToast(r.message, 'error');
       else {
         // The sheet is open once the host answers, so the note goes on top of it.
-        await (r.kind === 'indexed' ? host.open(r.loc) : host.show(r.doc));
+        await (r.kind === 'indexed' ? host.open(r.loc) : host.show(r.doc, r.handle));
         const notes = [r.note, host.ownWindow && BLOCKED].filter(Boolean);
         if (notes.length) toastAboveSheet(notes.join(' '));
       }

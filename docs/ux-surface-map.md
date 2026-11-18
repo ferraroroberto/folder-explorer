@@ -194,8 +194,8 @@ flowchart LR
 
 - **Root:** `data-surface`
 - **Reach:** dragging a file over the app window or the document window
-- **Holds:** *Drop a Markdown or HTML file to open it* and a line on what opens
-- **Does:** the drop opens an indexed document for editing, or any other as read-only, in its own window
+- **Holds:** *Drop a Markdown or HTML file to open it* and a line on what opens (for editing wherever the file is where the browser gives a handle, else for editing only when the scan has it)
+- **Does:** the drop opens an indexed document for editing, and any other for editing too when the browser gives its file handle (read-only otherwise), in its own window
 - **States:** absent while the Documents block is off
 - **Why:** it is a popover in the top layer so it shows above an open sheet
 - **Leads to:** [Document window](#docwindow-document-window) (a drop)
@@ -742,7 +742,8 @@ flowchart LR
   - an HTML page draws in a frame sandboxed without allow-same-origin
   - Esc in Edit goes back to View; closing with unsaved changes asks first
 - **States:**
-  - a dropped file the scan does not have is shown read-only with a note
+  - a dropped file the scan does not have is shown read-only with a note, or with Edit and a note that Save writes it back to the file when the browser gave its handle; it has no Open in new window
+  - Save on such a file asks the browser for write permission (once per file), and a refusal keeps the draft
   - a state block when it cannot show (see doc.state)
 - **Why:** the sheet never sends a path; every document is named by root, scan id and item id
 - **Leads to:**
@@ -797,7 +798,7 @@ flowchart LR
   - *Changed on disk since you opened it* and that the text is not lost
   - Compare, Copy my text, Load theirs and Overwrite theirs…
   - a line diff of the two copies after Compare
-- **Does:** Overwrite theirs… asks first and keeps the replaced copy as a backup in the app's data folder
+- **Does:** Overwrite theirs… asks first and keeps the replaced copy as a backup in the app's data folder; for a dropped file saved through the browser it says the copy is not kept
 - **Leads to:** [Confirm sheet](#docconfirm-confirm-sheet) (Overwrite theirs…)
 
 ### `doc.confirm` Confirm sheet
@@ -826,7 +827,7 @@ flowchart LR
   - the nav leads back into the app on a tab, asking first when there are unsaved changes
   - Esc in Edit goes back to View
 - **States:**
-  - a dropped file shows read-only with no address of its own and hides the mode switch
+  - a dropped file has no address of its own: read-only with the mode switch hidden, or, when the browser gave its handle, with View / Edit and Save writing back to the file
   - an address that names no document says so
   - the browser asks before the window closes with unsaved changes
 - **Desktop:** the outline sits beside the text from 1100px with a mouse; elsewhere it is a popover under the header

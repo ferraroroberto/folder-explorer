@@ -41,7 +41,9 @@ folder-explorer/
 │                           #   doc-edit.js the editor both share (doc-conflict.js its conflict screen, doc-confirm.js its confirm
 │                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
 │                           #   doc-drop.js takes a Markdown or HTML file dropped on the window (drop-files.js its DOM-free request builders,
-│                           #   doc-handoff.js hands a rendered one to the /doc window it opens in)
+│                           #   doc-handoff.js hands a rendered one, and its file handle, to the /doc window it opens in)
+│           ├── localdoc/       # local-doc.js: a dropped file no scan covers, read and saved through the browser's file handle (the only page-side writer of a
+│           │                   #   user file); local-text.js its DOM-free text shape: byte-order mark, line ends, version
 │           ├── filters/        # filter-trigger.js: the Filters & sort button's count badge and accessible name, shared by the Explore and Search sheets
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/

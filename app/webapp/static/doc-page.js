@@ -6,16 +6,19 @@
  * popover below it. View | Edit switches to the editor; Esc goes back to View.
  * The fleet nav leads back into the app: a tab opens the app on that tab,
  * after asking when there are unsaved changes. A file dropped on the app that the
- * scan doesn't have opens here too, as ``/doc?dropped=<token>`` (doc-handoff.js).
+ * scan doesn't have opens here too, as ``/doc?dropped=<token>`` (doc-handoff.js);
+ * with the browser's handle for it, it has Edit and saves through that handle
+ * (local-doc.js), otherwise it is read-only.
  */
 
 import { authHeaders, getJSON } from './api.js';
 import { esc } from './fmt.js';
 import { APP } from './state.js';
 import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
-import { openEditor } from './doc-edit.js';
+import { openEditor, saveButtonHooks } from './doc-edit.js';
 import { initDrop } from './doc-drop.js';
 import { droppedToken, fetchDropped } from './doc-handoff.js';
+import { renderLocal, withLocal } from './localdoc/local-doc.js';
 import { wireThemeToggle } from './theme.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
@@ -28,6 +31,8 @@ const WIDE = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
 
 // The address's document; null for an address that names none and for a dropped file the scan doesn't have.
 let loc = locFromUrl(location.href);
+// A dropped file the browser gave a handle for, edited and saved through it: ``{handle, name}``; null otherwise.
+let local = null;
 let editor = null;
 // Set once the reader chose how to leave (the in-app question), so the browser's own prompt doesn't ask again.
 let leaving = false;
@@ -53,14 +58,12 @@ function markMode(mode) {
 }
 
 function startEditing() {
-  if (editor || !loc) return;
+  const target = loc || local;
+  if (editor || !target) return;
   markMode('edit');
   placeOutline(false);
   releaseDoc($('docBody'));
-  editor = openEditor($('docBody'), loc, {
-    onDirty: (dirty) => { $('docSave').disabled = !dirty; },
-    onReady: (editable) => { if (!editable) $('docSave').hidden = true; },
-  });
+  editor = openEditor($('docBody'), target, saveButtonHooks($('docSave')));
 }
 
 /** Back to View: the draft, if any, stays on the device and the page shows the copy on disk. */
@@ -70,7 +73,8 @@ function stopEditing() {
   editor.close();
   editor = null;
   markMode('view');
-  load(false);
+  if (local) viewLocal();
+  else load(false);
 }
 
 function placeOutline(hasOutline) {
@@ -135,34 +139,49 @@ async function load(download) {
   if (started.fragment) scrollToHeading($('docBody'), started.fragment);
 }
 
+/** View of a local file: its copy on disk now, read through the handle and rendered by the server. */
+async function viewLocal() {
+  const started = local;
+  $('docBody').innerHTML = '<p class="doc-loading" role="status">Loading…</p>';
+  const r = await renderLocal(started.handle, started.name);
+  if (local !== started) return;
+  if (!r.ok) {
+    $('docBody').innerHTML = stateHtml(r);
+    return;
+  }
+  drawDoc($('docBody'), withLocal(r.body, started.handle));
+  drawSide(r.body.outline, await fetchRecent());
+}
+
 /** A dropped file the scan has opens as its document (a new address, so Edit and the bookmark work). */
 function openIndexed(next) {
   go(docUrl(next));
 }
 
-/** A dropped file the scan doesn't have, already rendered: shown read-only here, with no address of its own. */
-async function showDropped(doc) {
+/** A dropped file the scan doesn't have, already rendered, with no address of its own: read-only here, or with Edit when the browser gave its ``handle``. */
+async function showDropped(doc, handle) {
   if (editor) {
     if (!(await editor.leave())) return;
     editor.close();
     editor = null;
   }
   loc = null;
+  local = handle ? { handle, name: doc.name } : null;
   markMode('view');
-  document.querySelector('.doc-modebar').hidden = true;
+  document.querySelector('.doc-modebar').hidden = !local;
   document.title = doc.name + ' · Folder explorer';
   $('docTitle').textContent = doc.name;
   renderHeadStatus($('docStatus'), [], 'Dropped file');
-  drawDoc($('docBody'), doc);
+  drawDoc($('docBody'), withLocal(doc, handle));
   drawSide(doc.outline, await fetchRecent());
 }
 
 /** The window a drop opened for a file the scan doesn't have: its document comes from the app page that opened it. */
 async function loadDropped(token) {
   $('docBody').innerHTML = '<p class="doc-loading" role="status">Loading…</p>';
-  const doc = await fetchDropped(token);
-  if (doc) {
-    await showDropped(doc);
+  const given = await fetchDropped(token);
+  if (given) {
+    await showDropped(given.doc, given.handle);
     return;
   }
   renderHeadStatus($('docStatus'), [], '');

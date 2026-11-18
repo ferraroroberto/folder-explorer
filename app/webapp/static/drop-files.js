@@ -3,7 +3,9 @@
  * A browser hands the page a dropped file's bytes and name, never its path.
  * The server is told the name, size, modified time and a SHA-256 of the bytes
  * (to find the file on this PC), and the text only when none matched. Nothing
- * here builds a path.
+ * here builds a path. A file none matched is edited through the browser's file
+ * handle when the drop gave one (local-doc.js); ``fileItemFor`` finds the item
+ * to ask.
  */
 
 // The viewer's size cap (src/docs/reader.py DOC_MAX_BYTES); the server checks it again.
@@ -27,6 +29,13 @@ export function pickDrop(files) {
   return { file };
 }
 
+/** The drag item that carries ``file``, to ask for its handle; null when the drop lists no such item. Items and files list a drop's files in the same order. */
+export function fileItemFor(dataTransfer, file) {
+  const index = Array.from((dataTransfer && dataTransfer.files) || []).indexOf(file);
+  const items = Array.from((dataTransfer && dataTransfer.items) || []).filter((item) => item.kind === 'file');
+  return index >= 0 && items[index] ? items[index] : null;
+}
+
 /** Bytes as lower-case hex, the form the server takes a SHA-256 in. */
 export const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -42,6 +51,11 @@ const WHY_NOTES = {
 
 /** The toast for a drop that opened read-only, or '' for a reason this page does not know. */
 export const whyNote = (why) => WHY_NOTES[why] || '';
+
+/** Why a file none matched has no Edit: ``supported`` is whether the browser can give a dropped file's handle at all. */
+export const noHandleNote = (supported) => (supported
+  ? "The drop gave the browser no file to save back to, so it can't be edited."
+  : 'Editing a dropped file needs Chrome or Edge on a PC.');
 
 /** The read-only render request: the name and the text the page read. */
 export const renderBody = (file, text) => ({ name: file.name, text });

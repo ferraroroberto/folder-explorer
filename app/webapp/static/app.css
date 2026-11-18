@@ -420,8 +420,6 @@ button.list-row .lr-name { font-weight: 600; }
 .feature-row > .switch-slot { margin-top: 2px; }
 .settings-row > :is(.segmented, .switch-slot, .setting-text, .setting-action, .settings-row-time) { margin-left: auto; }
 .settings-row > .settings-row-time { width: 7.5em; }
-/* WebKit draws a select's text past its box once the row shrinks it (a long option on a phone), widening the row: clip it to the box. */
-.settings-row-select { overflow: hidden; }
 .settings-row > .setting-text { width: 9em; min-width: 0; }
 .setting-intro { margin: 0 14px var(--gap); }
 .setting-editor { margin: 0 0 var(--gap); }

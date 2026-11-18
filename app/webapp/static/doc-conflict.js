@@ -3,7 +3,8 @@
  * Nothing is lost here: the editor keeps the reader's text. The screen offers
  * Compare (a line diff of the copy on disk against theirs), Copy my text, Load
  * theirs, and Overwrite theirs…, which asks first and leaves the replaced copy
- * as a backup in the app's data folder.
+ * as a backup in the app's data folder (a dropped file saved through the browser
+ * has no such folder: its sheet says the copy is not kept).
  */
 
 import { esc, glyph } from './fmt.js';
@@ -25,7 +26,7 @@ function diffHtml(theirs, mine) {
 /**
  * Show the conflict in ``slot``. ``c`` carries ``theirs`` (the text on disk, or
  * null when it can no longer be edited), ``mine()`` (the editor's text now),
- * ``onLoadTheirs()`` and ``onOverwrite()``.
+ * ``onLoadTheirs()``, ``onOverwrite()`` and ``backup`` (whether the overwritten copy is kept).
  */
 export function showConflict(slot, c) {
   slot.innerHTML = '<div class="doc-conflict" role="alert" data-surface="doc.conflict"><p class="doc-conflict-title">' + glyph('triangle-alert') +
@@ -56,7 +57,8 @@ export function showConflict(slot, c) {
     } else if (act === 'overwrite') {
       const ok = await confirmSheet({
         title: 'Overwrite the copy on disk?',
-        text: 'Your text replaces it. The copy on disk now is kept as a backup in the app\'s data folder.',
+        text: c.backup ? 'Your text replaces it. The copy on disk now is kept as a backup in the app\'s data folder.'
+          : 'Your text replaces it. The copy on disk now is not kept.',
         view: 'doc-overwrite',
         actions: [{ value: 'overwrite', label: 'Overwrite', kind: 'danger' }],
       });

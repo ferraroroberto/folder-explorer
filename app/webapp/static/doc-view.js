@@ -32,9 +32,13 @@ const STATES = {
   edit_too_large: { text: 'Documents up to 1 MB can be edited here.' },
 };
 
-// Shown above a dropped file the scan doesn't have: it renders from the text the page read, so it can't be saved back.
+// Shown above a dropped file the scan doesn't have: it renders from the text the page read, which the server can't save back.
 const DROPPED_NOTE = '<p class="doc-drop-note" role="note">' + glyph('info') +
   '<span>Dropped file, shown read-only. Editing, relative links and the files beside it need it in a scanned folder.</span></p>';
+// The same file when the browser gave the page its handle: Edit saves back to it, but its folder is still unknown to the app.
+const LOCAL_NOTE = '<p class="doc-drop-note" role="note">' + glyph('info') +
+  '<span>Dropped file. Edit saves it back to the file. Relative links and the files beside it need it in a scanned folder.</span></p>';
+const noteOf = (doc) => (doc.local ? LOCAL_NOTE : doc.dropped ? DROPPED_NOTE : '');
 
 const blobs = new WeakMap();
 // Each container's loaded images by id, so the editor's preview reuses them on every render instead of fetching again.
@@ -142,7 +146,7 @@ export function releaseDoc(container) {
 export const FRAME_SANDBOX = 'allow-scripts allow-popups allow-popups-to-escape-sandbox';
 
 function drawFrame(container, doc) {
-  container.innerHTML = doc.dropped ? DROPPED_NOTE : '';
+  container.innerHTML = noteOf(doc);
   const frame = document.createElement('iframe');
   frame.className = 'doc-frame';
   frame.setAttribute('sandbox', FRAME_SANDBOX);
@@ -159,7 +163,7 @@ export function drawDoc(container, doc, keep) {
     drawFrame(container, doc);
     return;
   }
-  container.innerHTML = (doc.dropped ? DROPPED_NOTE : '') + '<article class="doc-prose">' + doc.html + '</article>';
+  container.innerHTML = noteOf(doc) + '<article class="doc-prose">' + doc.html + '</article>';
   loadImages(container, { root: doc.root, scan_id: doc.scan_id });
 }
 

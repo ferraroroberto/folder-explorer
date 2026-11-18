@@ -4,16 +4,21 @@
  * and Back returns to the one before. View | Edit switches to the editor;
  * Esc goes back to View, and closing the sheet with unsaved changes asks
  * first. The sheet never sends a path: every document is named by root,
- * scan id and item id.
+ * scan id and item id, or, for a dropped file the scan doesn't have, held by
+ * the browser's handle for it (local-doc.js), which has Edit and saves through
+ * that handle; without a handle it is read-only.
  */
 
 import { docUrl, drawDoc, fetchDoc, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
-import { openEditor } from './doc-edit.js';
+import { openEditor, saveButtonHooks } from './doc-edit.js';
+import { renderLocal, withLocal } from './localdoc/local-doc.js';
 import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
 const back = [];
 let current = null;
+// A dropped file the browser gave a handle for: ``{handle, name}``; null otherwise (``current`` is then null too).
+let local = null;
 let wired = false;
 let editor = null;
 // Each load's number: a slower answer to an earlier load never draws over a later one.
@@ -33,17 +38,15 @@ function markMode(mode) {
 }
 
 function startEditing() {
-  if (editor || !current) return;
+  const target = current || local;
+  if (editor || !target) return;
   seq += 1;
   markMode('edit');
   $('docBack').hidden = true;
   $('docOutlineBtn').hidden = true;
   toggleOutline(false);
   releaseDoc($('docSheetBody'));
-  editor = openEditor($('docSheetBody'), current, {
-    onDirty: (dirty) => { $('docSave').disabled = !dirty; },
-    onReady: (editable) => { if (!editable) $('docSave').hidden = true; },
-  });
+  editor = openEditor($('docSheetBody'), target, saveButtonHooks($('docSave')));
 }
 
 /** Back to View: the draft, if any, stays on the device and the sheet shows the copy on disk. */
@@ -53,7 +56,8 @@ function stopEditing() {
   editor.close();
   editor = null;
   markMode('view');
-  show(current);
+  if (local) viewLocal();
+  else show(current);
 }
 
 function wire() {
@@ -90,7 +94,8 @@ function wire() {
   dialog.addEventListener('close', () => {
     seq += 1;
     if (editor) { editor.close(); editor = null; }
-    dialog.classList.remove('is-dropped');
+    dialog.classList.remove('is-dropped', 'is-local');
+    local = null;
     markMode('view');
     releaseDoc($('docSheetBody'));
     back.length = 0;
@@ -101,7 +106,8 @@ function wire() {
 
 async function show(loc, download) {
   const mine = ++seq;
-  $('docDialog').classList.remove('is-dropped');
+  $('docDialog').classList.remove('is-dropped', 'is-local');
+  local = null;
   current = { root: loc.root, scan_id: loc.scan_id, id: loc.id, name: loc.name };
   $('docBack').hidden = !back.length;
   $('docWindow').href = docUrl(current);
@@ -127,6 +133,23 @@ async function show(loc, download) {
   if (loc.fragment) scrollToHeading($('docSheetBody'), loc.fragment);
 }
 
+/** View of a local file: its copy on disk now, read through the handle and rendered by the server. */
+async function viewLocal() {
+  const started = local;
+  const mine = ++seq;
+  $('docSheetBody').innerHTML = '<p class="doc-loading" role="status">Loading…</p>';
+  const r = await renderLocal(started.handle, started.name);
+  if (mine !== seq) return;
+  if (!r.ok) {
+    $('docSheetBody').innerHTML = stateHtml(r);
+    return;
+  }
+  $('docOutline').innerHTML = outlineHtml(r.body.outline);
+  $('docOutlineBtn').hidden = !r.body.outline.length;
+  drawDoc($('docSheetBody'), withLocal(r.body, started.handle));
+  $('docSheetBody').scrollTop = 0;
+}
+
 /** Leave the editor for another document: asks first when it holds unsaved changes; false when the reader chose to stay. */
 async function leaveEditor() {
   if (!editor) return true;
@@ -143,14 +166,16 @@ export async function openIndexed(loc) {
   if (await leaveEditor()) openDoc(loc);
 }
 
-/** A dropped file the scan doesn't have, already rendered by the server: read-only, with no id to edit, link from or open in a window. */
-export async function openDropped(doc) {
+/** A dropped file the scan doesn't have, already rendered by the server: with no id to link from or open in a window, and Edit only when the browser gave its ``handle``. */
+export async function openDropped(doc, handle) {
   wire();
   if (!(await leaveEditor())) return;
   seq += 1;
   back.length = 0;
   current = null;
+  local = handle ? { handle, name: doc.name } : null;
   $('docDialog').classList.add('is-dropped');
+  $('docDialog').classList.toggle('is-local', !!local);
   $('docBack').hidden = true;
   $('docDialogTitle').textContent = doc.name;
   $('docWhere').textContent = '';
@@ -158,7 +183,7 @@ export async function openDropped(doc) {
   $('docOutlineBtn').hidden = !doc.outline.length;
   toggleOutline(false);
   if (!$('docDialog').open) $('docDialog').showModal();
-  drawDoc($('docSheetBody'), doc);
+  drawDoc($('docSheetBody'), withLocal(doc, handle));
   $('docSheetBody').scrollTop = 0;
 }
 

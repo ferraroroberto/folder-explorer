@@ -308,7 +308,7 @@
 }
 .doc-drop-note .icon { flex: none; margin-top: 2px; color: var(--muted); }
 /* A rendered drop has no id to edit, so the sheet's View | Edit switch and its own window link have nothing to act on. */
-.doc-dialog.is-dropped .doc-mode, .doc-dialog.is-dropped #docWindow { display: none; }
+.doc-dialog.is-dropped:not(.is-local) .doc-mode, .doc-dialog.is-dropped #docWindow { display: none; }
 
 /* The drop target: the whole window, above an open sheet (the popover top layer; a plain fixed layer where popovers are missing). */
 .drop-overlay {

@@ -215,7 +215,7 @@ flowchart LR
   s14["Keyboard sheet"]
   s0(["Nav · Chrome"])
   s40(["Archive card · Archive and Outlook macro"])
-  s43(["Settings sheet · Settings"])
+  s43(["Settings page · Settings"])
   s31(["Document sheet · Documents"])
   s70(["Search keys · Keys and gestures"])
   s37(["Document window · Documents"])
@@ -268,7 +268,7 @@ flowchart LR
   - [Results](#searchresults-results) (results)
   - [Keyboard sheet](#searchkeys-keyboard-sheet) (keyboard button)
   - [Archive card](#archivecard-archive-card) (Emails on the PC)
-  - [Settings sheet](#settingssheet-settings-sheet) (gear)
+  - [Settings page](#settingssheet-settings-page) (gear)
 
 ### `search.off` Search not set up
 
@@ -277,7 +277,7 @@ flowchart LR
 - **Holds:**
   - a sentence naming each reason
   - Open Settings
-- **Leads to:** [Settings sheet](#settingssheet-settings-sheet) (Open Settings)
+- **Leads to:** [Settings page](#settingssheet-settings-page) (Open Settings)
 
 ### `search.recent` Recent searches
 
@@ -376,7 +376,7 @@ flowchart LR
   s1(["Toolbar · Chrome"])
   s2(["Filters and sort · Chrome"])
   s13(["Preview · Search"])
-  s43(["Settings sheet · Settings"])
+  s43(["Settings page · Settings"])
   s26(["Scans tab · Scans"])
   s31(["Document sheet · Documents"])
   s37(["Document window · Documents"])
@@ -423,7 +423,7 @@ flowchart LR
   - [Folder tree](#exploretree-folder-tree) (Folders)
   - [Folder contents](#explorecontents-folder-contents) (a folder)
   - [Explore with nothing to show](#exploreempty-explore-with-nothing-to-show) (no scan)
-  - [Settings sheet](#settingssheet-settings-sheet) (gear)
+  - [Settings page](#settingssheet-settings-page) (gear)
 
 ### `explore.empty` Explore with nothing to show
 
@@ -497,7 +497,7 @@ flowchart LR
   s23["Cleanup shortlist"]
   s0(["Nav · Chrome"])
   s1(["Toolbar · Chrome"])
-  s43(["Settings sheet · Settings"])
+  s43(["Settings page · Settings"])
   s15(["Explore tab · Explore"])
   s24(["Types tab · Types"])
   s0 -->|"Largest"| s21
@@ -524,7 +524,7 @@ flowchart LR
   - [Toolbar](#chrometoolbar-toolbar) (toolbar)
   - [Cleanup shortlist](#largestshortlist-cleanup-shortlist) (Cleanup shortlist)
   - [Largest with nothing to show](#largestempty-largest-with-nothing-to-show) (no scan)
-  - [Settings sheet](#settingssheet-settings-sheet) (gear)
+  - [Settings page](#settingssheet-settings-page) (gear)
 
 ### `largest.empty` Largest with nothing to show
 
@@ -558,7 +558,7 @@ flowchart LR
   s0(["Nav · Chrome"])
   s1(["Toolbar · Chrome"])
   s23(["Cleanup shortlist · Largest"])
-  s43(["Settings sheet · Settings"])
+  s43(["Settings page · Settings"])
   s0 -->|"Types"| s24
   s24 -->|"toolbar"| s1
   s24 -->|"Cleanup shortlist"| s23
@@ -581,7 +581,7 @@ flowchart LR
   - [Toolbar](#chrometoolbar-toolbar) (toolbar)
   - [Cleanup shortlist](#largestshortlist-cleanup-shortlist) (Cleanup shortlist)
   - [Types with nothing to show](#typesempty-types-with-nothing-to-show) (no scan)
-  - [Settings sheet](#settingssheet-settings-sheet) (gear)
+  - [Settings page](#settingssheet-settings-page) (gear)
 
 ### `types.empty` Types with nothing to show
 
@@ -601,7 +601,7 @@ flowchart LR
   s0(["Nav · Chrome"])
   s16(["Explore with nothing to show · Explore"])
   s15(["Explore tab · Explore"])
-  s43(["Settings sheet · Settings"])
+  s43(["Settings page · Settings"])
   s0 -->|"Scans"| s26
   s16 -->|"a running scan"| s26
   s26 -->|"help button"| s27
@@ -632,7 +632,7 @@ flowchart LR
   - [How scanning works](#scansinfo-how-scanning-works) (help button)
   - [Email index card](#scansemail-email-index-card) (Email index)
   - [Explore tab](#exploretab-explore-tab) (a root row)
-  - [Settings sheet](#settingssheet-settings-sheet) (gear)
+  - [Settings page](#settingssheet-settings-page) (gear)
 
 ### `scans.info` How scanning works
 
@@ -928,7 +928,7 @@ The gear in every tab's header opens one sheet of groups; a row that holds a cho
 
 ```mermaid
 flowchart LR
-  s43["Settings sheet"]
+  s43["Settings page"]
   s44["Set up folder-explorer"]
   s45["Display group"]
   s46["Available features group"]
@@ -999,14 +999,14 @@ flowchart LR
   s68 -->|"Remove"| s69
 ```
 
-### `settings.sheet` Settings sheet
+### `settings.sheet` Settings page
 
 - **Root:** `data-surface`
 - **Reach:** the gear in any tab's header
 - **Holds:**
   - the first-run card, when there is no config.json
   - the groups Display, Available features, Scanning, Email, Outlook archive, Files and documents, Tray and screenshot and Remote access
-- **Does:** closes with ×, Esc or a tap outside
+- **Does:** opens as the full Settings page over the tab and closes with × or Esc
 - **Leads to:**
   - [Set up folder-explorer](#settingssetup-set-up-folder-explorer) (no config.json)
   - [Display group](#settingsdisplay-display-group) (Display)
@@ -1322,8 +1322,8 @@ flowchart LR
 | [Search tab](#searchtab-search-tab) | results | [Results](#searchresults-results) |
 | [Search tab](#searchtab-search-tab) | keyboard button | [Keyboard sheet](#searchkeys-keyboard-sheet) |
 | [Search tab](#searchtab-search-tab) | Emails on the PC | [Archive card](#archivecard-archive-card) |
-| [Search tab](#searchtab-search-tab) | gear | [Settings sheet](#settingssheet-settings-sheet) |
-| [Search not set up](#searchoff-search-not-set-up) | Open Settings | [Settings sheet](#settingssheet-settings-sheet) |
+| [Search tab](#searchtab-search-tab) | gear | [Settings page](#settingssheet-settings-page) |
+| [Search not set up](#searchoff-search-not-set-up) | Open Settings | [Settings page](#settingssheet-settings-page) |
 | [Results](#searchresults-results) | a result | [Preview](#searchpreview-preview) |
 | [Results](#searchresults-results) | a Documents row on a phone, or View | [Document sheet](#docsheet-document-sheet) |
 | [Results](#searchresults-results) | keys line | [Search keys](#keyssearch-search-keys) |
@@ -1336,7 +1336,7 @@ flowchart LR
 | [Explore tab](#exploretab-explore-tab) | Folders | [Folder tree](#exploretree-folder-tree) |
 | [Explore tab](#exploretab-explore-tab) | a folder | [Folder contents](#explorecontents-folder-contents) |
 | [Explore tab](#exploretab-explore-tab) | no scan | [Explore with nothing to show](#exploreempty-explore-with-nothing-to-show) |
-| [Explore tab](#exploretab-explore-tab) | gear | [Settings sheet](#settingssheet-settings-sheet) |
+| [Explore tab](#exploretab-explore-tab) | gear | [Settings page](#settingssheet-settings-page) |
 | [Explore with nothing to show](#exploreempty-explore-with-nothing-to-show) | a running scan | [Scans tab](#scanstab-scans-tab) |
 | [Folder tree](#exploretree-folder-tree) | a row | [Folder contents](#explorecontents-folder-contents) |
 | [Folder contents](#explorecontents-folder-contents) | a row's kebab | [Row menu](#explorerow-menu-row-menu) |
@@ -1346,16 +1346,16 @@ flowchart LR
 | [Largest tab](#largesttab-largest-tab) | toolbar | [Toolbar](#chrometoolbar-toolbar) |
 | [Largest tab](#largesttab-largest-tab) | Cleanup shortlist | [Cleanup shortlist](#largestshortlist-cleanup-shortlist) |
 | [Largest tab](#largesttab-largest-tab) | no scan | [Largest with nothing to show](#largestempty-largest-with-nothing-to-show) |
-| [Largest tab](#largesttab-largest-tab) | gear | [Settings sheet](#settingssheet-settings-sheet) |
+| [Largest tab](#largesttab-largest-tab) | gear | [Settings page](#settingssheet-settings-page) |
 | [Cleanup shortlist](#largestshortlist-cleanup-shortlist) | Show in Explore | [Explore tab](#exploretab-explore-tab) |
 | [Types tab](#typestab-types-tab) | toolbar | [Toolbar](#chrometoolbar-toolbar) |
 | [Types tab](#typestab-types-tab) | Cleanup shortlist | [Cleanup shortlist](#largestshortlist-cleanup-shortlist) |
 | [Types tab](#typestab-types-tab) | no scan | [Types with nothing to show](#typesempty-types-with-nothing-to-show) |
-| [Types tab](#typestab-types-tab) | gear | [Settings sheet](#settingssheet-settings-sheet) |
+| [Types tab](#typestab-types-tab) | gear | [Settings page](#settingssheet-settings-page) |
 | [Scans tab](#scanstab-scans-tab) | help button | [How scanning works](#scansinfo-how-scanning-works) |
 | [Scans tab](#scanstab-scans-tab) | Email index | [Email index card](#scansemail-email-index-card) |
 | [Scans tab](#scanstab-scans-tab) | a root row | [Explore tab](#exploretab-explore-tab) |
-| [Scans tab](#scanstab-scans-tab) | gear | [Settings sheet](#settingssheet-settings-sheet) |
+| [Scans tab](#scanstab-scans-tab) | gear | [Settings page](#settingssheet-settings-page) |
 | [Email index card](#scansemail-email-index-card) | help button | [What the email stage reads](#scansemail-info-what-the-email-stage-reads) |
 | [Email index card](#scansemail-email-index-card) | Failed reads | [Failed reads](#scansfailures-failed-reads) |
 | [Document sheet](#docsheet-document-sheet) | outline button | [Outline popover](#docoutline-outline-popover) |
@@ -1376,15 +1376,15 @@ flowchart LR
 | [Nav in the document window](#docnav-nav-in-the-document-window) | Explore | [Explore tab](#exploretab-explore-tab) |
 | [Archive card](#archivecard-archive-card) | the row | [Archive sheet](#archivesheet-archive-sheet) |
 | [Archive sheet](#archivesheet-archive-sheet) | the macro info button | [Outlook macro sheet](#archivemacro-outlook-macro-sheet) |
-| [Settings sheet](#settingssheet-settings-sheet) | no config.json | [Set up folder-explorer](#settingssetup-set-up-folder-explorer) |
-| [Settings sheet](#settingssheet-settings-sheet) | Display | [Display group](#settingsdisplay-display-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Available features | [Available features group](#settingsfeatures-available-features-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Scanning | [Scanning group](#settingsscanning-scanning-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Email | [Email group](#settingsemail-email-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Outlook archive | [Outlook archive group](#settingsoutlook-group-outlook-archive-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Files and documents | [Files and documents group](#settingsfiles-files-and-documents-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Tray and screenshot | [Tray and screenshot group](#settingstray-tray-and-screenshot-group) |
-| [Settings sheet](#settingssheet-settings-sheet) | Remote access | [Remote access group](#settingsremote-group-remote-access-group) |
+| [Settings page](#settingssheet-settings-page) | no config.json | [Set up folder-explorer](#settingssetup-set-up-folder-explorer) |
+| [Settings page](#settingssheet-settings-page) | Display | [Display group](#settingsdisplay-display-group) |
+| [Settings page](#settingssheet-settings-page) | Available features | [Available features group](#settingsfeatures-available-features-group) |
+| [Settings page](#settingssheet-settings-page) | Scanning | [Scanning group](#settingsscanning-scanning-group) |
+| [Settings page](#settingssheet-settings-page) | Email | [Email group](#settingsemail-email-group) |
+| [Settings page](#settingssheet-settings-page) | Outlook archive | [Outlook archive group](#settingsoutlook-group-outlook-archive-group) |
+| [Settings page](#settingssheet-settings-page) | Files and documents | [Files and documents group](#settingsfiles-files-and-documents-group) |
+| [Settings page](#settingssheet-settings-page) | Tray and screenshot | [Tray and screenshot group](#settingstray-tray-and-screenshot-group) |
+| [Settings page](#settingssheet-settings-page) | Remote access | [Remote access group](#settingsremote-group-remote-access-group) |
 | [Scanning group](#settingsscanning-scanning-group) | Scan schedule | [Scan schedule](#settingsschedule-scan-schedule) |
 | [Scanning group](#settingsscanning-scanning-group) | Folders to scan | [Folders to scan](#settingsroots-folders-to-scan) |
 | [Scanning group](#settingsscanning-scanning-group) | Skipped folders | [Skipped folders](#settingsexclude-skipped-folders) |

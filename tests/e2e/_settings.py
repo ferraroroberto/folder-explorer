@@ -15,5 +15,5 @@ def open_setting(page: Page, name: str) -> Locator:
 
 def close_setting(page: Page) -> None:
     """Close the open setting sheet, back to the Settings sheet beneath it."""
-    page.locator("#settingDialog [data-close]").click()
+    page.locator("#settingDialog .detail-close").click()
     expect(page.locator("#settingDialog")).to_be_hidden()

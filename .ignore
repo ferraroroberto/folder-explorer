@@ -60,5 +60,6 @@
 /tests/e2e/_e2e_live_guard.py
 /tests/e2e/_geometry.py
 /tests/e2e/_layout_lint.py
+/tests/e2e/_paced_browser.py
 /tests/e2e/_shot.py
 # END vendored-copies

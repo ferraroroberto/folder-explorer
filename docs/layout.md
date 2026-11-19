@@ -106,10 +106,12 @@ folder-explorer/
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
-├── scripts/                    # the gate, the eleven ratchets (vendored, the UX surface one with its map generator), gen_icons, gen_tailscale_cert, gen_token
+├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this
+│                               #   repo's own readme_index_ratchet.py (README feature-bullet word count), gen_icons,
+│                               #   gen_tailscale_cert, gen_token
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

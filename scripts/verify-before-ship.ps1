@@ -33,20 +33,25 @@
       8. docs ratchet        - scripts/docs_ratchet.py: README.md size and the history
                              markers (issue references, dated and changelog headings) in
                              README.md / docs against the baseline; exit 3 is a failure
-      9. comment ratchet     - scripts/comment_ratchet.py: issue references in product-code
+      9. readme index ratchet - scripts/readme_index_ratchet.py (repo-specific, not
+                             vendored): every README.md top-level feature bullet's word
+                             count against the baseline -- a bullet may not regrow into a
+                             reference paragraph, and a brand-new bullet must fit the index
+                             rule on its own; exit 3 is a failure
+     10. comment ratchet     - scripts/comment_ratchet.py: issue references in product-code
                              comments (Python, JS, CSS, PowerShell) against the baseline;
                              an exit 3 is a failure
-     10. conventions ratchet - scripts/conventions_ratchet.py: the no-window,
+     11. conventions ratchet - scripts/conventions_ratchet.py: the no-window,
                              logging-not-print, no-drive-path, secret-compare,
                              git-wrapper and password-input-vendored rules against the
                              baseline; exit 3 is a failure
-     11. runtime write ratchet - scripts/runtime_write_ratchet.py: a write target resolving
+     12. runtime write ratchet - scripts/runtime_write_ratchet.py: a write target resolving
                              under a code folder against the baseline; a new unresolvable
                              target is exit 3, a failure
-     12. usage track ratchet - scripts/usage_track_ratchet.py: a web control with no constant
+     13. usage track ratchet - scripts/usage_track_ratchet.py: a web control with no constant
                              tracking id, a <dialog> with no data-track-view, a built id or
                              an unwired usage log against the baseline; exit 3 is a failure
-     13. UX surface ratchet  - scripts/ux_surface_ratchet.py: a surface root with no constant
+     14. UX surface ratchet  - scripts/ux_surface_ratchet.py: a surface root with no constant
                              data-surface id, an id with no entry in docs/ux-surfaces.yaml, an
                              entry no element carries, an id on two surfaces, a link to an id
                              with no entry, and a docs/ux-surface-map.md page that is not what
@@ -129,6 +134,7 @@ Invoke-Stage "doc refs ratchet" { & $py "scripts/doc_refs_ratchet.py" }
 Invoke-Stage "dead code ratchet" { & $py "scripts/dead_code_ratchet.py" }
 Invoke-Stage "static ratchet" { & $py "scripts/static_ratchet.py" }
 Invoke-Stage "docs ratchet" { & $py "scripts/docs_ratchet.py" }
+Invoke-Stage "readme index ratchet" { & $py "scripts/readme_index_ratchet.py" }
 Invoke-Stage "comment ratchet" { & $py "scripts/comment_ratchet.py" }
 Invoke-Stage "conventions ratchet" { & $py "scripts/conventions_ratchet.py" }
 Invoke-Stage "runtime write ratchet" { & $py "scripts/runtime_write_ratchet.py" }

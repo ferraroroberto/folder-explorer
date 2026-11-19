@@ -1168,7 +1168,7 @@ flowchart LR
 - **Reach:** Settings, Outlook archive, Outlook archiving
 - **Holds:**
   - an Outlook category switch and its note
-  - a Move to archive folder switch and its note
+  - an Also archive in Outlook switch and its note
   - a closing note
 
 ### `settings.markdown-search` Documents search

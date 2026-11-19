@@ -355,7 +355,7 @@ export function initSettings(opts) {
   });
   $('archiveCategorySlot').appendChild(categorySwitch);
   moveSwitch = switchEl(false, {
-    label: 'Move to archive folder',
+    label: 'Also archive in Outlook',
     onToggle: (next) => save({ outlook: { move_to_archive: next } }),
   });
   $('archiveMoveSlot').appendChild(moveSwitch);

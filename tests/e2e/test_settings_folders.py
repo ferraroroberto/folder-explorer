@@ -226,7 +226,7 @@ def test_the_move_to_archive_switch_is_off_by_default_and_saves(page: Page, app_
     expect(page.locator("#settingsDialog")).to_be_visible()
     sheet = open_setting(page, "outlook")
     move = sheet.locator("#archiveMoveSlot [role=switch]")
-    expect(move).to_have_attribute("aria-label", "Move to archive folder")
+    expect(move).to_have_attribute("aria-label", "Also archive in Outlook")
     expect(move).to_have_attribute("aria-checked", "false")
     expect(sheet.locator("#archiveMoveNote")).to_contain_text("leaves it where it is in Outlook")
     try:

@@ -50,6 +50,7 @@ ERR_ARCHIVE = "archive_failed"
 ERR_CATEGORY = "category_failed"
 ERR_INDEX = "index_failed"
 ERR_MOVE = "move_failed"
+ERR_NO_ARCHIVE = "no_archive_folder"
 ERR_NOT_IN_MAILBOX = "not_in_mailbox"
 ERR_TIMEOUT = "timeout"
 ERR_FAILED = "failed"
@@ -72,6 +73,7 @@ MESSAGES = {
     ERR_CATEGORY: "The mail was filed, but Outlook wouldn't take the category.",
     ERR_INDEX: "The mail was filed, but its folder wasn't queued for indexing: search finds it after the next scan.",
     ERR_MOVE: "The mail was filed, but Outlook wouldn't move it to its archive folder: it is still where it was.",
+    ERR_NO_ARCHIVE: "The mail was filed, but its mailbox has no archive folder to move it to: it is still where it was.",
     ERR_NOT_IN_MAILBOX: "The live copy isn't in the Inbox, the archive folder or Sent Items any more.",
     ERR_TIMEOUT: "Outlook didn't answer in time. A dialog may be waiting in Outlook.",
     ERR_FAILED: "Something went wrong talking to Outlook.",
@@ -336,6 +338,11 @@ def _move_to_archive(client: Any, saved: Saved) -> bool:
     """Move the saved mail to the Outlook archive folder through the batch verbs' own move; the file stays whatever happens."""
     if saved.move_to is None:
         return False
+    # The mail's own mailbox: its Sent Items, its archive folder, never the profile's default store's.
+    client = client.for_store_of(saved.item)
+    if client is None:
+        logger.warning("⚠️ archive sheet: Outlook would not say which mailbox the filed mail is in, so it was not moved")
+        raise SheetError(ERR_MOVE, MESSAGES[ERR_MOVE] + " Outlook wouldn't say which mailbox it is in.")
     # Like the ``apply`` verb, a filed Sent item stays in Sent Items: only received mail moves.
     in_sent = client.is_in_sent_items(saved.item)
     if in_sent is None:
@@ -344,6 +351,11 @@ def _move_to_archive(client: Any, saved: Saved) -> bool:
     if in_sent:
         logger.info("ℹ️ archive sheet: the filed mail is in Sent Items, so it stays there")
         return False
+    # The batch verbs create a missing archive folder; a filing that was only asked to move the mail does not invent one.
+    if not client.has_folder(saved.move_to):
+        logger.warning("⚠️ archive sheet: the mailbox has no %r folder, so the filed mail was not moved", saved.move_to)
+        raise SheetError(ERR_NO_ARCHIVE, "The mail was filed, but its mailbox has no \"%s\" folder to move it to: it is still where it was."
+                         % saved.move_to)
     # The move takes over the only reference: ``Saved`` is frozen and goes out of use after the follow-up.
     held = [saved.item]
     try:
@@ -395,7 +407,10 @@ def follow_up(client: Any, saved: Saved, steps: tuple[FollowUpStep, ...] = FOLLO
         except Exception as exc:
             logger.exception("⚠️ archive sheet: the %s step after the save failed", step.name)
             doc[step.key] = False
-            failed.append((step.code, str(exc) if isinstance(exc, SheetError) else MESSAGES[step.code] + " " + type(exc).__name__))
+            if isinstance(exc, SheetError):
+                failed.append((exc.code, str(exc)))
+            else:
+                failed.append((step.code, MESSAGES[step.code] + " " + type(exc).__name__))
         if timer:
             timer.mark(step.name)
     if failed:

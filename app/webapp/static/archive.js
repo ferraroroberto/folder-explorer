@@ -289,6 +289,7 @@ async function followUp(token) {
     }
     if (r.done) {
       if (!r.result.ok) showToast((r.result.error && r.result.error.message) || NOT_CONFIRMED + '.', 'error');
+      else if (r.result.moved) showToast('Archived and moved in Outlook');
       return;
     }
   }

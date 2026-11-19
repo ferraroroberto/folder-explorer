@@ -153,6 +153,16 @@ class FakeOutlookClient:
         # The real client resolves its mailbox's store; nothing to resolve here.
         return self
 
+    # Folders this fake mailbox has none of; `for_store_of` answers None when Outlook would not name the mail's store.
+    missing_folders: frozenset[str] = frozenset()
+    store_unknown = False
+
+    def has_folder(self, name: str) -> bool:
+        return name not in self.missing_folders
+
+    def for_store_of(self, item: _FakeMailItem):
+        return None if self.store_unknown else self
+
     # -- the surface batch.py calls -------------------------------------------
 
     def iter_inbox(self, preview_len: int = 500):

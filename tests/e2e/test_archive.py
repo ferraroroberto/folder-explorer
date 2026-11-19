@@ -157,8 +157,10 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     def file_mail(route: Route) -> None:
         filed.append(route.request.post_data_json)
         _json(route, {"ok": True, "folder_path": filed[-1]["folder"], "files": [filed[-1]["folder"] + "/005 - Kickoff agenda.msg"],
-                      "categorized": True, "indexing": True, "error": None})
+                      "categorized": True, "indexing": True, "error": None, "follow_up": len(filed) == 3})
     page.route("**/api/archive/file", file_mail)
+    # Only the third filing has a follow-up to collect: the one where the switch "Also archive in Outlook" moved the mail.
+    page.route("**/api/archive/followup*", lambda r: _json(r, {"done": True, "result": {"ok": True, "moved": True, "error": None}}))
 
     page.goto(app_url + "/")
     card = page.locator("#outlookCard")
@@ -207,6 +209,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
 
     _file_the_archived_mail_again_through_the_copy_switch(page, sheet, filed)
     _with_the_category_switch_off_the_sheet_shows_no_category_row(page, sheet, filed)
+    expect(page.locator(".toast")).to_contain_text("Archived and moved in Outlook")
 
     _the_macro_sheet_lists_its_steps_and_copies_the_macro(page, browser_name)
     assert errors == []

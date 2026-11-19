@@ -157,6 +157,46 @@ def test_a_mail_whose_folder_outlook_will_not_name_is_not_moved_and_says_so(cfg:
     assert client.moves == [] and client.folders[None] == [item]
 
 
+def test_a_mailbox_with_no_archive_folder_gets_its_own_outcome_and_the_mail_stays_put(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"].update(add_category=True, move_to_archive=True)
+    client, item = _client_with("Kickoff agenda")
+    client.missing_folders = frozenset({"Archive"})
+    doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), "Filed")
+    assert not doc["ok"] and doc["moved"] is False and doc["categorized"], "the other steps still ran"
+    assert doc["error"]["code"] == "no_archive_folder" and '"Archive" folder' in doc["error"]["message"]
+    assert Path(doc["files"][0]).is_file(), "the save stands"
+    assert client.moves == [] and client.folders[None] == [item] and "Archive" not in client.folders, "no folder was invented"
+
+
+def test_the_move_goes_through_the_client_of_the_mails_own_store(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["move_to_archive"] = True
+    default_store, item = _client_with("Kickoff agenda")
+    own_store = FakeOutlookClient([item])
+    default_store.for_store_of = lambda mail: own_store  # type: ignore[method-assign]
+    default_store.folders = {None: []}
+    doc = _file(default_store, cfg, item, str(archive_root / "Project Alpha"), None)
+    assert doc["ok"] and doc["moved"] is True
+    assert own_store.moves == [(item.message_id, "Archive")] and default_store.moves == []
+
+
+def test_a_mail_whose_mailbox_outlook_will_not_name_is_not_moved_and_says_so(cfg: dict, archive_root: Path) -> None:
+    cfg["outlook"]["move_to_archive"] = True
+    client, item = _client_with("Kickoff agenda")
+    client.store_unknown = True
+    doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), None)
+    assert not doc["ok"] and doc["moved"] is False and doc["error"]["code"] == "move_failed"
+    assert "which mailbox" in doc["error"]["message"] and client.moves == []
+
+
+def test_a_failed_save_moves_nothing_even_with_the_move_setting_on(cfg: dict, archive_root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg["outlook"]["move_to_archive"] = True
+    client, item = _client_with("Vanished")
+    monkeypatch.setattr(item, "SaveAs", lambda path, fmt: None)
+    with pytest.raises(SheetError):
+        archive_sheet.save_mail(client, cfg, item, str(archive_root), None)
+    assert client.moves == [] and client.folders[None] == [item]
+
+
 def test_with_the_move_setting_off_the_mail_stays_where_it_is(cfg: dict, archive_root: Path) -> None:
     client, item = _client_with("Kickoff agenda")
     doc = _file(client, cfg, item, str(archive_root / "Project Alpha"), None)

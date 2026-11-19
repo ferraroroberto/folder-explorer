@@ -1148,7 +1148,7 @@ surfaces:
       - Settings, Outlook archive, Outlook archiving
     holds:
       - an Outlook category switch and its note
-      - a Move to archive folder switch and its note
+      - an Also archive in Outlook switch and its note
       - a closing note
 
   - id: settings.markdown-search

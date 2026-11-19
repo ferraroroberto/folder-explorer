@@ -300,6 +300,23 @@ class OutlookClient(DraftSurface):
         logger.info("Creating Outlook folder %r under %s", name, root.Name)
         return folders.Add(name)
 
+    def has_folder(self, name: str) -> bool:
+        """Whether a folder called ``name`` is directly under the mailbox root; never creates one."""
+        return self._named_folder(name, create=False) is not None
+
+    def for_store_of(self, item: Any) -> OutlookClient | None:
+        """A client whose folders come from the store ``item`` sits in, or ``None`` when Outlook won't name it.
+
+        A filed mail moves within its own mailbox: the profile's default store would be the wrong
+        one for a mail that arrived in another account.
+        """
+        store = safe_com(lambda: item.Parent.Store, None)
+        if store is None:
+            return None
+        scoped = OutlookClient(self.mailbox)
+        scoped._resolved_store = store
+        return scoped
+
     def _resolve_folder(self, folder_name: str | None) -> Any:
         """Inbox for ``None``, else the named folder under the mailbox root."""
         return self._inbox() if folder_name is None else self._named_folder(folder_name)

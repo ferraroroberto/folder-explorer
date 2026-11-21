@@ -192,6 +192,10 @@ def make_sparse(path: Path, length: int) -> None:
         subprocess.run(["fsutil", "sparse", "setflag", str(path)], check=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
     with path.open("r+b") as f:
         f.truncate(length)
+    if sys.platform == "win32":
+        # truncate() zero-fills on Windows, so the file would fill up on disk in the background; deallocating the range makes the hole real.
+        subprocess.run(["fsutil", "sparse", "setrange", str(path), "4096", str(length - 4096)], check=True, capture_output=True,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
 
 
 def make_compressed(path: Path, length: int) -> bool:

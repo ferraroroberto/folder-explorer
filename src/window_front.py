@@ -25,11 +25,8 @@ from src.explorer_window import is_explorer
 
 logger = logging.getLogger(__name__)
 
-# The window class of every File Explorer folder window, and of each tab inside one (the shown tab is its first child).
+# The window class of every File Explorer folder window.
 _CABINET_CLASS = "CabinetWClass"
-_TAB_CLASS = "ShellTabWindowClass"
-# The shell service that answers with a tab's own browser, whose window is that tab.
-_SID_TOP_LEVEL_BROWSER = "{4C96BE40-915C-11CF-99D3-00AA004AE837}"
 # Long enough for a cold Explorer on a slow PC; past it the open is logged as not seen.
 FOLLOW_TIMEOUT_S = 5.0
 _POLL_S = 0.015
@@ -98,26 +95,6 @@ def _shown_folders(shell: object) -> dict[int, list[str]]:
         except Exception:  # noqa: BLE001 - a window can close or still be loading while the shell lists it
             continue
     return shown
-
-
-def is_shown_tab(window: object) -> bool:
-    """True when this shell window is the tab its File Explorer window shows; False when that can't be told.
-
-    Every tab of a window reports the window's handle, so navigating any but the
-    shown one would change a tab the user can't see.
-    """
-    try:
-        import pythoncom  # noqa: PLC0415 - Windows only, imported where it is used
-        import pywintypes  # noqa: PLC0415
-        import win32gui  # noqa: PLC0415
-        from win32com.shell import shell  # noqa: PLC0415
-
-        provider = window._oleobj_.QueryInterface(pythoncom.IID_IServiceProvider)  # type: ignore[attr-defined]
-        browser = provider.QueryService(pywintypes.IID(_SID_TOP_LEVEL_BROWSER), shell.IID_IShellBrowser)
-        return bool(browser.GetWindow() == win32gui.FindWindowEx(int(window.HWND), 0, _TAB_CLASS, None))  # type: ignore[attr-defined]
-    except Exception as exc:  # noqa: BLE001 - a tab that can't be placed is never reused
-        logger.debug("Can't tell whether a tab is the shown one: %s", exc)
-        return False
 
 
 def _set_foreground(hwnd: int) -> None:

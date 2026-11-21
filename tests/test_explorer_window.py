@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import types
+from pathlib import Path
 
 import pytest
 
@@ -89,3 +91,37 @@ def test_an_unreadable_z_order_falls_back_to_the_newest_window(monkeypatch: pyte
     monkeypatch.setattr(explorer, "_enumerate_explorer_folders", lambda: {1: r"E:\mail\a", 2: r"E:\mail\b"})
     monkeypatch.setattr(explorer, "top_level_z_order", refused)
     assert explorer.get_current_explorer_folder() == r"E:\mail\b"
+
+
+def test_a_hidden_tab_never_speaks_for_its_window(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, com: list[str]) -> None:
+    shown, hidden = tmp_path / "shown", tmp_path / "hidden"
+    shown.mkdir()
+    hidden.mkdir()
+
+    class Tab:
+        def __init__(self, folder: Path, is_shown: bool) -> None:
+            # Every tab of a window reports the window's handle.
+            self.HWND, self.FullName, self.is_shown = 1, r"C:\Windows\explorer.exe", is_shown
+            self.Document = types.SimpleNamespace(Folder=types.SimpleNamespace(Self=types.SimpleNamespace(Path=str(folder))))
+
+    tabs = [Tab(shown, True), Tab(hidden, False)]  # the shown tab is listed first, so a last-one-wins dict keeps the hidden one
+    fake_client = types.SimpleNamespace(Dispatch=lambda name: types.SimpleNamespace(Windows=lambda: tabs))
+    monkeypatch.setitem(sys.modules, "win32com", types.SimpleNamespace(client=fake_client))
+    monkeypatch.setitem(sys.modules, "win32com.client", fake_client)
+    monkeypatch.setattr(explorer, "is_shown_tab", lambda window: window.is_shown)
+    assert explorer._enumerate_explorer_folders() == {1: str(shown)}
+    monkeypatch.setattr(explorer, "top_level_z_order", lambda: [1])
+    assert explorer.get_current_explorer_folder() == str(shown)
+    monkeypatch.setattr(explorer, "is_shown_tab", lambda window: False)  # no tab can be placed: nothing is claimed
+    assert explorer.get_current_explorer_folder() is None
+
+
+def test_every_module_that_lists_shell_windows_keeps_to_the_shown_tab() -> None:
+    # Tabs share their window's handle, so a reader that keys by handle without this check answers a hidden tab.
+    # window_front keeps every tab of a window on purpose (it matches the folder an open just showed).
+    by_design = {"window_front.py"}
+    src = Path(__file__).resolve().parent.parent / "src"
+    readers = [p for p in src.rglob("*.py") if 'Dispatch("Shell.Application")' in p.read_text(encoding="utf-8")]
+    assert {p.name for p in readers} >= {"desktop.py", "explorer_window.py"}
+    unchecked = [p.name for p in readers if p.name not in by_design and "is_shown_tab(" not in p.read_text(encoding="utf-8")]
+    assert unchecked == []

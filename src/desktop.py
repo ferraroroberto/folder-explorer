@@ -28,7 +28,7 @@ import time
 from typing import Any, Optional, Union
 
 from src import config, window_front
-from src.explorer_window import is_explorer, top_level_z_order
+from src.explorer_window import is_explorer, is_shown_tab, top_level_z_order
 from src.no_window import NO_WINDOW
 
 logger = logging.getLogger(__name__)
@@ -157,7 +157,7 @@ def _reuse_window(folder: str) -> Optional[int]:
         windows: dict[int, Any] = {}
         for window in win32com.client.Dispatch("Shell.Application").Windows():
             try:
-                if is_explorer(str(window.FullName or "")) and window_front.is_shown_tab(window):
+                if is_explorer(str(window.FullName or "")) and is_shown_tab(window):
                     windows[int(window.HWND)] = window
             except Exception:  # noqa: BLE001,S112 - a window can close while the shell lists it
                 continue

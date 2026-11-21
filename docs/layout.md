@@ -9,6 +9,8 @@ folder-explorer/
 │   ├── cli/email_batch.py      # `email batch <verb>`: the archive verbs' flags, JSON document and exit codes
 │   ├── cli/archive_gate.py     # `email batch` with the Outlook archive block off: one JSON refusal, exit 2, before any Outlook code loads
 │   ├── cli/folders.py          # `folders search --json`: folder search for another app, one JSON document
+│   ├── install.py              # `scripts\install.bat` / `python -m app.install`: set up or bring in step, never overwriting a setting
+│   │                           #   (docs/install.md); standard library only, it runs before .venv exists
 │   ├── launcher.py             # `pythonw -m app.launcher <file>`: the Markdown "Open with" handler (names the file by its
 │   │                           #   scanned folder, asks the app for its id, opens the /doc window)
 │   ├── outlook.py              # `python -m app.outlook`: the Outlook bridge (the macro's entry, the Archive
@@ -93,6 +95,9 @@ folder-explorer/
 │   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
 │   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
 │   ├── config.py               # config.json with defaults and validation
+│   ├── install/                # the installer's parts, standard library only: config_merge (config.json and .env from their templates, missing
+│   │                           #   keys only, after a backup), startup (the opt-in Startup shortcut to tray.bat), checklist (ok / missing / unknown)
+│   ├── ps_script.py            # starts a repo PowerShell script under any execution policy (AllSigned included) without weakening it
 │   ├── features.py             # the feature blocks (email, archive, documents, screenshot): their keys, which are on, and whether each can run on this machine
 │   ├── atomic_write.py         # the one atomic writer: text (config.json, .env) and bytes (a saved Markdown file); unique temp, cleanup on failure; swap_in renames a built file
 │   ├── runtime_files.py        # mkdir, lock-file open and SQLite connects for a path a caller names; raises on a path under a code folder
@@ -104,14 +109,16 @@ folder-explorer/
 │                               #   leaves few loopback sockets in TIME_WAIT; `_port_pool.py` heads a failure on `ERR_ADDRESS_IN_USE` with PORT POOL EXHAUSTED),
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,
+│                               #   tests/install the installer on temp checkouts, the standalone restart, and the clean-pull and AllSigned checks,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this
 │                               #   repo's own readme_index_ratchet.py (README feature-bullet word count), gen_icons,
-│                               #   gen_tailscale_cert, gen_token
+│                               #   gen_tailscale_cert, gen_token, standalone_restart (tray.bat --restart on a PC without the shared
+│                               #   tray helper, and the owned ports tray.bat reads from the config)
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, install.md (install, update, uninstall), setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

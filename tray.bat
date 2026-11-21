@@ -23,8 +23,9 @@ REM
 REM  The full detect -> kill -> reclaim -> start -> verify lifecycle lives in
 REM  the ONE shared, machine-local tray_lifecycle.ps1 owned by fleet-config
 REM  (project-scaffolding#153) -- exposed at %USERPROFILE%\.claude\tray\ by
-REM  fleet-config's install.ps1 junction, shelled to with -File, NOT in
-REM  cmd-side `for /f` output capture or inline `powershell -Command "..."`.
+REM  fleet-config's install.ps1 junction, shelled to once (loaded as a ScriptBlock,
+REM  see below), NOT in cmd-side `for /f` output capture or inline logic in a
+REM  `powershell -Command "..."` string.
 REM  Both cmd shapes have failed under non-interactive nested callers (Git Bash
 REM  -> `cmd /c "tray.bat --restart"`, or a finisher skill's Bash tool): detect
 REM  output came back empty, nothing was killed, and --restart silently degraded
@@ -43,12 +44,8 @@ REM  the base interpreter, so .Path reports the shared base python while only th
 REM  CommandLine still carries the .venv path. Matching the image path would miss
 REM  the real service; the CommandLine scope keeps the sweep on THIS repo only.
 REM
-REM  Without the shared helper (a PC with none of the other fleet repos) a plain
-REM  `tray.bat` still starts the tray from this repo's .venv; only `--restart`
-REM  needs the helper and hard-errors without it (project-scaffolding#345).
-REM
 REM  Mutex-shared ports (a port another app may legitimately own) must NOT go in
-REM  the 8453 reclaim list -- reclaiming one would kill the sibling.
+REM  the owned-ports reclaim list -- reclaiming one would kill the sibling.
 REM
 REM  Keep this whole file ASCII-only. cmd.exe read-ahead-buffers a chunk of the
 REM  batch file for parsing at the codepage active when the buffer was filled;
@@ -92,30 +89,26 @@ set "WANT_RESTART="
 if /i "%~1"=="--restart" set "WANT_RESTART=1"
 if /i "%~1"=="-r"        set "WANT_RESTART=1"
 
-REM === ADAPT (3/4): in the -TrayMatch below, replace -ms+app.tray with a regex
-REM     matching THIS app's tray invocation, e.g. launcher\.py\s+tray  or  -m\s+tray
+REM === ADAPT (3/4): the -TrayMatch below is a regex matching THIS app's tray
+REM     invocation (-m\s+app\.tray) -- filled in from the template.
 set "PS=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "TRAY_VENV=%SCRIPT_DIR%.venv"
 REM  ONE shared, machine-local copy owned by fleet-config (project-scaffolding#153)
 REM  -- junctioned by fleet-config's install.ps1, never vendored per-app.
 set "TRAY_PS=%USERPROFILE%/.claude/tray/tray_lifecycle.ps1"
-REM  --restart without the helper stays a hard error: the orphan-proof restart
-REM  is fleet-config's job, and degrading it to a plain start would adopt the
-REM  stale build, see project-scaffolding#54. A plain start has no such risk, so
-REM  it jumps to the standalone start at the bottom. Two flat ifs, not a nested
+REM  Without the helper a plain start and --restart each take their own standalone
+REM  path at the bottom. --restart is never degraded to a plain start: that would
+REM  adopt the stale build, see project-scaffolding#54. Two flat ifs, not a nested
 REM  block: an `exit /b 1` nested inside a block that also holds a `goto` comes
 REM  back as exit code 0 under cmd.exe (project-scaffolding#345).
 if not exist "%TRAY_PS%" if not defined WANT_RESTART goto :standalone_start
-if not exist "%TRAY_PS%" (
-    echo ERROR: missing shared tray helper "%TRAY_PS%"
-    echo        --restart needs it: install fleet-config and run its install.ps1, then retry.
-    echo        See ferraroroberto/fleet-config's README for details.
-    exit /b 1
-)
+if not exist "%TRAY_PS%" goto :standalone_restart
 
-REM === ADAPT (4/4): replace 8453 with this tray's exclusively-owned
-REM     ports as a comma list, e.g. 8445,8446 . Exclude any mutex-shared port. ===
-set "OWNED_PORTS=8453"
+REM === ADAPT (4/4): this tray's exclusively-owned ports. They are not written
+REM     here: the -Command below asks the repo's config resolver for them
+REM     (scripts\standalone_restart.py ports), so a PC that moved the port in
+REM     its own config.json needs no edit to a tracked file. ===
+set "TRAY_PY=%TRAY_VENV%\Scripts\python.exe"
 REM Optional override for the restart-verification probe. Leave blank and the
 REM helper probes https:// then http:// on 127.0.0.1:<first-owned-port>/api/version
 REM (HTTPS first because fleet PWAs are HTTPS; loopback so an auth-gated endpoint
@@ -123,28 +116,54 @@ REM takes its bypass and a public-name leaf's cert is skipped - #147). Set this
 REM only for a non-standard path, e.g. http://127.0.0.1:8000/admin/api/version.
 set "VERSION_URL="
 
-set "RESTART_ARG="
-if defined WANT_RESTART set "RESTART_ARG=-Restart"
-
-%PS% -NoProfile -NonInteractive -File "%TRAY_PS%" launch -AppName "%TRAY_APP_NAME%" -ScriptDir "%SCRIPT_DIR_ARG%" -VenvDir "%TRAY_VENV%" -TrayMatch "-m\s+app\.tray" -Ports "%OWNED_PORTS%" -TrayLaunch "%TRAY_LAUNCH%" -VersionUrl "%VERSION_URL%" !RESTART_ARG!
+REM  The helper is loaded as text and run as a ScriptBlock, not started with -File: -File refuses
+REM  an unsigned script under an AllSigned (or Restricted) execution policy, and overriding the
+REM  policy on the command line would weaken the machine's own control. The values travel in the
+REM  environment (set above), so no quoting nests inside the -Command string, and the process that
+REM  carries them is powershell.exe, which the helper's tray detection (python processes only)
+REM  can never mistake for the tray. An `exit` inside the helper ends this process with its code.
+%PS% -NoProfile -NonInteractive -Command "$ports = & $env:TRAY_PY -m scripts.standalone_restart ports; if ($LASTEXITCODE -ne 0 -or -not $ports) { [Console]::Error.WriteLine('could not read the owned ports from the config'); exit 1 }; $a = @{ AppName = $env:TRAY_APP_NAME; ScriptDir = $env:SCRIPT_DIR_ARG; VenvDir = $env:TRAY_VENV; TrayMatch = '-m\s+app\.tray'; Ports = [string]$ports; TrayLaunch = $env:TRAY_LAUNCH; VersionUrl = $env:VERSION_URL }; if ($env:WANT_RESTART) { $a.Restart = $true }; try { & ([scriptblock]::Create([IO.File]::ReadAllText($env:TRAY_PS))) launch @a } catch { [Console]::Error.WriteLine(($_ | Out-String)); exit 1 }; exit 0"
 exit /b %ERRORLEVEL%
 
 REM  Standalone start (project-scaffolding#345): the shared helper is missing,
 REM  e.g. this app was moved to a PC that has none of the other fleet repos, and
 REM  a plain start was asked for. Launch the tray straight from this repo's .venv
 REM  and exit 0. No detect/adopt here: the tray's own single-instance guard
-REM  (app/tray/single_instance.py) stops a duplicate, and --restart is refused
-REM  above, so nothing in this path can mask a stale build.
+REM  (app/tray/single_instance.py) stops a duplicate, and --restart takes the
+REM  standalone restart below, so nothing in this path can mask a stale build.
 :standalone_start
 set "TRAY_PYW=%TRAY_VENV%\Scripts\pythonw.exe"
 if not exist "%TRAY_PYW%" (
     echo ERROR: missing "%TRAY_PYW%" - create this app's .venv first.
     exit /b 1
 )
-echo NOTE: shared tray helper not found, starting the %TRAY_APP_NAME% tray standalone - --restart needs fleet-config.
+echo NOTE: shared tray helper not found, starting the %TRAY_APP_NAME% tray standalone.
 REM  Start-Process (as the shared helper does), not cmd `start`: `start` lets the
 REM  tray inherit this script's stdout pipe, so a caller capturing our output (an
 REM  agent shell, a finisher skill) would block until the tray exits. Values go
 REM  through the environment, so no quoting nests inside the -Command string.
 %PS% -NoProfile -NonInteractive -Command "Start-Process -FilePath $env:TRAY_PYW -ArgumentList $env:TRAY_LAUNCH -WorkingDirectory $env:SCRIPT_DIR_ARG -WindowStyle Hidden -ErrorAction Stop"
+exit /b %ERRORLEVEL%
+
+REM  Standalone restart: the shared helper is missing and --restart was asked for.
+REM  scripts\standalone_restart.py ends only THIS app's tray and server (command line
+REM  under this repo's .venv, plus the owners of its configured ports, never a name
+REM  match), this script starts the tray again the same way as above, and the
+REM  script then polls /api/version until the served git_sha is HEAD's. Each step's
+REM  exit code stops the chain, so a failed stop never starts a second tray and a
+REM  restart is never reported done on a stale build.
+:standalone_restart
+set "TRAY_PY=%TRAY_VENV%\Scripts\python.exe"
+set "TRAY_PYW=%TRAY_VENV%\Scripts\pythonw.exe"
+if not exist "%TRAY_PY%" echo ERROR: missing "%TRAY_PY%" - create this app's .venv first.
+if not exist "%TRAY_PY%" exit /b 1
+if not exist "%TRAY_PYW%" echo ERROR: missing "%TRAY_PYW%" - create this app's .venv first.
+if not exist "%TRAY_PYW%" exit /b 1
+echo NOTE: shared tray helper not found, restarting the %TRAY_APP_NAME% tray standalone.
+set "PYTHONUTF8=1"
+"%TRAY_PY%" -m scripts.standalone_restart stop
+if errorlevel 1 exit /b 1
+%PS% -NoProfile -NonInteractive -Command "Start-Process -FilePath $env:TRAY_PYW -ArgumentList $env:TRAY_LAUNCH -WorkingDirectory $env:SCRIPT_DIR_ARG -WindowStyle Hidden -ErrorAction Stop"
+if errorlevel 1 exit /b 1
+"%TRAY_PY%" -m scripts.standalone_restart verify
 exit /b %ERRORLEVEL%

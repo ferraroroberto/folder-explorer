@@ -25,11 +25,35 @@ logger = logging.getLogger(__name__)
 # Legacy Internet Explorer instances sit in the same shell collection and are not destinations; the
 # hosting program's name tells them apart, and a name with no extension is the same program.
 _EXPLORER_PROGRAM = "explorer"
+# The window class of each tab inside a File Explorer window (the shown tab is its first child).
+_TAB_CLASS = "ShellTabWindowClass"
+# The shell service that answers with a tab's own browser, whose window is that tab.
+_SID_TOP_LEVEL_BROWSER = "{4C96BE40-915C-11CF-99D3-00AA004AE837}"
 
 
 def is_explorer(program_path: str) -> bool:
     """True when the shell window's hosting program is File Explorer."""
     return os.path.splitext(os.path.basename(program_path))[0].lower() == _EXPLORER_PROGRAM
+
+
+def is_shown_tab(window: object) -> bool:
+    """True when this shell window is the tab its File Explorer window shows; False when that can't be told.
+
+    Every tab of a window reports the window's handle, so navigating any but the
+    shown one would change a tab the user can't see.
+    """
+    try:
+        import pythoncom  # noqa: PLC0415 - Windows only, imported where it is used
+        import pywintypes  # noqa: PLC0415
+        import win32gui  # noqa: PLC0415
+        from win32com.shell import shell  # noqa: PLC0415
+
+        provider = window._oleobj_.QueryInterface(pythoncom.IID_IServiceProvider)  # type: ignore[attr-defined]
+        browser = provider.QueryService(pywintypes.IID(_SID_TOP_LEVEL_BROWSER), shell.IID_IShellBrowser)
+        return bool(browser.GetWindow() == win32gui.FindWindowEx(int(window.HWND), 0, _TAB_CLASS, None))  # type: ignore[attr-defined]
+    except Exception as exc:  # noqa: BLE001 - a tab that can't be placed is never reused
+        logger.debug("Can't tell whether a tab is the shown one: %s", exc)
+        return False
 
 
 class ExplorerUnavailableError(RuntimeError):
@@ -56,14 +80,16 @@ def pick_foremost_folder(folders_by_hwnd: dict[int, str], z_order: Sequence[int]
 def _enumerate_explorer_folders() -> dict[int, str]:
     """Window handle to folder path for every File Explorer window showing a real folder.
 
-    This PC, Quick Access, the Recycle Bin and the like have no folder path, so they are skipped.
+    Every tab of a window reports the window's handle, so only the shown tab speaks for it; a hidden tab
+    would answer a folder the user isn't looking at. This PC, Quick Access, the Recycle Bin and the like
+    have no folder path, so they are skipped.
     """
     import win32com.client  # noqa: PLC0415 - Windows only, imported where it is used
 
     folders: dict[int, str] = {}
     for window in win32com.client.Dispatch("Shell.Application").Windows():
         try:
-            if not is_explorer(str(window.FullName or "")):
+            if not is_explorer(str(window.FullName or "")) or not is_shown_tab(window):
                 continue
             hwnd = int(window.HWND)
             path = str(window.Document.Folder.Self.Path or "")

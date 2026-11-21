@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from app.webapp.server import app
 from src import config, desktop, window_front
+from src.explorer_window import is_shown_tab
 from tests.conftest import write_config
 
 FOLDER = r"X:\Invented\Projects"
@@ -72,7 +73,7 @@ def test_the_reused_window_is_picked_in_z_order_and_only_navigated(monkeypatch: 
     monkeypatch.setitem(sys.modules, "win32com", types.SimpleNamespace(client=fake_client))
     monkeypatch.setitem(sys.modules, "win32com.client", fake_client)
     monkeypatch.setattr(desktop, "top_level_z_order", lambda: [3, 2, 1])
-    monkeypatch.setattr(desktop.window_front, "is_shown_tab", lambda window: True)
+    monkeypatch.setattr(desktop, "is_shown_tab", lambda window: True)
     monkeypatch.setattr(desktop.sys, "platform", "win32")
     assert desktop._reuse_window(FOLDER) == 2
     assert windows[1].went == [FOLDER] and windows[0].went == [] and windows[2].went == []
@@ -92,16 +93,16 @@ def test_only_the_shown_tab_of_a_window_is_ever_navigated(monkeypatch: pytest.Mo
     monkeypatch.setitem(sys.modules, "win32com", types.SimpleNamespace(client=fake_client))
     monkeypatch.setitem(sys.modules, "win32com.client", fake_client)
     monkeypatch.setattr(desktop, "top_level_z_order", lambda: [1])
-    monkeypatch.setattr(desktop.window_front, "is_shown_tab", lambda tab: tab.shown)
+    monkeypatch.setattr(desktop, "is_shown_tab", lambda tab: tab.shown)
     monkeypatch.setattr(desktop.sys, "platform", "win32")
     assert desktop._reuse_window(FOLDER) == 1
     assert tabs[0].went == [FOLDER] and tabs[1].went == []
-    monkeypatch.setattr(desktop.window_front, "is_shown_tab", lambda tab: False)
+    monkeypatch.setattr(desktop, "is_shown_tab", lambda tab: False)
     assert desktop._reuse_window(FOLDER) is None  # no tab it can place: a new window opens instead
 
 
 def test_a_tab_that_cannot_be_placed_is_not_the_shown_one() -> None:
-    assert window_front.is_shown_tab(object()) is False
+    assert is_shown_tab(object()) is False
 
 
 def test_a_folder_windows_cannot_find_reads_as_gone(opened: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch) -> None:

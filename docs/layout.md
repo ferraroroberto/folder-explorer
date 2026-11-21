@@ -75,7 +75,7 @@ folder-explorer/
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
-│   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window (the Archive sheet and window offer it)
+│   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window's shown tab (the Archive sheet and window offer it)
 │   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
 │   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),
 │   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths

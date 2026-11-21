@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import struct
+import sys
+
+import pytest
 
 from src import winfs
+from tests.fixture_tree import make_compressed, make_sparse
 
 
 def _record(name: str, attrs: int, size: int, alloc: int, ea: int = 0, written: int = 0, last: bool = False) -> bytes:
@@ -65,6 +69,20 @@ def test_list_dir_reports_real_sizes(tmp_path) -> None:
     assert set(entries) == {"a.bin", "sub"}
     assert entries["a.bin"].size == 10_000 and entries["a.bin"].alloc >= 10_000
     assert entries["sub"].is_dir and not winfs.is_link(entries["sub"])
+
+
+def test_list_dir_reports_space_on_disk_below_length_for_sparse_and_compressed(tmp_path) -> None:
+    length = 8 * 1024 * 1024
+    make_sparse(tmp_path / "hollow.bin", length)
+    squeezed = make_compressed(tmp_path / "squeezed.txt", length)
+    entries = {e.name: e for e in winfs.list_dir(str(tmp_path))}
+    assert entries["hollow.bin"].size == length
+    assert entries["hollow.bin"].alloc < length // 4
+    if squeezed:
+        assert entries["squeezed.txt"].size == length
+        assert entries["squeezed.txt"].alloc < length // 4
+    elif sys.platform == "win32":
+        pytest.skip("this volume does not support NTFS compression")
 
 
 def test_extended_path_prefixes_once(tmp_path) -> None:

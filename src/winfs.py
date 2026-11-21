@@ -183,8 +183,7 @@ else:
                 st = item.stat(follow_symlinks=False)
                 link = stat.S_ISLNK(st.st_mode)
                 is_dir = stat.S_ISDIR(st.st_mode) or (link and item.is_dir())
-                blocks = getattr(st, "st_blocks", None)
-                alloc = blocks * 512 if blocks is not None else st.st_size
+                alloc = st.st_blocks * 512  # every POSIX stat has it; a missing one raises rather than passing length off as allocation
                 attrs = (FILE_ATTRIBUTE_DIRECTORY if is_dir else 0) | (FILE_ATTRIBUTE_REPARSE_POINT if link else 0)
                 yield Entry(item.name, is_dir, 0 if is_dir else st.st_size, 0 if is_dir else alloc,
                             attrs, int(st.st_mtime), REPARSE_TAG_NAME_SURROGATE if link else 0)

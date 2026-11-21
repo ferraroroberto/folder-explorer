@@ -102,12 +102,12 @@ def test_tree_selecting_a_folder_shows_its_contents_and_the_basis_switches_total
     _tab(page, "largest")
     expect(page.locator("#topList .list-row").first).to_contain_text("river-01.mp4")
     _tab(page, "explore")
-    expect(page.locator("#summary .stat-label").first).to_have_text("Total size")
-    open_filters(page)
-    page.locator('#basisSeg [data-value="disk"]').click()
-    expect(page.locator("#filtersOpen")).to_have_attribute("aria-label", "Filters & sort, 1 on: totals by on disk")
-    close_filters(page)
     expect(page.locator("#summary .stat-label").first).to_have_text("On disk")
+    open_filters(page)
+    page.locator('#basisSeg [data-value="size"]').click()
+    expect(page.locator("#filtersOpen")).to_have_attribute("aria-label", "Filters & sort, 1 on: totals by size")
+    close_filters(page)
+    expect(page.locator("#summary .stat-label").first).to_have_text("Total size")
 
 
 def test_type_filter_narrows_every_view(page: Page, app_url: str) -> None:

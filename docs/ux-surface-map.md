@@ -153,7 +153,7 @@ flowchart LR
   - Clear and Done
 - **Does:**
   - each choice applies as it changes and reloads the three tabs for the same folder
-  - Clear returns to the first root, every type and Totals by Size
+  - Clear returns to the first root, every type and Totals by On disk
 - **States:** the title and the Clear and Done footer stay in view while the settings scroll
 - **Leads to:** [Size and On disk](#exploresizes-info-size-and-on-disk) (the info button beside Totals by)
 
@@ -486,7 +486,7 @@ flowchart LR
 
 - **Root:** `data-surface`
 - **Reach:** the info button beside Totals by in the Filters & sort sheet
-- **Holds:** what Size and On disk mean, and that an online-only file takes no space until it is opened
+- **Holds:** what Size and On disk mean, that On disk is the default and what deleting frees, and that an online-only file takes no space until it is opened
 
 ## Largest
 

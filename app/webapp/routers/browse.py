@@ -1,7 +1,7 @@
 """Browse one root's current index: tree, contents, largest files, percentile, types, summary.
 
 Every endpoint takes ``root`` (a root key), ``folder`` (a folder id in that
-root's current index, ``0`` is the root), ``basis`` (``size`` or ``disk``)
+root's current index, ``0`` is the root), ``basis`` (``disk``, the default, or ``size``)
 and an optional ``type``: a file extension, or ``-`` for files with none.
 Each answer carries the ``scan_id`` it was read from; folder ids belong to
 one scan, so the page starts over at the root when the scan id changes.
@@ -22,7 +22,7 @@ from fastapi import APIRouter, Body, HTTPException, Query, Request
 from app.webapp.auth import is_pc_itself
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, desktop, store
-from src.index import BASES, Index
+from src.index import BASES, DEFAULT_BASIS, Index
 from src.roots import Root, resolve_roots
 
 router = APIRouter(prefix="/api")
@@ -66,7 +66,7 @@ def _hidden(ix: Index, shown: bool) -> dict[str, bool]:
 
 
 @router.get("/tree")
-def tree(root: str, folder: int = 0, basis: str = "size", type: Optional[str] = None) -> dict[str, Any]:
+def tree(root: str, folder: int = 0, basis: str = DEFAULT_BASIS, type: Optional[str] = None) -> dict[str, Any]:
     ext = _ext(type)
     shown = _show_hidden()
 
@@ -79,7 +79,7 @@ def tree(root: str, folder: int = 0, basis: str = "size", type: Optional[str] = 
 
 
 @router.get("/folder")
-def folder_contents(request: Request, root: str, folder: int = 0, basis: str = "size", type: Optional[str] = None,
+def folder_contents(request: Request, root: str, folder: int = 0, basis: str = DEFAULT_BASIS, type: Optional[str] = None,
                     mode: str = Query("direct", pattern="^(direct|nested)$")) -> dict[str, Any]:
     ext = _ext(type)
     shown = _show_hidden()
@@ -138,7 +138,7 @@ def open_item(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, s
 
 
 @router.get("/top")
-def top(root: str, folder: int = 0, basis: str = "size", type: Optional[str] = None,
+def top(root: str, folder: int = 0, basis: str = DEFAULT_BASIS, type: Optional[str] = None,
         n: int = Query(10, ge=1, le=100)) -> dict[str, Any]:
     ext = _ext(type)
     return _query(root, lambda ix: {"folder": ix.node(ix.folder(folder), ext),
@@ -146,14 +146,14 @@ def top(root: str, folder: int = 0, basis: str = "size", type: Optional[str] = N
 
 
 @router.get("/percentile")
-def percentile(root: str, folder: int = 0, basis: str = "size", type: Optional[str] = None,
+def percentile(root: str, folder: int = 0, basis: str = DEFAULT_BASIS, type: Optional[str] = None,
                p: float = Query(1, gt=0, le=50)) -> dict[str, Any]:
     ext = _ext(type)
     return _query(root, lambda ix: ix.percentile(folder, p, _basis(basis), ext))
 
 
 @router.get("/types")
-def types(root: str, folder: int = 0, basis: str = "size") -> dict[str, Any]:
+def types(root: str, folder: int = 0, basis: str = DEFAULT_BASIS) -> dict[str, Any]:
     return _query(root, lambda ix: {"folder": ix.node(ix.folder(folder), None), **ix.types(folder, _basis(basis))})
 
 

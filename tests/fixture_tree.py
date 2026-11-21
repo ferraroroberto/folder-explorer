@@ -179,3 +179,32 @@ def add_docs(root: Path) -> Path:
     (pages / "page.js").write_bytes(PAGE_JS.encode("utf-8"))
     (pages / "sketch.htm").write_bytes(SKETCH_HTML)
     return root
+
+
+def make_sparse(path: Path, length: int) -> None:
+    """A ``length``-byte file whose data is one 4 KiB run: the rest is a hole that takes no space."""
+    import subprocess
+    import sys
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"x" * 4096)
+    if sys.platform == "win32":
+        subprocess.run(["fsutil", "sparse", "setflag", str(path)], check=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    with path.open("r+b") as f:
+        f.truncate(length)
+    if sys.platform == "win32":
+        # truncate() zero-fills on Windows, so the file would fill up on disk in the background; deallocating the range makes the hole real.
+        subprocess.run(["fsutil", "sparse", "setrange", str(path), "4096", str(length - 4096)], check=True, capture_output=True,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
+
+
+def make_compressed(path: Path, length: int) -> bool:
+    """A highly compressible file with the NTFS compression attribute; False where the volume can't compress."""
+    import subprocess
+    import sys
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"a" * length)
+    if sys.platform != "win32":
+        return False
+    return subprocess.run(["compact", "/c", str(path)], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW).returncode == 0

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from app.webapp.bind import STATE_NO_CERT, STATE_OFF, STATE_ON, resolve_bind
 from app.webapp.server import app
 from tests.conftest import write_config
-from tests.fixture_tree import FILES, TOTAL_BYTES, build_tree
+from tests.fixture_tree import FILES, TOTAL_BYTES, build_tree, make_sparse
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.7", 50000)
@@ -43,6 +43,27 @@ def test_browse_endpoints_answer_from_the_index(scanned: str) -> None:
         assert c.get("/api/tree", params={"root": scanned, "basis": "bogus"}).status_code == 400
         assert c.get("/api/tree", params={"root": scanned, "folder": 9999}).status_code == 404
         assert c.get("/api/tree", params={"root": "unknown"}).status_code == 404
+
+
+def test_totals_default_to_space_on_disk_not_length(isolated: Path) -> None:
+    root = isolated / "Sparse root"
+    make_sparse(root / "Hollow" / "preallocated.log", 300 * 1024 * 1024)
+    (root / "Solid").mkdir(parents=True)
+    (root / "Solid" / "data.bin").write_bytes(b"y" * (8 * 1024 * 1024))
+    write_config(isolated, roots=[str(root)])
+    with TestClient(app, client=LOCAL) as c:
+        assert c.post("/api/scan", json={}).status_code == 202
+        for _ in range(100):
+            if not c.get("/api/scan").json()["scanning"]:
+                break
+            time.sleep(0.05)
+        key = c.get("/api/roots").json()["roots"][0]["key"]
+        by_length = [n["name"] for n in c.get("/api/tree", params={"root": key, "basis": "size"}).json()["children"]]
+        by_default = [n["name"] for n in c.get("/api/tree", params={"root": key}).json()["children"]]
+        by_disk = [n["name"] for n in c.get("/api/tree", params={"root": key, "basis": "disk"}).json()["children"]]
+    assert by_length == ["Hollow", "Solid"]
+    assert by_disk == ["Solid", "Hollow"]
+    assert by_default == by_disk
 
 
 def test_roots_report_the_last_scan(scanned: str) -> None:

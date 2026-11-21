@@ -184,7 +184,7 @@ function contentsHtml() {
     '<div class="contents-controls"><span class="segmented" role="group" aria-label="Show" data-seg="mode">' +
     segBtn('direct', 'In this folder', 'mode-direct') + segBtn('nested', 'All nested files', 'mode-nested') + '</span>' + hiddenSwitch() + '</div>' +
     '<p class="contents-note">' + esc(hiddenNote()) + '</p>' +
-    '<div class="col-head list-cols" aria-hidden="true"><span></span><span>Name</span><span>Type</span><span>Modified</span><span>Share</span><span>Size</span></div>' +
+    '<div class="col-head list-cols" aria-hidden="true"><span></span><span>Name</span><span>Type</span><span>Modified</span><span>Share</span><span>' + (state.basis === 'disk' ? 'On disk' : 'Size') + '</span></div>' +
     '<ul class="rows">' + rows.join('') + '</ul>' + (note ? '<p class="rows-note">' + note + '</p>' : '');
 }
 

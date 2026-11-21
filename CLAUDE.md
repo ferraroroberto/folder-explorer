@@ -22,7 +22,7 @@ folder-explorer: a public disk-space explorer, read-only apart from mail filing 
 
 ## Run / restart
 
-- **Restart recipe:** `tray.bat --restart` (the shared `tray_lifecycle.ps1`: kills this repo's tray subtree, reclaims port 8453 by command line, starts the tray, and checks the served `git_sha` against `HEAD`). Run it fire-and-forget through a real Windows shell, then poll `GET http://127.0.0.1:8453/api/version` (or `https://` with remote access on) until `git_sha` matches `git rev-parse --short HEAD`, with a hard timeout. A `/healthz` 200 alone proves nothing about the build. Agents may run this recipe without asking; it touches only this app.
+- **Restart recipe:** `tray.bat --restart` (the shared `tray_lifecycle.ps1`: kills this repo's tray subtree, reclaims port 8453 by command line, starts the tray, and checks the served `git_sha` against `HEAD`; on a PC without that helper, `scripts/standalone_restart.py` does the same for this checkout). Run it fire-and-forget through a real Windows shell, then poll `GET http://127.0.0.1:8453/api/version` (or `https://` with remote access on) until `git_sha` matches `git rev-parse --short HEAD`, with a hard timeout. A `/healthz` 200 alone proves nothing about the build. Agents may run this recipe without asking; it touches only this app.
 - **Console:** `start.bat` / `python -m app.webapp` (no tray).
 - **Scans:** `python -m app.cli scan` (disk walk, then the email stage); the nightly app-launcher Job runs exactly that, so the in-app schedule stays `off` on this PC. `python -m app.cli email index [--root FOLDER]` runs the email stage alone under its own lock.
 - The live signal is the Explore tree rendering the root's folders with sizes, not a health check.

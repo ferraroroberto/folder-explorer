@@ -20,24 +20,15 @@ The copy list was derived from the code, not from memory: every path the app rea
 
 **Steps**
 
-1. Clone the repository, then in `<repo>`:
+1. Clone the repository and run `.\scripts\install.bat` in `<repo>` ([install.md](install.md)): it creates `.venv`, installs the requirements of each switched-on block, creates `config.json` from `config.example.json` when it is missing, and prints a checklist. Every key has a default, so the config needs no edit until you change something.
+2. Run the app: `tray.bat` for the always-on tray, or `start.bat` for a console. Open `http://127.0.0.1:8453/`. `.\scripts\install.bat --startup` starts the tray at sign-in.
+3. In **Settings → Available features** switch off every block this machine cannot run (a block whose dependency is missing says why on its row). Blocks are on by default; a change applies at once, except the Screenshot block, which applies when the tray next starts (`tray.bat --restart`). After switching a block on, run `.\scripts\install.bat` again so its requirements are installed.
+4. Set the folders: **Folders to scan** (default: every fixed drive and each OneDrive folder), and, if you use the Email block, **Email folders**. Press **Rescan** in the Scans tab, or run `& .\.venv\Scripts\python.exe -m app.cli scan`.
+5. Optional, remote access from a phone: `scripts\gen_tailscale_cert.py`, then `python -m src.password set` and `scripts\gen_token.py`, then restart (README, Remote access). The installer's checklist shows each as `missing` until it is done.
+6. Optional, the Outlook macro: set `FOLDER_EXPLORER_HOME` to `<repo>` for the user (Settings → Outlook macro prints the exact line) and import `assets\ArchiveMacro.bas` in Outlook.
+7. Optional, a nightly scan: a scheduler job that runs `& <repo>\.venv\Scripts\python.exe -m app.cli scan`, with Settings → Scan schedule left `off` so two schedules never double-run.
 
-   ```powershell
-   python -m venv .venv
-   & .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-tray.txt
-   & .\.venv\Scripts\python.exe -m pip install -r requirements-email.txt     # optional: the Email block
-   & .\.venv\Scripts\python.exe -m pip install -r requirements-outlook.txt   # optional: the Outlook archive block
-   ```
-
-2. Create the machine's settings. Either `copy config.example.json config.json`, or run the app and press **Create config.json** in Settings (it never overwrites a file that exists). Every key has a default, so this step is optional until you change something.
-3. Run the app: `tray.bat` for the always-on tray, or `start.bat` for a console. Open `http://127.0.0.1:8453/`. Put a shortcut to `tray.bat` in `shell:startup` to start it at sign-in.
-4. In **Settings → Available features** switch off every block this machine cannot run (a block whose dependency is missing says why on its row). Blocks are on by default; a change applies at once, except the Screenshot block, which applies when the tray next starts (`tray.bat --restart`).
-5. Set the folders: **Folders to scan** (default: every fixed drive and each OneDrive folder), and, if you use the Email block, **Email folders**. Press **Rescan** in the Scans tab, or run `& .\.venv\Scripts\python.exe -m app.cli scan`.
-6. Optional, remote access from a phone: `scripts\gen_tailscale_cert.py`, then `python -m src.password set` and `scripts\gen_token.py`, then restart (README, Remote access).
-7. Optional, the Outlook macro: set `FOLDER_EXPLORER_HOME` to `<repo>` for the user (Settings → Outlook macro prints the exact line) and import `assets\ArchiveMacro.bas` in Outlook.
-8. Optional, a nightly scan: a scheduler job that runs `& <repo>\.venv\Scripts\python.exe -m app.cli scan`, with Settings → Scan schedule left `off` so two schedules never double-run.
-
-**Update**: `git pull`, then `tray.bat --restart` (or stop and start `start.bat`). `--restart` needs the shared `tray_lifecycle.ps1` that the fleet-config repo's install puts under `%USERPROFILE%\.claude\tray\`; on a machine without it, `tray.bat --restart` stops with an error, so quit the tray from its menu and run `tray.bat` again. The page footer and `GET /api/version` show the running build; it should match `git rev-parse --short HEAD`.
+**Update**: `git pull --ff-only`, then `tray.bat --restart` (or stop and start `start.bat`); [install.md](install.md#a-pc-that-already-runs-it) covers when to run `scripts\install.bat` again. The page footer and `GET /api/version` show the running build; it should match `git rev-parse --short HEAD`.
 
 ## Where the state lives
 
@@ -92,7 +83,7 @@ Elsewhere:
 - `FOLDER_EXPLORER_HOME` (user environment) for the Outlook macro: set it to `<repo>` on this machine.
 - The Markdown "Open with" association: switch **Associate Markdown files with this app** on again in Settings; it is a per-user registry entry that does not travel.
 - The Outlook macro: import `assets\ArchiveMacro.bas` in Outlook again.
-- A startup shortcut to `tray.bat`, and any scheduler job that runs the scan.
+- Starting the tray at sign-in (`.\scripts\install.bat --startup`), and any scheduler job that runs the scan.
 
 ### Check that the copy worked
 

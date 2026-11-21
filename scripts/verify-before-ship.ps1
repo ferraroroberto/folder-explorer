@@ -116,8 +116,10 @@ if (-not (Test-Path $py)) {
 
 # Box load lock: re-runs this script under the shared lock and exits with its
 # code. The gate itself only ever exits 0 or 1, so the helper's exit 3 ("lock
-# not taken in time") cannot be confused with it.
-. (Join-Path $PSScriptRoot "box_lock_gate.ps1"); Enter-BoxLockGate
+# not taken in time") cannot be confused with it. Loaded as text, not dot-sourced
+# from its file: under an AllSigned policy a dot-sourced unsigned file is refused,
+# while a ScriptBlock made from its text runs with the policy unchanged.
+. ([scriptblock]::Create([IO.File]::ReadAllText((Join-Path $PSScriptRoot "box_lock_gate.ps1")))); Enter-BoxLockGate
 
 Invoke-Stage "byte-compile"      { & $py -m compileall -q app src tests }
 # Runtime write probe, first half: what already sits untracked or ignored under

@@ -1,4 +1,5 @@
-.venv/
+# no trailing slash: a .venv linked in (a worktree junction, a symlink) is not a folder to git
+.venv
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -9,6 +10,8 @@ __pycache__/
 .env
 config.json
 config.json.tmp
+# the timestamped copies the installer keeps before it adds a missing key (app/install.py)
+*.bak
 # The mailbox registry: personal addresses, machine-local (mailboxes.sample.json is the template)
 mailboxes.json
 # The tailnet certificate and key, issued per machine
@@ -20,3 +23,6 @@ test-results/
 
 # The app password hash (src/password.py)
 config/app_password.json
+
+# scratch an agent or a tool leaves at the root
+tmp/

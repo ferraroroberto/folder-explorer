@@ -1,7 +1,7 @@
 /* Folder explorer: boot, tabs, toolbar, header lines, scan polling, the jump from Search into Explore and the shared click handling. */
 
 import { getJSON, postJSON, authHeaders, ApiError } from './api.js';
-import { readPref, rootInfo, state, writePref, APP, loadFeatures, onFeaturesChange } from './state.js';
+import { DEFAULT_BASIS, readPref, rootInfo, state, writePref, APP, loadFeatures, onFeaturesChange } from './state.js';
 import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
 import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
 import { loadLargest } from './largest.js';
@@ -68,6 +68,7 @@ async function renderToolbar() {
   $('rootSelect').innerHTML = state.roots.map((r) => '<option value="' + esc(r.key) + '"' + (r.key === state.root ? ' selected' : '') +
     (r.current ? '' : ' disabled') + '>' + esc(r.name) + ' (' + esc(r.kind) + ')</option>').join('');
   $('basisSeg').querySelectorAll('.segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === state.basis)));
+  $('treeSizeHead').textContent = state.basis === 'disk' ? 'On disk' : 'Size';
   updateScope();
   paintFilters();
   const r = rootInfo();
@@ -79,13 +80,13 @@ async function renderToolbar() {
   paintFilters();
 }
 
-/** The sheet's settings that differ from their default, one phrase each: the first root, every type, totals by size. */
+/** The sheet's settings that differ from their default, one phrase each: the first root, every type, totals by on disk. */
 function activeFilters() {
   const out = [];
   const r = rootInfo();
   if (r && state.roots.length && state.root !== state.roots[0].key) out.push('scan root ' + r.name);
   if (state.type !== null) out.push('file type ' + extLabel(state.type));
-  if (state.basis !== 'size') out.push('totals by on disk');
+  if (state.basis !== DEFAULT_BASIS) out.push('totals by size');
   return out;
 }
 
@@ -259,12 +260,12 @@ function wireClicks(nav) {
   document.querySelectorAll('dialog:not(.settings-page)').forEach((d) => d.addEventListener('click', (e) => { if (e.target === d) d.close(); }));
 }
 
-/** Back to the defaults: the first root, every type, totals by size. */
+/** Back to the defaults: the first root, every type, totals by on disk. */
 function clearFilters() {
   if (!activeFilters().length) return;
   const first = state.roots[0];
   state.type = null;
-  state.basis = 'size';
+  state.basis = DEFAULT_BASIS;
   if (first && state.root !== first.key) {
     state.root = first.key;
     writePref('root', state.root);

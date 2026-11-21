@@ -160,7 +160,7 @@ surfaces:
       - Clear and Done
     does:
       - each choice applies as it changes and reloads the three tabs for the same folder
-      - Clear returns to the first root, every type and Totals by Size
+      - Clear returns to the first root, every type and Totals by On disk
     states:
       - the title and the Clear and Done footer stay in view while the settings scroll
     links:
@@ -497,7 +497,7 @@ surfaces:
     reach:
       - the info button beside Totals by in the Filters & sort sheet
     holds:
-      - what Size and On disk mean, and that an online-only file takes no space until it is opened
+      - what Size and On disk mean, that On disk is the default and what deleting frees, and that an online-only file takes no space until it is opened
 
   - id: largest.tab
     area: largest

@@ -220,7 +220,7 @@
             <h2 class="card-title"><svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Folders</h2>
             <span class="card-head-meta" id="treeMeta"></span>
           </div>
-          <div class="col-head tree-cols" aria-hidden="true"><span>Name</span><span></span><span>Share</span><span>Size</span><span>Files</span></div>
+          <div class="col-head tree-cols" aria-hidden="true"><span>Name</span><span></span><span>Share</span><span id="treeSizeHead">On disk</span><span>Files</span></div>
           <ul class="tree" id="tree"></ul>
         </div>
         <!-- duplicate-surface-exempt: the wide desktop's pane for the one contents surface a phone gets as #contentsDialog below -->
@@ -617,8 +617,8 @@
         <span>Totals by</span>
         <span class="tb-inline">
           <span class="segmented" role="group" aria-label="Totals by" id="basisSeg">
-            <button type="button" class="segmented-item" aria-pressed="true" data-value="size" data-track="basis-size">Size</button>
-            <button type="button" class="segmented-item" aria-pressed="false" data-value="disk" data-track="basis-disk">On disk</button>
+            <button type="button" class="segmented-item" aria-pressed="false" data-value="size" data-track="basis-size">Size</button>
+            <button type="button" class="segmented-item" aria-pressed="true" data-value="disk" data-track="basis-disk">On disk</button>
           </span>
           <button type="button" class="icon-button" id="basisInfo" aria-label="About Size and On disk" title="About Size and On disk" data-track="basis-info">
             <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
@@ -646,8 +646,8 @@
       </button>
     </div>
     <div class="prose">
-      <p><strong>Size</strong> is a file's full length: what the cloud stores and what you would download.</p>
-      <p><strong>On disk</strong> is the space it takes on this PC. An online-only file (<svg class="icon inline-glyph" aria-hidden="true"><use href="#i-cloud"></use></svg>) takes nothing until you open it: a 567 KB document shows Size 567 KB and On disk 0 B.</p>
+      <p><strong>On disk</strong> is the space a file takes on this PC, and what deleting it frees. It is the default. A sparse or compressed file, or a very small one, takes less than its length; an online-only file (<svg class="icon inline-glyph" aria-hidden="true"><use href="#i-cloud"></use></svg>) takes nothing until you open it.</p>
+      <p><strong>Size</strong> is a file's full length: what the cloud stores and what you would download. A 567 KB online-only document shows Size 567 KB and On disk 0 B.</p>
       <p>The scan reads folder listings only. It never opens a file, so it never downloads one.</p>
     </div>
   </div>

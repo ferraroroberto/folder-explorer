@@ -17,10 +17,13 @@ export function writePref(key, value) {
   try { localStorage.setItem(APP + '.' + key, value); } catch (e) { /* not kept across visits */ }
 }
 
+/** What deleting frees is the space on disk, not a file's length (a sparse or compressed file is far smaller than its length). */
+export const DEFAULT_BASIS = 'disk';
+
 export const state = {
   roots: [],
   root: null,
-  basis: readPref('basis', 'size') === 'disk' ? 'disk' : 'size',
+  basis: readPref('basis', DEFAULT_BASIS) === 'size' ? 'size' : 'disk',
   type: null, // null = every type, '' = files with no extension
   folder: 0,
   folderName: '',

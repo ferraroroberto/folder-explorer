@@ -16,6 +16,10 @@ How a scan reads every file's size without opening a file, why that keeps OneDri
 
 No file is opened, read or stat-ed one by one: one handle per folder gives every figure. That is also about a hundred times faster than a `GetCompressedFileSizeW` call per file. Off Windows the same record comes from `os.scandir` + `lstat`, with `st_blocks` as the allocation.
 
+## Size and On disk
+
+The views total by **On disk** by default (Settings, Totals by, changes it per device), because that is what deleting frees: a sparse file (a preallocated log), an NTFS-compressed file or a very small one takes less than its length, and a folder's length total can overstate a cleanup several times over. **Size** stays one tap away in the same toggle, and every column header and summary cell says which figure it shows. The listing's `AllocationSize` already matches `GetCompressedFileSizeW` for sparse and compressed files (a test holds it), so the on-disk figure costs no extra call and the scan time is unchanged. Off Windows, `st_blocks` is read directly and never replaced by the length.
+
 ## Cloud files
 
 A file is **online-only** when any of `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, `FILE_ATTRIBUTE_RECALL_ON_OPEN` or `FILE_ATTRIBUTE_OFFLINE` is set; the OneDrive client marks its placeholders with the first. `FILE_ATTRIBUTE_PINNED` means "always keep on this device". Opening a placeholder's *data* is what makes the sync client download it, and a scan never does. Listing a folder whose listing is not local yet may make the client fetch that listing, which is metadata, never file content.

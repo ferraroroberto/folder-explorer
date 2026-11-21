@@ -1,7 +1,7 @@
 /* Settings: text size, the Documents search switch, blocking remote content in HTML, default basis, how File Explorer opens, the Markdown association, what a tray click opens, every screenshot setting, remote access, the in-app schedule, and the folder lists for the scan and the email index. Each row of the pane shows its current value; a row with help text or a list opens its own sheet (settingDialog) holding the control, its note and its list. */
 
 import { getJSON, postJSON } from './api.js';
-import { readPref, state, writePref, setFeatures } from './state.js';
+import { DEFAULT_BASIS, readPref, state, writePref, setFeatures } from './state.js';
 import { fmtBytes } from './fmt.js';
 import { setSwitch, switchEl } from './_vendored/switch/switch.js';
 import { showToast } from './_vendored/toast/toast.js';
@@ -107,7 +107,7 @@ function render(body) {
   $('outlookNote').textContent = body.archive.ready
     ? 'Ready: the Archive button in Outlook files the open mail through this app.'
     : body.archive.reason + '. The macro text is still here to copy.';
-  setBasis(readPref('basis', 'size'));
+  setBasis(readPref('basis', DEFAULT_BASIS));
 }
 
 /** The Available features rows: each block's switch, what it covers, and why it can't run on this machine. */

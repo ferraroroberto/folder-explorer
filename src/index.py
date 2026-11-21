@@ -20,6 +20,8 @@ from src.folder_match import edits, unpack_ids
 from src.winfs import ONLINE_ONLY_ATTRS
 
 BASES = ("size", "disk")
+# What deleting frees is the space on disk, not the length: a sparse or compressed file is far smaller than its length.
+DEFAULT_BASIS = "disk"
 NO_EXT = ""
 
 # Caps on what one response carries; a folder with 100,000 subfolders

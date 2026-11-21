@@ -44,6 +44,7 @@ folder-explorer/
 │                           #   sheets, md-source.js its DOM-free text helpers); doc-answer.js names a failed API answer for both;
 │                           #   doc-drop.js takes a Markdown or HTML file dropped on the window (drop-files.js its DOM-free request builders,
 │                           #   doc-handoff.js hands a rendered one, and its file handle, to the /doc window it opens in)
+│           ├── dochost/        # doc-host.js: the View/Edit lifecycle the sheet and the /doc window share (mode, editor, a dropped file's handle, the race guard); a test holds it to one copy
 │           ├── localdoc/       # local-doc.js: a dropped file no scan covers, read and saved through the browser's file handle (the only page-side writer of a
 │           │                   #   user file); local-text.js its DOM-free text shape: byte-order mark, line ends, version
 │           ├── filters/        # filter-trigger.js: the Filters & sort button's count badge and accessible name, shared by the Explore and Search sheets

@@ -14,16 +14,14 @@
 import { authHeaders, getJSON } from './api.js';
 import { esc } from './fmt.js';
 import { APP } from './state.js';
-import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, releaseDoc, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
-import { openEditor, saveButtonHooks } from './doc-edit.js';
+import { docUrl, drawDoc, fetchDoc, locFromUrl, outlineHtml, scrollToHeading, stateHtml, wireDocHost } from './doc-view.js';
+import { createDocHost } from './dochost/doc-host.js';
 import { initDrop } from './doc-drop.js';
 import { droppedToken, fetchDropped } from './doc-handoff.js';
-import { renderLocal, withLocal } from './localdoc/local-doc.js';
 import { wireThemeToggle } from './theme.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
-import { showToast } from './_vendored/toast/toast.js';
 
 const $ = (id) => document.getElementById(id);
 // Wide windows show the outline beside the text; narrower ones open it from the header.
@@ -31,15 +29,22 @@ const WIDE = window.matchMedia('(min-width: 1100px) and (pointer: fine)');
 
 // The address's document; null for an address that names none and for a dropped file the scan doesn't have.
 let loc = locFromUrl(location.href);
-// A dropped file the browser gave a handle for, edited and saved through it: ``{handle, name}``; null otherwise.
-let local = null;
-let editor = null;
+// The view/edit lifecycle (doc-host.js); its ``local`` is a dropped file's handle, edited and saved through it.
+const host = createDocHost({
+  root: document.body,
+  body: $('docBody'),
+  saveBtn: $('docSave'),
+  getLoc: () => loc,
+  onEditStart: () => placeOutline(false),
+  redraw: () => load(false),
+  onLocalDrawn: async (body) => drawSide(body.outline, await fetchRecent()),
+});
 // Set once the reader chose how to leave (the in-app question), so the browser's own prompt doesn't ask again.
 let leaving = false;
 
 /** Leave for ``href``, asking first when the editor holds unsaved changes. */
 async function go(href) {
-  if (editor && !(await editor.leave())) return;
+  if (host.editor && !(await host.editor.leave())) return;
   leaving = true;
   location.href = href;
 }
@@ -48,33 +53,6 @@ async function go(href) {
 function toApp(tab) {
   try { localStorage.setItem(APP + '.tab', tab); } catch (e) { /* the app opens on its default tab */ }
   go('/');
-}
-
-function markMode(mode) {
-  document.querySelectorAll('.doc-mode .segmented-item').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  document.body.classList.toggle('is-editing', mode === 'edit');
-  $('docSave').hidden = mode !== 'edit';
-  $('docSave').disabled = true;
-}
-
-function startEditing() {
-  const target = loc || local;
-  if (editor || !target) return;
-  markMode('edit');
-  placeOutline(false);
-  releaseDoc($('docBody'));
-  editor = openEditor($('docBody'), target, saveButtonHooks($('docSave')));
-}
-
-/** Back to View: the draft, if any, stays on the device and the page shows the copy on disk. */
-function stopEditing() {
-  if (!editor) return;
-  if (editor.dirty()) showToast('Your unsaved draft is kept on this device');
-  editor.close();
-  editor = null;
-  markMode('view');
-  if (local) viewLocal();
-  else load(false);
 }
 
 function placeOutline(hasOutline) {
@@ -139,20 +117,6 @@ async function load(download) {
   if (started.fragment) scrollToHeading($('docBody'), started.fragment);
 }
 
-/** View of a local file: its copy on disk now, read through the handle and rendered by the server. */
-async function viewLocal() {
-  const started = local;
-  $('docBody').innerHTML = '<p class="doc-loading" role="status">Loading…</p>';
-  const r = await renderLocal(started.handle, started.name);
-  if (local !== started) return;
-  if (!r.ok) {
-    $('docBody').innerHTML = stateHtml(r);
-    return;
-  }
-  drawDoc($('docBody'), withLocal(r.body, started.handle));
-  drawSide(r.body.outline, await fetchRecent());
-}
-
 /** A dropped file the scan has opens as its document (a new address, so Edit and the bookmark work). */
 function openIndexed(next) {
   go(docUrl(next));
@@ -160,19 +124,12 @@ function openIndexed(next) {
 
 /** A dropped file the scan doesn't have, already rendered, with no address of its own: read-only here, or with Edit when the browser gave its ``handle``. */
 async function showDropped(doc, handle) {
-  if (editor) {
-    if (!(await editor.leave())) return;
-    editor.close();
-    editor = null;
-  }
+  if (!(await host.showDropped(doc, handle))) return;
   loc = null;
-  local = handle ? { handle, name: doc.name } : null;
-  markMode('view');
-  document.querySelector('.doc-modebar').hidden = !local;
+  document.querySelector('.doc-modebar').hidden = !host.local;
   document.title = doc.name + ' · Folder explorer';
   $('docTitle').textContent = doc.name;
   renderHeadStatus($('docStatus'), [], 'Dropped file');
-  drawDoc($('docBody'), withLocal(doc, handle));
   drawSide(doc.outline, await fetchRecent());
 }
 
@@ -211,17 +168,13 @@ function boot() {
     $('docOutline').hidden = !open;
     $('docOutlineBtn').setAttribute('aria-expanded', String(open));
   });
-  WIDE.addEventListener('change', () => { if (!editor) placeOutline(!!$('docOutline').querySelector('li')); });
-  document.querySelector('.doc-mode').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-mode]');
-    if (b && b.dataset.mode === 'edit') startEditing();
-    else if (b) stopEditing();
-  });
-  $('docSave').addEventListener('click', () => { if (editor) editor.save(); });
+  WIDE.addEventListener('change', () => { if (!host.editor) placeOutline(!!$('docOutline').querySelector('li')); });
+  host.wire();
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && editor && !document.querySelector('dialog[open]')) stopEditing();
+    if (e.key === 'Escape' && host.editor && !document.querySelector('dialog[open]')) host.stopEditing();
   });
   window.addEventListener('beforeunload', (e) => {
+    const editor = host.editor;
     if (!editor) return;
     editor.keepDraft();
     if (leaving || !editor.dirty()) return;

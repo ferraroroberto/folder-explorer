@@ -41,13 +41,13 @@ reason = "Add beside a folder path field is a utility button at the field's heig
 rule   = "COMP-16"
 reason = "The Settings sheet has no footer commit: Add saves a folder as it is added, and it stays the same height as the field beside it, so the larger Show macro button is not a rival to a commit"
 
-# The two contract failures below have their only evidence in docs/design/unified-app-mockup.html,
+# The contract failures below have their only evidence in docs/design/unified-app-mockup.html,
 # a self-contained reference page read in a browser and never served; the shipped page mounts one
 # footer outside the tab panels and its modals are the vendored modal shell.
 [[design.accepted]]
-check  = "modal-top-anchor"
+check  = "modal-unstyled-rows"
 target = "docs/design/unified-app-mockup.html"
-detail = "editor-modal(s) with no max-height + internal scroll — a tall form jumps as conditional rows toggle (design.md modal: top-anchored on mobile): docs/design/unified-app-mockup.html:681"
+detail = "1 dialog row class(es) with no dialog-scoped styling (design.md modal contract): docs/design/unified-app-mockup.html:2869 label.tb-field (never styled)"
 reason = "Evidence is the design mock-up under docs/design, which is never served; the shipped modals are the vendored modal shell"
 
 [[design.accepted]]

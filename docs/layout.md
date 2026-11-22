@@ -112,11 +112,14 @@ folder-explorer/
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,
 │                               #   tests/install the installer on temp checkouts, the standalone restart, and the clean-pull and AllSigned checks,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
+│                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this
 │                               #   repo's own readme_index_ratchet.py (README feature-bullet word count), gen_icons,
 │                               #   gen_tailscale_cert, gen_token, standalone_restart (tray.bat --restart on a PC without the shared
-│                               #   tray helper, and the owned ports tray.bat reads from the config)
+│                               #   tray helper, and the owned ports tray.bat reads from the config), disposable_webapp (the throwaway
+│                               #   scanned instance on a free port that the e2e suite and the design review's synthetic run both boot) and
+│                               #   design_review_synthetic (prints that instance's URL for `/design-review --synthetic` and `measure --e2e`)
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
 └── docs/                       # this file, install.md (install, update, uninstall), setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)

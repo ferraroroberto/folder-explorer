@@ -21,6 +21,25 @@ ignore_refs = [
 [design]
 wide_views = ["search", "explore"]
 
+# /design-review's e2e capture (tests/e2e/_surface.py) flips light/dark in place on an open
+# surface; this app stamps html[data-theme] at load from folder-explorer.theme (else the OS
+# scheme), so the hook sets that key too or its dark shots stay light.
+[design.review]
+theme_storage_key = "folder-explorer.theme"
+
+# `measure --e2e` and `--synthetic` walk this throwaway app (invented trees, a temp data
+# folder), never the live tray on :8453 (scripts/design_review_synthetic.py). The timeout
+# covers the fixture scan that runs before the app starts.
+[design.review.synthetic]
+command = ["scripts/design_review_synthetic.py"]
+startup_timeout_s = 60
+
+# The capture run is the whole suite on both projections; --e2e-autoboot lets it boot its own
+# instance while the live app holds :8453, and never opts in to acting on the live one.
+[design.review.e2e]
+command   = ["-m", "pytest", "tests/e2e", "-q", "--e2e-autoboot"]
+timeout_s = 1500
+
 # Search and Largest show the owner's own mail text and folder names, which can hold
 # snake_case words (a tracking parameter in a link, a folder someone named that way):
 # the app reports them as they are, so renaming them would misreport the disk.
@@ -110,6 +129,7 @@ webapp_serve = { src = "app/webapp/serve.py", sha = "6d779b94b028a898aa87200174a
 pooled_http = { src = "src/pooled_http.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "src/pooled_http.py" }
 single_instance = { src = "app/tray/single_instance.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "app/tray/single_instance.py" }
 tray_watchdog = { src = "app/tray/watchdog.py", sha = "072d7355da45001255c3d53db00f80c3a3393900", dest = "app/tray/watchdog.py" }
+surface_capture = { src = "tests/e2e/_surface.py", sha = "5c4d3a7947dae8b3b4a028bf636c0f052ea3b1f7", dest = "tests/e2e/_surface.py" }
 e2e_live_guard = { src = "tests/e2e/_e2e_live_guard.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_e2e_live_guard.py" }
 layout_lint = { src = "tests/e2e/_layout_lint.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "tests/e2e/_layout_lint.py" }
 geometry = { src = "tests/e2e/_geometry.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "tests/e2e/_geometry.py" }

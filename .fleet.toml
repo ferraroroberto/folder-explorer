@@ -108,7 +108,7 @@ toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b836357
 build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "2d871dd5a6a3ee6fe12a3c5c6439d2c53a93c2c4", dest = "app/webapp/static/_vendored/build-watch" }
 action-row = { src = "app/webapp/static/_vendored/action-row", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app/webapp/static/_vendored/action-row" }
 text-size = { src = "app/webapp/static/_vendored/text-size", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/text-size" }
-page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "3f1dcc76d5ba40c8b3d12a80a99659816ce1dd0e", dest = "app/webapp/static/_vendored/page-foot" }
+page-foot = { src = "app/webapp/static/_vendored/page-foot", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "app/webapp/static/_vendored/page-foot" }
 usage-log = { src = "app/webapp/static/_vendored/usage-log", sha = "e3524eba89bba7424a61a5270da04a6c2c5c4d3e", dest = "app/webapp/static/_vendored/usage-log" }
 sign-in = { src = "app/webapp/static/_vendored/sign-in", sha = "a04abc7b3af872cbac974401dd0945587eac6cef", dest = "app/webapp/static/_vendored/sign-in" }
 switch = { src = "app/webapp/static/_vendored/switch", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app/webapp/static/_vendored/switch" }
@@ -163,7 +163,7 @@ subject_text = { src = "src/subject_text.py", sha = "3e4f46013f4a1bda6a7e33a0e39
 # [structure_ratchet] -- scripts/structure_ratchet.py fails when a file passes 1,000
 # lines, a function 100 lines or a directory 40 modules, when src/ imports app/, and
 # when the root folders do not match `shape` plus `extra_roots`. Exit 3 fails the gate.
-self_restart = { src = "src/self_restart.py", sha = "3f1dcc76d5ba40c8b3d12a80a99659816ce1dd0e", dest = "src/self_restart.py" }
+self_restart = { src = "src/self_restart.py", sha = "564864cb95a8b416c16d1a1e1e9f31b9d5b2ec8e", dest = "src/self_restart.py" }
 [structure_ratchet]
 enabled  = true
 baseline = ".structure-ratchet-baseline.json"

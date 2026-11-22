@@ -33,6 +33,16 @@
             <button type="button" class="segmented-item" aria-pressed="true" data-value="disk" data-track="default-basis-disk">On disk</button>
           </div>
         </div>
+        <label class="settings-row fullscreen-row" id="fullscreenRow" hidden>
+          <svg class="icon settings-row-icon" aria-hidden="true"><use href="#i-maximize"></use></svg>
+          <span class="settings-row-text">
+            <span class="settings-row-label">Full screen on Edge</span>
+            <span class="settings-row-hint" aria-live="polite">Hides the address bar and toolbar.<span class="fullscreen-armed"> Tap anywhere to go full screen.</span></span>
+          </span>
+          <button type="button" class="toggle" role="switch" aria-checked="false" aria-label="Full screen on Edge" data-fullscreen-toggle data-track="settings.fullscreen">
+            <span class="knob"></span><span class="toggle-label">OFF</span>
+          </button>
+        </label>
       </section>
       <h3 class="settings-group-label" id="groupFeatures">Available features</h3>
       <section class="card settings-group" aria-labelledby="groupFeatures" data-surface="settings.features">

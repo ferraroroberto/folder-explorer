@@ -1034,7 +1034,8 @@ flowchart LR
 - **Holds:**
   - Text size, Small, Default or Large
   - Totals by, the default basis, Size or On disk
-- **Does:** each applies at once; text size is kept on this device, the basis in config.json
+  - Full screen on Edge, a switch that appears only in Edge
+- **Does:** each applies at once; text size is kept on this device, the basis in config.json; full screen is kept on this device, off by default, and while it is on the first tap after a reload enters full screen again
 
 ### `settings.features` Available features group
 

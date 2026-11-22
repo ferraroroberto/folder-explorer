@@ -954,8 +954,9 @@ surfaces:
     holds:
       - Text size, Small, Default or Large
       - Totals by, the default basis, Size or On disk
+      - Full screen on Edge, a switch that appears only in Edge
     does:
-      - each applies at once; text size is kept on this device, the basis in config.json
+      - each applies at once; text size is kept on this device, the basis in config.json; full screen is kept on this device, off by default, and while it is on the first tap after a reload enters full screen again
 
   - id: settings.features
     area: settings

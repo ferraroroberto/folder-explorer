@@ -21,6 +21,7 @@ import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
 import { initRestartSheet } from './_vendored/page-foot/restart-sheet.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
+import { bindFullscreen } from './_vendored/fullscreen/fullscreen.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { emptyStateEl } from './_vendored/empty-state/empty-state.js';
 import { initUsageLog } from './_vendored/usage-log/usage-log.js';
@@ -369,6 +370,7 @@ async function boot() {
     onSearchChanged: () => { if (state.tab === 'search') loadSearch().catch(fail); },
   });
   bindTextSize($('textSizeControl'), APP);
+  bindFullscreen($('fullscreenRow'), APP);
   wireTheme();
   wireClicks(nav);
   wireToolbar(nav);

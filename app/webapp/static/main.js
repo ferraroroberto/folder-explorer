@@ -1,6 +1,6 @@
 /* Folder explorer: boot, tabs, toolbar, header lines, scan polling, the jump from Search into Explore and the shared click handling. */
 
-import { getJSON, postJSON, authHeaders, ApiError } from './api.js';
+import { api, getJSON, postJSON, authHeaders, ApiError } from './api.js';
 import { DEFAULT_BASIS, readPref, rootInfo, state, writePref, APP, loadFeatures, onFeaturesChange } from './state.js';
 import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
 import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
@@ -19,6 +19,7 @@ import { paintFilterTrigger } from './filters/filter-trigger.js';
 import { initNavTabs } from './_vendored/nav/nav-tabs.js';
 import { renderHeadStatus } from './_vendored/home-head/home-head.js';
 import { buildReadoutText } from './_vendored/page-foot/page-foot.js';
+import { initRestartSheet } from './_vendored/page-foot/restart-sheet.js';
 import { bindTextSize } from './_vendored/text-size/text-size.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { emptyStateEl } from './_vendored/empty-state/empty-state.js';
@@ -321,6 +322,14 @@ function wireTheme() {
   document.querySelectorAll('.open-settings').forEach((b) => b.addEventListener('click', () => openSettings()));
 }
 
+// The restart sheet reads the POST's status itself (a refusal is an answer, not an error).
+async function postRestart(url, body) {
+  const res = await api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  return { status: res.status, body: data };
+}
+
 async function showBuild() {
   try {
     const v = await getJSON('/api/version');
@@ -364,6 +373,7 @@ async function boot() {
   wireClicks(nav);
   wireToolbar(nav);
   showBuild();
+  initRestartSheet({ fetchJson: getJSON, postJson: postRestart });
   state.root = readPref('root', null);
   // Every control is wired by now; reading the blocks first means a view that is off never draws, and a drop is never missed while it loads.
   await loadFeatures();

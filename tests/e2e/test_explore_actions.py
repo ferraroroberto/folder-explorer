@@ -9,7 +9,7 @@ import pytest
 from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
-from tests.e2e.conftest import LIVE_PORT
+from tests.e2e.conftest import FOOT_UNDER_SCROLLED_ROWS, LIVE_PORT
 from tests.fixture_tree import HIDDEN_FILE, HIDDEN_FOLDER
 
 
@@ -44,7 +44,7 @@ def test_hidden_items_switch_and_opening_items_on_and_off_the_pc(page: Page, app
     expect(page.locator("#tree .tree-label", has_text=HIDDEN_FOLDER)).to_be_visible()
     expect(dock.locator(".row-item.is-hidden")).to_have_count(2)
     expect(dock.locator(".row-item.is-hidden .hidden-mark").first).to_be_visible()
-    assert_layout_clean(page)
+    assert_layout_clean(page, allow=FOOT_UNDER_SCROLLED_ROWS)
     page.reload()
     expect(page.locator("#contentsDock [data-act=hidden]")).to_have_attribute("aria-checked", "true")
     page.locator("#contentsDock [data-act=hidden]").click()

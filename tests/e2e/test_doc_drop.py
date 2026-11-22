@@ -18,6 +18,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._surface import surface
 from tests.fixture_tree import DOCS_FOLDER
 
 pytestmark = pytest.mark.desktop_only
@@ -76,6 +77,7 @@ def test_a_dropped_indexed_file_opens_in_its_own_window_with_edit(page: Page, ap
     # The drag shows the target, the drop opens the indexed copy in a /doc window, as Explore's "Open in new window" does.
     page.evaluate(DROP, {"name": "guide.md", "size": guide["size"], "modified": guide["modified"], "text": None, "step": ["dragenter"]})
     expect(page.locator(".drop-overlay")).to_be_visible()
+    surface(page, "chrome.drop-overlay")
     for theme in ("light", "dark"):
         page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
         assert_layout_clean(page)

@@ -75,7 +75,6 @@ function overlay() {
   const el = document.createElement('div');
   el.className = 'drop-overlay';
   el.dataset.surface = 'chrome.drop-overlay';
-  el.setAttribute('aria-hidden', 'true');
   const text = handlesSupported() ? 'It opens for editing, wherever the file is.' : 'It opens for editing when the scan has it, and read-only when it doesn\'t.';
   el.innerHTML = '<div class="drop-card">' + glyph('file-text') + '<p class="drop-title">Drop a Markdown or HTML file to open it</p>' +
     '<p class="drop-text">' + text + '</p></div>';

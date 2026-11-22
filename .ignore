@@ -54,6 +54,7 @@
 /src/password.py
 /src/pooled_http.py
 /src/runtime_data.py
+/src/self_restart.py
 /src/shell_etag.py
 /src/subject_text.py
 /src/usage_log.py
@@ -62,4 +63,5 @@
 /tests/e2e/_layout_lint.py
 /tests/e2e/_paced_browser.py
 /tests/e2e/_shot.py
+/tests/e2e/_surface.py
 # END vendored-copies

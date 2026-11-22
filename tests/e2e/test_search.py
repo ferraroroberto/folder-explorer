@@ -12,7 +12,7 @@ from playwright.sync_api import Page, Route, expect
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._settings import close_setting, open_setting
 from tests.e2e._surface import surface
-from tests.e2e.conftest import LIVE_PORT
+from tests.e2e.conftest import FOOT_UNDER_SCROLLED_ROWS, LIVE_PORT
 from tests.e2e.test_settings_folders import BELOW_FOLD
 
 
@@ -27,7 +27,7 @@ def _lint(page: Page) -> None:
     # The wide layout scrolls the side column on its own; the lint reads boxes in page
     # coordinates, so a scrolled column would "overlap" the search box above it.
     page.evaluate("document.querySelectorAll('.search-side, .results-card, .preview-card').forEach(e => { e.scrollTop = 0; })")
-    assert_layout_clean(page)
+    assert_layout_clean(page, allow=FOOT_UNDER_SCROLLED_ROWS)
 
 
 def _preview(page: Page, browser_name: str):  # type: ignore[no-untyped-def]

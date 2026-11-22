@@ -28,6 +28,8 @@ from tests.e2e._port_pool import pytest_runtest_makereport, pytest_terminal_summ
 from tests.e2e._surface import pytest_collection_modifyitems  # noqa: F401 — the hook pytest looks for here: capture mode runs only the tests that call surface()
 
 LIVE_PORT = 8453
+#: Rows scrolled out of view inside a pane that scrolls on its own still report page boxes under the footer.
+FOOT_UNDER_SCROLLED_ROWS = {"#buildReadout": "rows scrolled out of a pane that scrolls on its own"}
 LIVE_ENV = "FOLDER_EXPLORER_E2E_LIVE"
 AUTOBOOT_ENV = "FOLDER_EXPLORER_E2E_AUTOBOOT"
 _BOOT_TIMEOUT_S = 20.0

@@ -41,6 +41,7 @@ from app.webapp.state import EMAILS, POOL, refresh_pool
 from src import config, scan_runner, store
 from src.compression import StreamSafeGZipMiddleware
 from src.roots import resolve_roots
+from src.self_restart import TRAY_RESTART, RestartTarget, restart_router
 from src.shell_etag import shell_response
 from src.usage_log import usage_router
 
@@ -107,6 +108,13 @@ def create_app() -> FastAPI:
     app.include_router(shortlist.router)
     # Local-only view/tap log, under the same sign-in rule as every other route.
     app.include_router(usage_router(store.data_dir() / "usage.sqlite3"))
+    # The build readout's restart sheet runs this repo's own `tray.bat --restart`; SignInMiddleware
+    # already gates every /api route, so the router's guard has nothing left to add.
+    app.include_router(restart_router(
+        targets=[RestartTarget("app", "Restart app", TRAY_RESTART)],
+        status_dir=store.data_dir() / "restart",
+        guard=lambda: None,
+    ))
 
     def shell(request: Request, page: str) -> Response:
         # The shell revalidates on every launch; an unchanged build answers with no body.

@@ -15,6 +15,8 @@ from typing import Iterator
 
 import pytest
 
+from tests.host._synthetic_host import synthetic_host  # noqa: F401 -- registers the fixture
+
 _SESSION_DIR = Path(tempfile.mkdtemp(prefix="folder-explorer-tests-"))
 os.environ["FOLDER_EXPLORER_DATA_DIR"] = str(_SESSION_DIR / "data")
 os.environ["FOLDER_EXPLORER_CONFIG"] = str(_SESSION_DIR / "config.json")

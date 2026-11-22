@@ -22,6 +22,7 @@ from src.no_window import NO_WINDOW
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ps_script.POWERSHELL_EXE
+# host-identity-exempt: deliberate live-install guard, runs the real shared tray helper only where this PC has it
 TRAY_HELPER = Path(os.environ.get("USERPROFILE", str(Path.home()))) / ".claude" / "tray" / "tray_lifecycle.ps1"
 GIT_TIMEOUT_S = 60
 PS_TIMEOUT_S = 120

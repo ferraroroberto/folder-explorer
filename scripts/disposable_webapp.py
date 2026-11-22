@@ -3,7 +3,7 @@
 The e2e suite (``tests/e2e/conftest.py``) and the design review's synthetic run
 (``scripts/design_review_synthetic.py``) both boot the app here, so there is one copy
 of the recipe: a temp data folder and config, the invented trees and mail index, a
-fixture scan, ``FOLDER_EXPLORER_OUTLOOK=off`` and ``FOLDER_EXPLORER_DESKTOP=off``.
+fixture scan, a synthetic account and home (so the screenshot privacy check covers the account name), ``FOLDER_EXPLORER_OUTLOOK=off`` and ``FOLDER_EXPLORER_DESKTOP=off``.
 Nothing is read from or written to the live app's data, port or config, and the temp
 folder is removed on exit.
 """
@@ -30,6 +30,7 @@ if str(ROOT) not in sys.path:
 from tests.e2e._scan_capture import NO_WINDOW, run_utf8  # noqa: E402
 from tests.email_fixture import build_email_index  # noqa: E402
 from tests.fixture_tree import add_docs, add_hidden, build_tree  # noqa: E402
+from tests.host._synthetic_host import synthetic_host_env  # noqa: E402
 
 _SCAN_TIMEOUT_S = 60
 _LOG_TAIL_CHARS = 2000
@@ -64,7 +65,7 @@ def disposable_webapp(*, roots_count: int = 2, startup_timeout: float = 20.0) ->
         port = _free_port()
         (work / "config.json").write_text(json.dumps({"remote_access": False, "port": port, "roots": [str(r) for r in roots],
                                                       "email": {"index_path": str(emails), "roots": [str(mail)]}}))
-        env = dict(os.environ, FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
+        env = dict(synthetic_host_env(os.environ, work), FOLDER_EXPLORER_DATA_DIR=str(work / "data"), FOLDER_EXPLORER_CONFIG=str(work / "config.json"),
                    FOLDER_EXPLORER_OUTLOOK="off", FOLDER_EXPLORER_DESKTOP="off", PYTHONUTF8="1", PYTHONUNBUFFERED="1")
         scan = run_utf8([sys.executable, "-m", "app.cli", "scan"], cwd=ROOT, env=env, timeout=_SCAN_TIMEOUT_S)
         if scan.returncode != 0:

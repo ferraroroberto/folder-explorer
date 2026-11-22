@@ -11,6 +11,7 @@ from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._settings import close_setting, open_setting
+from tests.e2e._surface import surface
 from tests.e2e.conftest import LIVE_PORT
 from tests.e2e.test_settings_folders import BELOW_FOLD
 
@@ -87,6 +88,8 @@ def test_email_search_refines_previews_and_acts_on_the_mail(page: Page, app_url:
     expect(rows).to_have_count(3)
     expect(rows.first.locator("mark").first).to_have_text("budget", ignore_case=True)
     page.locator("#searchFiltersOpen").click()
+    expect(page.locator("#searchFiltersDialog")).to_be_visible()
+    surface(page, "search.filters")
     page.locator('.facet[data-op="is"]').click()
     page.locator('#searchFiltersDialog [data-track="search-filters-done"]').click()
     expect(page.locator(".qchip")).to_have_count(1)
@@ -95,6 +98,9 @@ def test_email_search_refines_previews_and_acts_on_the_mail(page: Page, app_url:
     rows.first.click()
     preview = _preview(page, browser_name)
     expect(preview.locator(".pv-subject")).to_contain_text("Q4 budget draft")
+    if browser_name == "webkit":
+        # The first capture of a name wins and the desktop projection runs first with a dock, not the sheet.
+        surface(page, "search.preview")
     expect(preview.locator(".pv-snippet mark").first).to_have_text("budget", ignore_case=True)
     expect(preview.locator('[data-act="folder"]').first).to_be_visible()
     expect(preview.locator('[data-act="outlook"]')).to_be_visible()

@@ -9,6 +9,7 @@ from playwright.sync_api import Page, expect
 from tests.e2e._filters import close_filters, open_filters
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._shot import settle
+from tests.e2e._surface import surface
 
 TABS = ("search", "explore", "largest", "types", "scans")
 TITLES = {"search": "Search", "explore": "Explore", "largest": "Largest", "types": "Types", "scans": "Scans"}
@@ -80,6 +81,7 @@ def test_every_tab_leads_with_its_own_header_and_lays_out_clean(page: Page, app_
             first = pane.locator("> *").first
             expect(first).to_have_class("card home-head")
             expect(first.locator(".home-title")).to_have_text(TITLES[tab])
+            surface(page, tab + ".tab")
             page.wait_for_timeout(150)
             assert_layout_clean(page)
     assert errors == []
@@ -93,6 +95,7 @@ def test_tree_selecting_a_folder_shows_its_contents_and_the_basis_switches_total
         sheet = page.locator("#contentsDialog")
         expect(sheet).to_be_visible()
         expect(sheet.locator(".list-row", has_text="drone-footage")).to_be_visible()
+        surface(page, "explore.contents")
         assert_layout_clean(page)
         sheet.locator("[data-close]").click()
     else:
@@ -104,6 +107,7 @@ def test_tree_selecting_a_folder_shows_its_contents_and_the_basis_switches_total
     _tab(page, "explore")
     expect(page.locator("#summary .stat-label").first).to_have_text("On disk")
     open_filters(page)
+    surface(page, "chrome.filters")
     page.locator('#basisSeg [data-value="size"]').click()
     expect(page.locator("#filtersOpen")).to_have_attribute("aria-label", "Filters & sort, 1 on: totals by size")
     close_filters(page)
@@ -169,6 +173,7 @@ def test_the_cleanup_shortlist_marks_a_largest_file_and_shows_it_in_explore(page
     sheet = page.locator("#shortlistDialog")
     row = sheet.locator(".row-item", has_text="river-01.mp4")
     expect(row).to_contain_text("drone-footage")
+    surface(page, "largest.shortlist")
     for theme in ("light", "dark"):
         page.evaluate("t => { document.documentElement.dataset.theme = t; }", theme)
         page.wait_for_timeout(150)
@@ -181,3 +186,37 @@ def test_the_cleanup_shortlist_marks_a_largest_file_and_shows_it_in_explore(page
     opener.click()
     row.locator("[data-remove]").click()
     expect(sheet.locator(".rows-note")).to_contain_text("Nothing on the shortlist yet")
+
+
+def _open_sheet(page: Page, opener: str, dialog: str) -> Any:
+    page.locator(opener).click()
+    sheet = page.locator(dialog)
+    expect(sheet).to_be_visible()
+    return sheet
+
+
+def _close_sheet(sheet: Any) -> None:
+    sheet.locator("[data-close]").first.click()
+    expect(sheet).to_be_hidden()
+
+
+def test_each_help_sheet_opens_over_its_tab_and_closes(page: Page, app_url: str, browser_name: str) -> None:
+    _open(page, app_url)
+    open_filters(page)
+    sheet = _open_sheet(page, "#basisInfo", "#infoDialog")
+    surface(page, "explore.sizes-info")
+    _close_sheet(sheet)
+    close_filters(page)
+    _tab(page, "scans")
+    sheet = _open_sheet(page, "#scanInfo", "#scanInfoDialog")
+    surface(page, "scans.info")
+    _close_sheet(sheet)
+    sheet = _open_sheet(page, "#emailInfo", "#emailInfoDialog")
+    surface(page, "scans.email-info")
+    _close_sheet(sheet)
+    if browser_name == "chromium":
+        # The keyboard button shows only on a wide window with a mouse, which the desktop projection has.
+        _tab(page, "search")
+        sheet = _open_sheet(page, "#keysInfo", "#keysDialog")
+        surface(page, "search.keys")
+        _close_sheet(sheet)

@@ -10,6 +10,7 @@ from playwright.sync_api import Locator, Page, Response, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._settings import close_setting, open_setting
+from tests.e2e._surface import surface
 from tests.e2e.conftest import LIVE_PORT
 
 # The sheet scrolls, so its controls above or below the visible part sit outside
@@ -24,12 +25,18 @@ def _add(section: Locator, path: str) -> None:
     section.locator(".folder-add button[type=submit]").click()
 
 
-def _remove(page: Page, section: Locator, path: str) -> None:
+def _ask_remove(page: Page, section: Locator, path: str) -> Locator:
+    """Choose Remove on a folder's row and return the confirm sheet, open and naming that folder."""
     section.locator(".action-row", has_text=path).locator(".action-row-kebab").click()
     page.get_by_role("menuitem", name="Remove").click()
     confirm = page.locator("#folderRemoveDialog")
     expect(confirm).to_be_visible()
     expect(confirm.locator("[data-remove-path]")).to_have_text(path)
+    return confirm
+
+
+def _remove(page: Page, section: Locator, path: str) -> None:
+    confirm = _ask_remove(page, section, path)
     confirm.locator("[data-remove-ok]").click()
     expect(confirm).to_be_hidden()
 
@@ -58,20 +65,25 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
 
     scans.locator(".open-settings").click()
     expect(page.locator("#settingsDialog")).to_be_visible()
+    surface(page, "settings.sheet")
     remote = open_setting(page, "remote")
+    surface(page, "settings.remote")
     expect(remote.locator("#remoteSwitchSlot [role=switch]")).to_have_attribute("aria-checked", "false")
     expect(remote.locator("#remoteNote")).to_contain_text("this PC only")
     close_setting(page)
     sheet = open_setting(page, "schedule")
     expect(sheet.locator("#scheduleSelect")).to_have_value("off")
+    surface(page, "settings.schedule")
     close_setting(page)
     # A config that never set a download budget has no limit, and the menu offers that first.
     sheet = open_setting(page, "budget")
     expect(sheet.locator("#emailBudget")).to_have_value("")
     expect(sheet.locator("#emailBudget option").first).to_have_text("No limit (recommended)")
+    surface(page, "settings.budget")
     close_setting(page)
     roots = open_setting(page, "roots").locator("#rootsEditor")
     expect(roots).to_be_visible()
+    surface(page, "settings.roots")
     field, add = (roots.locator(".folder-add " + sel).bounding_box() for sel in ("input", "button"))
     # A fine pointer's 44px field box holds a 36px visible control (transparent hit inset); a coarse pointer's field is a real 44px.
     visible = 44 if page.evaluate("matchMedia('(pointer: coarse)').matches") else 36
@@ -89,6 +101,7 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
     emails = open_setting(page, "email-roots").locator("#emailRootsEditor")
     _add(emails, str(inbox))
     expect(emails.locator(".action-row", has_text=str(inbox))).to_be_visible()
+    surface(page, "settings.email-roots")
     assert_layout_clean(page, allow=BELOW_FOLD)
     close_setting(page)
 
@@ -103,7 +116,10 @@ def test_settings_show_remote_access_and_the_schedule_and_edit_the_folder_lists(
     expect(emails.locator(".action-row", has_text=str(inbox))).to_have_count(0)
     close_setting(page)
     roots = open_setting(page, "roots").locator("#rootsEditor")
-    _remove(page, roots, str(extra))
+    confirm = _ask_remove(page, roots, str(extra))
+    surface(page, "settings.folder-remove")
+    confirm.locator("[data-remove-ok]").click()
+    expect(confirm).to_be_hidden()
     expect(roots.locator(".action-row")).to_have_count(before)
     expect(roots.locator(".folder-error")).to_be_empty()
 

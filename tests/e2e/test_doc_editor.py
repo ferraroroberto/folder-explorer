@@ -15,6 +15,7 @@ from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._surface import surface
 from tests.fixture_tree import DOCS_FOLDER
 
 # The sheet's and the editor's panes scroll in their own boxes inside a fixed layer; text below their fold is not off the screen.
@@ -69,6 +70,7 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
 
     sheet = page.locator("#docDialog")
     expect(sheet.locator("#docSheetBody h1")).to_have_text("Journal")
+    surface(page, "doc.sheet")
     sheet.locator('.doc-mode [data-mode="edit"]').click()
     source = sheet.locator(".doc-src-input")
     expect(source).to_have_value(_source(page, app_url, loc)["text"])
@@ -81,6 +83,7 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
     else:
         expect(sheet.locator(".doc-edit-preview h1")).to_have_text("Journal")
         expect(sheet.locator(".doc-format button")).to_have_count(8)
+    surface(page, "doc.editor")
     _themes(page)
 
     # Unsaved changes: closing asks, and a kept draft comes back on the next Edit.
@@ -89,6 +92,7 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
     sheet.locator("[data-close]").click()
     leave = page.locator('dialog[data-track-view="doc-leave"]')
     expect(leave).to_be_visible()
+    surface(page, "doc.confirm")
     leave.locator('[data-confirm="keep"]').click()
     expect(sheet).to_be_hidden()
     _open(journal, browser_name)
@@ -116,6 +120,7 @@ def test_a_file_changed_underneath_shows_the_conflict_screen(page: Page, app_url
     loc = _journal(page, app_url)
     page.goto(app_url + "/doc?" + urlencode(loc))
     expect(page.locator("#docBody h1")).to_have_text("Journal")
+    surface(page, "doc.window")
     page.locator('.doc-mode [data-mode="edit"]').click()
     source = page.locator(".doc-src-input")
     opened = _source(page, app_url, loc)
@@ -135,6 +140,7 @@ def test_a_file_changed_underneath_shows_the_conflict_screen(page: Page, app_url
     conflict = page.locator(".doc-conflict")
     expect(conflict).to_contain_text("Changed on disk since you opened it")
     assert _source(page, app_url, loc)["text"] == theirs
+    surface(page, "doc.conflict")
     conflict.locator('[data-conflict="compare"]').click()
     expect(conflict.locator(".doc-diff-del")).to_contain_text(["Their line."])
     expect(conflict.locator(".doc-diff-add")).to_contain_text(["My line."])

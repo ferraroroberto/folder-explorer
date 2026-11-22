@@ -12,6 +12,7 @@ from app.webapp.server import app
 from src import config, desktop
 from src.snap import settings
 from src.snap.core import QUALITY_CHOICES, ConfigError
+from tests.host._synthetic_host import SyntheticHost
 
 LOCAL = ("127.0.0.1", 50000)
 REMOTE = ("100.64.0.9", 50000)
@@ -21,18 +22,18 @@ def _file(isolated: Path) -> dict:
     return json.loads((isolated / "config.json").read_text(encoding="utf-8"))
 
 
-def test_no_file_means_the_defaults() -> None:
+def test_no_file_means_the_defaults(synthetic_host: SyntheticHost) -> None:
     cfg = settings.resolve(config.load()["snap"])
     assert (cfg.hotkey, cfg.jpeg_quality, cfg.copy_to_clipboard, cfg.file_prefix, cfg.show_loupe, cfg.hold_to_capture) == ("ctrl+shift+a", 90, True, "snap", True, False)
-    assert cfg.folder == Path.home() / "Pictures" / "snaps"
+    assert cfg.folder == synthetic_host.home / "Pictures" / "snaps"
 
 
-def test_values_are_read_and_a_folder_expands(isolated: Path) -> None:
+def test_values_are_read_and_a_folder_expands(isolated: Path, synthetic_host: SyntheticHost) -> None:
     (isolated / "config.json").write_text(json.dumps({"snap": {
         "folder": "~/shots", "hotkey": "Ctrl+Alt+S", "jpeg_quality": 75, "copy_to_clipboard": False, "file_prefix": " shot ", "show_loupe": False}}),
         encoding="utf-8")
     cfg = settings.resolve(config.load()["snap"])
-    assert cfg.folder == Path("~/shots").expanduser()
+    assert cfg.folder == synthetic_host.home / "shots"
     assert (cfg.hotkey, cfg.jpeg_quality, cfg.copy_to_clipboard, cfg.file_prefix, cfg.show_loupe) == ("ctrl+alt+s", 75, False, "shot", False)
 
 
@@ -132,13 +133,13 @@ def test_the_settings_api_refuses_a_bad_snap_value_with_the_validators_message_a
     assert _file(isolated) == start
 
 
-def test_the_settings_body_names_the_save_folder_and_whether_this_caller_may_open_it(isolated: Path) -> None:
+def test_the_settings_body_names_the_save_folder_and_whether_this_caller_may_open_it(isolated: Path, synthetic_host: SyntheticHost) -> None:
     (isolated / "config.json").write_text(json.dumps({"snap": {"folder": "X:/Invented/shots"}}), encoding="utf-8")
     with TestClient(app, client=LOCAL) as c:
         assert c.get("/api/config").json()["snap_folder"] == {"path": str(Path("X:/Invented/shots")), "can_open": True}
     (isolated / "config.json").write_text("{}", encoding="utf-8")
     with TestClient(app, client=LOCAL) as c:
-        assert c.get("/api/config").json()["snap_folder"]["path"] == str(Path.home() / "Pictures" / "snaps")
+        assert c.get("/api/config").json()["snap_folder"]["path"] == str(synthetic_host.home / "Pictures" / "snaps")
 
 
 def test_open_folder_shows_the_configured_folder_for_this_pc_only(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:

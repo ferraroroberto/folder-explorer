@@ -13,6 +13,7 @@ from typing import Any
 from playwright.sync_api import Locator, Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
+from tests.e2e._surface import surface
 
 ROOT = "/archive/Mail"
 MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "2026-11-05T09:12:00",
@@ -166,6 +167,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     card = page.locator("#outlookCard")
     expect(card).to_be_visible()
     expect(page.locator("#outlookMeta")).to_have_text("The mail open or selected in Outlook (classic)")
+    surface(page, "archive.card")
     _lint_both_themes(page)
     page.locator("#openArchive").click()
     sheet = page.locator("#archiveDialog")
@@ -177,6 +179,7 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     expect(sheet.locator(".ao-line .rank")).to_have_text(["1", "2", "3"])
     expect(sheet.locator(".ao-score .chip")).to_have_text(["81%", "52%", "30%"])
     expect(sheet.locator(".ao-score .chip.tone-attention")).to_have_count(1)
+    surface(page, "archive.sheet")
     expect(options.nth(2).locator(".ao-similar")).to_have_text("23 similar emails · e.g. “Agenda for week 23”")
     expect(sheet.locator("#archiveGo")).to_have_text("Archive to Project Alpha\\2026")
     preview = sheet.locator(".arch-preview")
@@ -212,6 +215,8 @@ def test_the_card_opens_the_sheet_files_to_a_folder_and_files_a_copy_only_throug
     expect(page.locator(".toast")).to_contain_text("Archived and moved in Outlook")
 
     _the_macro_sheet_lists_its_steps_and_copies_the_macro(page, browser_name)
+    expect(page.locator("#macroDialog")).to_be_visible()
+    surface(page, "archive.macro")
     assert errors == []
 
 

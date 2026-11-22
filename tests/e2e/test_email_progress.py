@@ -9,6 +9,7 @@ from playwright.sync_api import Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._shot import settle
+from tests.e2e._surface import surface
 
 
 def _running(base: dict[str, Any], counts: dict[str, int]) -> dict[str, Any]:
@@ -20,6 +21,7 @@ def _running(base: dict[str, Any], counts: dict[str, int]) -> dict[str, Any]:
 def test_a_running_index_shows_a_bar_and_counts_that_move(page: Page, app_url: str) -> None:
     base = page.request.get(app_url + "/api/email/status").json()
     base["budget_mb"] = None
+    base["failed"] = 1
     steps = [
         {},
         {"to_index": 10, "done": 3, "downloaded": 2, "downloaded_bytes": 5 * 1024 * 1024, "failed": 1, "unchanged": 40},
@@ -33,6 +35,9 @@ def test_a_running_index_shows_a_bar_and_counts_that_move(page: Page, app_url: s
         route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
 
     page.route("**/api/email/status", status)
+    page.route("**/api/email/failures", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body=json.dumps({"failures": [{"path": "C:/Invented/Mail/broken-01.msg", "reason": "not a mail file"}], "total": 1})))
     page.goto(app_url + "/")
     page.locator('.tab[data-tab="scans"]').click()
     row = page.locator("#emailRuns .run-row").first
@@ -45,4 +50,10 @@ def test_a_running_index_shows_a_bar_and_counts_that_move(page: Page, app_url: s
     expect(page.locator("#emailStats")).not_to_contain_text("Waiting for budget")
     settle(page)
     assert_layout_clean(page)
+    page.locator('#emailStats [data-email-act="failures"]').click()
+    failures = page.locator("#failuresDialog")
+    expect(failures.locator(".fail-row")).to_have_count(1)
+    surface(page, "scans.failures")
+    failures.locator("[data-close]").first.click()
+    expect(failures).to_be_hidden()
     page.unroute("**/api/email/status")

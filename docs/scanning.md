@@ -104,3 +104,7 @@ Nothing else opens or writes a scanned file. Filing mail (the Archive sheet, the
 ## One scan at a time
 
 `scan.lock` in the runtime-data folder is an OS byte-range lock taken without waiting, by the app's Rescan, the in-app schedule, the tray and the CLI alike. The operating system releases it when the holder exits, so a crashed scan never leaves it stuck; the next scan marks the crashed one `interrupted`.
+
+## What a scan prints
+
+A scan logs one line when a root starts, one every 60 s while it walks (the root's key, folders and files so far, seconds elapsed, never a path) and one with the totals the moment the root finishes, not after the last root. The scheduled job's launcher ends a run that prints nothing for an hour, and a single large root can walk for most of that, so the 60 s line is the heartbeat that keeps it alive (`_PROGRESS_LOG_SECONDS` in `src/scan_runner.py`).

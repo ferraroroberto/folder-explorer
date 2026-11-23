@@ -150,3 +150,19 @@ def test_the_download_budget_defaults_to_no_limit_and_keeps_a_saved_number(isola
     for bad in (-1, True, "unlimited", 1.5, config.MAX_BUDGET_MB + 1):
         with pytest.raises(ValueError):
             config.validate_update({"email": {"download_budget_mb": bad}})
+
+
+def test_the_schedule_looks_once_a_minute(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scheduler = scan_runner.Scheduler()
+    waits: list[float] = []
+
+    class Stop:
+        def wait(self, interval: float) -> bool:
+            waits.append(interval)
+            return len(waits) >= 3
+
+    ticks: list[datetime] = []
+    monkeypatch.setattr(scheduler, "_stop", Stop())
+    monkeypatch.setattr(scheduler, "tick", ticks.append)
+    scheduler._loop()
+    assert waits == [60.0, 60.0, 60.0] and len(ticks) == 2

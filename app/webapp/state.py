@@ -13,6 +13,7 @@ from src.email.search import EmailIndexHolder
 from src.email.settings import is_under, under_any
 from src.folder_search import item_path
 from src.index import IndexPool
+from src.request_timing import RequestStats
 from src.roots import Root, resolve_roots
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ SHEET_FOLDER_ROWS = 8
 
 POOL = IndexPool()
 EMAILS = EmailIndexHolder()
+# What the request-timing middleware has seen since boot; GET /api/request-stats reads it without starting work.
+REQUEST_STATS = RequestStats()
 
 
 def current_files(roots: list[Root]) -> set[str]:

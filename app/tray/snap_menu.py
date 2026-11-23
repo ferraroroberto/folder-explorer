@@ -15,8 +15,10 @@ from src.snap.service import SnapService
 
 logger = logging.getLogger(__name__)
 
-# How often the tray looks at config.json for a change made elsewhere (Settings in the web app).
-WATCH_INTERVAL_S = 2.0
+# How often the tray looks at config.json for a change made elsewhere (Settings in the web app): the
+# request budget's 5 s floor for a loop nobody watches. The tray's own menu redraws at once through
+# ``SnapService.on_change``, so only a change made on the web page waits for this.
+WATCH_INTERVAL_S = 5.0
 
 
 def _stamp(path: Path) -> int:
@@ -27,13 +29,13 @@ def _stamp(path: Path) -> int:
         return 0
 
 
-def refresh_when_config_changes(refresh: Callable[[], None], stop: threading.Event, interval: float = WATCH_INTERVAL_S) -> None:
+def refresh_when_config_changes(refresh: Callable[[], None], stop: threading.Event) -> None:
     """Call ``refresh`` whenever ``config.json`` changes, until ``stop`` is set, so a change made in Settings shows in the menu's checks.
 
     The menu draws its checks when it is rebuilt, not when it opens, so without this a setting changed on the web page would show stale here.
     """
     seen = _stamp(config.config_path())
-    while not stop.wait(interval):
+    while not stop.wait(WATCH_INTERVAL_S):
         now = _stamp(config.config_path())
         if now != seen:
             seen = now

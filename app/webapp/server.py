@@ -37,9 +37,10 @@ from app.webapp.routers import (
     settings,
     shortlist,
 )
-from app.webapp.state import EMAILS, POOL, refresh_pool
+from app.webapp.state import EMAILS, POOL, REQUEST_STATS, refresh_pool
 from src import config, scan_runner, store
 from src.compression import StreamSafeGZipMiddleware
+from src.request_timing import RequestTimingMiddleware
 from src.roots import resolve_roots
 from src.self_restart import TRAY_RESTART, RestartTarget, restart_router
 from src.shell_etag import shell_response
@@ -135,6 +136,8 @@ def create_app() -> FastAPI:
 
     app.mount("/static", CachingStaticFiles(directory=str(STATIC_DIR)), name="static")
     app.add_middleware(auth.SignInMiddleware)
+    # Outside the gate, so a refused request is timed too: Server-Timing on every /api answer and a log line for a slow one.
+    app.add_middleware(RequestTimingMiddleware, stats=REQUEST_STATS)
     # Added last, so it is the outermost layer: a 401 from the gate passes through unchanged.
     app.add_middleware(StreamSafeGZipMiddleware, bypass_paths=())
     return app

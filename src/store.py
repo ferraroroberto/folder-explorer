@@ -14,7 +14,7 @@ import json
 import logging
 import sqlite3
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -106,6 +106,13 @@ SEARCH_MODES = ("emails", "folders")
 
 _COUNTERS = ("folders", "files", "size", "alloc", "online_files", "online_size", "skipped_links", "errors")
 
+# A Settings read reuses the last sum of the index files while the index folder is unchanged and the sum is
+# younger than this, so opening Settings lists no folder; a live scan grows its file without touching the
+# folder, which is what the age bounds.
+INDEX_BYTES_MAX_AGE_S = 60.0
+# index folder -> (its modified time in ns, when the sum was taken, the sum).
+_index_bytes_seen: dict[str, tuple[int, float, int]] = {}
+
 
 def data_dir() -> Path:
     """The app's runtime-data folder, created on first use."""
@@ -116,6 +123,32 @@ def index_dir() -> Path:
     path = data_dir() / "index"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _sum_index_files(folder: Path) -> int:
+    total = 0
+    for path in folder.glob("*.sqlite3"):
+        try:
+            total += path.stat().st_size
+        except OSError:
+            pass
+    return total
+
+
+def index_bytes(clock: Callable[[], float] = time.monotonic) -> int:
+    """The scan indexes' total size, summed again only when the index folder changed or the last sum aged out."""
+    folder = index_dir()
+    try:
+        stamp = folder.stat().st_mtime_ns
+    except OSError:
+        return 0
+    now = clock()
+    seen = _index_bytes_seen.get(str(folder))
+    if seen is not None and seen[0] == stamp and now - seen[1] < INDEX_BYTES_MAX_AGE_S:
+        return seen[2]
+    total = _sum_index_files(folder)
+    _index_bytes_seen[str(folder)] = (stamp, now, total)
+    return total
 
 
 def index_name(root_key: str, scan_id: int) -> str:

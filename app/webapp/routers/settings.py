@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.webapp.auth import is_pc_itself
@@ -14,6 +14,7 @@ from app.webapp.bind import resolve_bind
 from app.webapp.build import BUILD_INFO
 from app.webapp.feature_gate import require
 from app.webapp.routers.archive import OFF_REASON, archive_status, bridge_off
+from app.webapp.state import REQUEST_STATS
 from src import config, features, file_assoc, folder_lists, password, store
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 from src.snap import settings as snap_settings
@@ -31,16 +32,6 @@ EFFECTIVE_BIND_ENV = "FOLDER_EXPLORER_BIND_STATE"
 
 def effective_state() -> str:
     return os.environ.get(EFFECTIVE_BIND_ENV, "") or resolve_bind(config.load()).state
-
-
-def _index_bytes() -> int:
-    total = 0
-    for path in store.index_dir().glob("*.sqlite3"):
-        try:
-            total += path.stat().st_size
-        except OSError:
-            pass
-    return total
 
 
 def feature_blocks(cfg: dict[str, Any]) -> list[dict[str, Any]]:
@@ -68,7 +59,7 @@ def settings_body(pc: bool) -> dict[str, Any]:
             "restart_needed": running != wanted.state,
             "password_set": bool(password.is_configured(legacy=get_secret(PASSWORD_VAR)) and get_secret(TOKEN_VAR)),
         },
-        "index_bytes": _index_bytes(),
+        "index_bytes": store.index_bytes(),
         "archive": archive_status(cfg, pc),
         "config_file": {"exists": config.config_path().is_file()},
         "features": feature_blocks(cfg),
@@ -84,6 +75,12 @@ def healthz() -> dict[str, str]:
 @router.get("/api/version")
 def version() -> dict[str, str]:
     return BUILD_INFO.as_dict()
+
+
+@router.get("/api/request-stats")
+def request_stats(window_s: float = Query(300.0, gt=0, le=900)) -> dict[str, Any]:
+    """What the request-timing middleware has seen since boot: in-flight now, the peak in the last ``window_s`` seconds, verdicts."""
+    return REQUEST_STATS.snapshot(window_s)
 
 
 @router.get("/api/features")

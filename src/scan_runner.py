@@ -193,10 +193,12 @@ def schedule_due(schedule: str, at: str, last_run: Optional[float], now: datetim
     return False
 
 
+# How often the in-app schedule looks whether a scan is due: once a minute, well above the request budget's floor.
+SCHEDULE_CHECK_S = 60.0
+
+
 class Scheduler:
     """The in-app schedule: checks once a minute, starts a scan when due and the lock is free."""
-
-    CHECK_SECONDS = 60.0
 
     def __init__(self) -> None:
         self._stop = threading.Event()
@@ -211,7 +213,7 @@ class Scheduler:
         self._stop.set()
 
     def _loop(self) -> None:
-        while not self._stop.wait(self.CHECK_SECONDS):
+        while not self._stop.wait(SCHEDULE_CHECK_S):
             self.tick(datetime.now())
 
     def tick(self, now: datetime) -> bool:

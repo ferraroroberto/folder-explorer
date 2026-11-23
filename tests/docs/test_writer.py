@@ -11,13 +11,13 @@ from __future__ import annotations
 import ast
 import codecs
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.webapp.server import app
-from src import store, winfs
+from src import atomic_write, store, winfs
 from src.docs import reader, writer
 from tests.fixture_tree import DOCS_FOLDER, JOURNAL_MD
 
@@ -250,3 +250,52 @@ def test_the_draft_preview_renders_without_reading_the_disk(docs: dict[str, Any]
         r = c.post("/api/doc/render", json={**_loc(docs, "guide.md"), "text": "# Draft\n\nSee [watering](sub/watering.md)."})
     assert r.status_code == 200, r.text
     assert r.json()["outline"][0]["text"] == "Draft" and 'data-doc-id="%d"' % docs["ids"]["watering.md"] in r.json()["html"]
+
+
+# ------------------------------------------------------------------ a save in a synced folder
+
+def _hold(monkeypatch: pytest.MonkeyPatch, code: Optional[int]) -> None:
+    """Every swap fails as Windows fails it: held open by another program (a sync engine), or refused for good."""
+    def refused(src: str, dst: Any) -> None:
+        err = PermissionError(13, "Access is denied")
+        err.winerror = code  # type: ignore[attr-defined]
+        raise err
+
+    monkeypatch.setattr(atomic_write.os, "replace", refused)
+    monkeypatch.setattr(atomic_write.time, "sleep", lambda _s: None)
+
+
+@pytest.mark.parametrize(("code", "reason"), [(32, "in_use"), (None, "not_writable")])
+def test_a_refused_save_names_why_and_keeps_the_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                     code: Optional[int], reason: str) -> None:
+    path = tmp_path / "page.md"
+    path.write_bytes(b"# Title\r\n\r\nSome **bold** text.\r\n")
+    opened = writer.source(str(path), False)
+    _hold(monkeypatch, code)
+    with pytest.raises(reader.Refused) as refused:
+        writer.save(str(path), "# Title\n\nSome **bold** text, edited.\n", opened["version"], False)
+    assert refused.value.reason == reason
+    assert path.read_bytes() == b"# Title\r\n\r\nSome **bold** text.\r\n"
+    assert [p.name for p in path.parent.iterdir()] == [path.name]
+
+
+def test_the_save_route_reports_a_file_held_by_a_sync(docs: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    with TestClient(app, client=LOCAL) as c:
+        opened = c.get("/api/doc/source", params={"root": docs["root"], "scan": docs["scan"], "id": docs["ids"]["journal.md"]}).json()
+        _hold(monkeypatch, 32)
+        r = c.post("/api/doc/save", json={**_loc(docs, "journal.md"), "text": "# Journal\n\nHeld.\n", "version": opened["version"]})
+    assert r.status_code == 423 and r.json()["reason"] == "in_use"
+    assert "OneDrive" in r.json()["detail"]
+    assert (Path(docs["path"]) / DOCS_FOLDER / "journal.md").read_bytes() == JOURNAL_MD
+
+
+def test_a_heading_and_emphasis_open_exactly_as_written(docs: dict[str, Any]) -> None:
+    """The source the editor shows is the file's text, character for character: no escapes added."""
+    journal = Path(docs["path"]) / DOCS_FOLDER / "journal.md"
+    text = "# Title\n\n## Sub *one*\n\nSome **bold**, _italic_, `#tag` and a literal \# kept.\n\n- [ ] task\n"
+    with TestClient(app, client=LOCAL) as c:
+        loc = {"root": docs["root"], "scan": docs["scan"], "id": docs["ids"]["journal.md"]}
+        saved = c.post("/api/doc/save", json={**_loc(docs, "journal.md"), "text": text, "version": c.get("/api/doc/source", params=loc).json()["version"]})
+        assert saved.status_code == 200, saved.text
+        assert c.get("/api/doc/source", params=loc).json()["text"] == text
+    assert journal.read_bytes() == text.encode()

@@ -100,11 +100,13 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
     expect(source).to_have_value("# Journal\n\nA kept draft.\n")
     expect(sheet.locator(".doc-edit-status")).to_have_text("Restored your unsaved draft")
 
-    source.fill("# Journal\n\nSaved from the sheet.\n")
+    # Headings and emphasis come back exactly as typed: the source pane adds no escapes and nothing else.
+    saved = "# Journal\n\n## Saved *here*\n\nSaved **from** the _sheet_.\n"
+    source.fill(saved)
     sheet.locator("#docSave").click()
     expect(sheet.locator(".doc-edit-status")).to_have_text("Saved")
     expect(sheet.locator("#docSave")).to_be_disabled()
-    assert _source(page, app_url, loc)["text"] == "# Journal\n\nSaved from the sheet.\n"
+    assert _source(page, app_url, loc)["text"] == saved
 
     page.keyboard.press("Escape")  # back to View, which reads the copy on disk
     expect(sheet.locator("#docSheetBody p")).to_have_text("Saved from the sheet.")
@@ -112,6 +114,8 @@ def test_edit_save_and_reopen_in_the_sheet(page: Page, app_url: str, browser_nam
     expect(sheet).to_be_hidden()
     _open(journal, browser_name)
     expect(sheet.locator("#docSheetBody p")).to_have_text("Saved from the sheet.")
+    sheet.locator('.doc-mode [data-mode="edit"]').click()
+    expect(source).to_have_value(saved)
     assert errors == []
 
 

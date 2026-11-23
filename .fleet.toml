@@ -123,6 +123,7 @@ notify = { src = "src/notify", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a",
 usage_log = { src = "src/usage_log.py", sha = "78635aa74a92b9622326cb53992e0634fbaf6246", dest = "src/usage_log.py" }
 runtime_data = { src = "src/runtime_data.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "src/runtime_data.py" }
 build_info = { src = "src/build_info.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "src/build_info.py" }
+restart_check   = { src = "src/restart_check.py", sha = "1c1007fcd0b65b54342779250cb66975d57482e8", dest = "src/restart_check.py" }
 compression = { src = "src/compression.py", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "src/compression.py" }
 no_window = { src = "src/no_window.py", sha = "fe8cc1bdbd038ed65947186248df13072eceb25a", dest = "src/no_window.py" }
 shell_etag = { src = "src/shell_etag.py", sha = "a94dbf39864c4dd19bcd07a516a04466010a9b8c", dest = "src/shell_etag.py" }

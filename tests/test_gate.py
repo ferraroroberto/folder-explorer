@@ -26,7 +26,7 @@ def _enabled_ratchets() -> list[str]:
 def test_gate_runs_every_enabled_ratchet() -> None:
     gate = (ROOT / "scripts" / "verify-before-ship.ps1").read_text(encoding="utf-8")
     names = _enabled_ratchets()
-    assert len(names) == 11
+    assert len(names) == 12
     for name in names:
         stage = re.compile(r'^Invoke-Stage\s+"[^"]+"\s+\{\s*&\s*\$py\s+"scripts/%s\.py"\s*\}\s*$' % name, re.M)
         assert stage.search(gate), "%s has no gate stage" % name

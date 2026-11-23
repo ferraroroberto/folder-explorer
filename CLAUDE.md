@@ -35,7 +35,7 @@ folder-explorer: a public disk-space explorer, read-only apart from mail filing 
 powershell -File scripts/verify-before-ship.ps1
 ```
 
-Byte-compile, the unit tests, the e2e suite (`tests/e2e`, Chromium desktop + WebKit iPhone, disposable instance on a free port; set `FOLDER_EXPLORER_E2E_AUTOBOOT=1` to run it alone), the runtime-write probe, and twelve ratchets (structure, instruction, doc refs, dead code, static, docs, readme index, comment, conventions, runtime write, usage track, UX surface), eleven vendored byte-for-byte with an empty baseline and `scripts/readme_index_ratchet.py` (README.md feature-bullet word count) owned by this repo. Exit 3 from a ratchet is "not confirmed", a failure. Never raise a baseline to get green.
+Byte-compile, the unit tests, the e2e suite (`tests/e2e`, Chromium desktop + WebKit iPhone, disposable instance on a free port; set `FOLDER_EXPLORER_E2E_AUTOBOOT=1` to run it alone), the runtime-write probe, and thirteen ratchets (structure, instruction, doc refs, dead code, static, docs, readme index, comment, conventions, runtime write, usage track, UX surface, request budget), twelve vendored byte-for-byte (eleven with an empty baseline, request budget with its recorded debt, which only shrinks) and `scripts/readme_index_ratchet.py` (README.md feature-bullet word count) owned by this repo. Exit 3 from a ratchet is "not confirmed", a failure. Never raise a baseline to get green.
 
 ## CI expectations
 

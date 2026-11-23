@@ -56,6 +56,11 @@
                              entry no element carries, an id on two surfaces, a link to an id
                              with no entry, and a docs/ux-surface-map.md page that is not what
                              the map generates, against the baseline; exit 3 is a failure
+     15. request budget ratchet - scripts/request_budget_ratchet.py: a fixed-rate browser poll
+                             that reaches the server, a poll under 2 s, an undeclared fast server
+                             loop, a directory walk in a request handler, a submit to the shared
+                             default pool or a web app without the request-timing middleware,
+                             against the baseline; exit 3 is a failure
 
     Verdict line: the last line on stdout is `GATE-RESULT: PASS` or
     `GATE-RESULT: FAIL`, on every path that can still run code. Never pipe the
@@ -142,6 +147,7 @@ Invoke-Stage "conventions ratchet" { & $py "scripts/conventions_ratchet.py" }
 Invoke-Stage "runtime write ratchet" { & $py "scripts/runtime_write_ratchet.py" }
 Invoke-Stage "usage track ratchet" { & $py "scripts/usage_track_ratchet.py" }
 Invoke-Stage "ux surface ratchet" { & $py "scripts/ux_surface_ratchet.py" }
+Invoke-Stage "request budget ratchet" { & $py "scripts/request_budget_ratchet.py" }
 
 Write-Host ""
 Write-Host "[PASS] all checks green - safe to ship." -ForegroundColor Green

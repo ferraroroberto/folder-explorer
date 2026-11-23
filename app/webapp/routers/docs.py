@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/doc", dependencies=[Depends(require("documents"))])
 
 _STATUS = {"not_found": 404, "scan_changed": 409, "gone": 410, "too_large": 413, "not_document": 415,
-           "unreadable": 422, "cloud_only": 423, "edit_too_large": 413, "not_utf8": 415, "not_writable": 423,
+           "unreadable": 422, "cloud_only": 423, "edit_too_large": 413, "not_utf8": 415, "not_writable": 423, "in_use": 423,
            "pc_only": 403}
 _MESSAGES = {**reader.REASON_MESSAGES, "not_found": "No such file in this scan",
              "scan_changed": "A newer scan renumbered this file: find it again in Explore",

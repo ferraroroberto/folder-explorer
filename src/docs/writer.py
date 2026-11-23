@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src import runtime_files, store
-from src.atomic_write import atomic_write_bytes
+from src.atomic_write import atomic_write_bytes, is_held
 from src.docs import reader
 
 logger = logging.getLogger(__name__)
@@ -145,7 +145,9 @@ def save(path: str, text: str, version: str, index_online: bool, overwrite: bool
     try:
         atomic_write_bytes(Path(path), new)
     except OSError as exc:
-        logger.warning("⚠️ doc: save failed: %s", exc)
-        raise reader.Refused("not_writable") from exc
+        # A read-only file also answers "access denied"; its attribute tells it apart from a file a sync holds open.
+        held = is_held(exc) and os.access(path, os.W_OK)
+        logger.warning("⚠️ doc: save failed (%s): %s", "held open by another program" if held else "refused", exc)
+        raise reader.Refused("in_use" if held else "not_writable") from exc
     logger.info("ℹ️ doc: saved a Markdown file (%d -> %d bytes)", len(data), len(new))
     return _current(path, index_online)[1]

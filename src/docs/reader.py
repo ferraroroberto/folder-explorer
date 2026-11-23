@@ -45,6 +45,7 @@ REASON_MESSAGES = {
     "not_utf8": "Not UTF-8 text, so it opens read-only",
     "edit_too_large": "Too large to edit here",
     "not_writable": "Windows would not let it be saved",
+    "in_use": "Another program, such as OneDrive while it syncs, has the file open, so it was not saved. Try again in a moment",
 }
 
 

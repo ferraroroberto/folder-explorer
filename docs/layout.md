@@ -111,6 +111,7 @@ folder-explorer/
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,
 │                               #   tests/install the installer on temp checkouts, the standalone restart, and the clean-pull and AllSigned checks,
+│                               #   tests/scan what a scan logs: the progress heartbeat over a fake clock, each root's result as it ends,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
 │                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)

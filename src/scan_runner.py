@@ -26,24 +26,36 @@ logger = logging.getLogger(__name__)
 # turn into a stream of small state-database commits.
 _PROGRESS_WRITE_SECONDS = 1.0
 
+# A log line this often while a root is walked: the scheduled job's launcher ends a run that prints
+# nothing for an hour, and one root can take most of that, so the line is the heartbeat.
+_PROGRESS_LOG_SECONDS = 60.0
+
 
 def lock() -> ScanLock:
     return ScanLock(store.data_dir() / "scan.lock")
 
 
-def _scan_root(root: Root, trigger: str, exclude: frozenset[str] = frozenset()) -> dict[str, Any]:
+def _scan_root(root: Root, trigger: str, exclude: frozenset[str] = frozenset(),
+               clock: Callable[[], float] = time.monotonic, log_every: float = _PROGRESS_LOG_SECONDS) -> dict[str, Any]:
     scan_id = store.begin_scan(root.key, root.path, trigger)
     index_name = store.index_name(root.key, scan_id)
-    last = [0.0]
+    t0 = clock()
+    last_write = float("-inf")
+    last_log = t0
 
     def progress(counters: dict[str, int]) -> None:
-        now = time.monotonic()
-        if now - last[0] >= _PROGRESS_WRITE_SECONDS:
-            last[0] = now
+        nonlocal last_write, last_log
+        now = clock()
+        if now - last_write >= _PROGRESS_WRITE_SECONDS:
+            last_write = now
             store.update_progress(scan_id, counters)
+        if now - last_log >= log_every:
+            last_log = now
+            # The root's key only, never a scanned path.
+            logger.info("ℹ️ scan %d of root %s: %d folders, %d files so far, %.0f s elapsed",
+                        scan_id, root.key, counters["folders"], counters["files"], now - t0)
 
     logger.info("ℹ️ scan %d started: root %s", scan_id, root.key)
-    t0 = time.monotonic()
     try:
         counters = scan_to_index(root.path, store.index_dir() / index_name, root_name=root.name, on_progress=progress,
                                  exclude=exclude)
@@ -52,7 +64,7 @@ def _scan_root(root: Root, trigger: str, exclude: frozenset[str] = frozenset()) 
         store.finish_scan(scan_id, store.STATUS_FAILED, {}, None, str(exc))
         return {"root": root.key, "status": store.STATUS_FAILED, "message": str(exc)}
     store.finish_scan(scan_id, store.STATUS_OK, counters.as_dict(), index_name)
-    elapsed = time.monotonic() - t0
+    elapsed = clock() - t0
     logger.info(
         "✅ scan %d of root %s: %d folders, %d files, %d errors, %d links skipped, %d excluded in %.1f s",
         scan_id, root.key, counters.folders, counters.files, counters.errors, counters.skipped_links, counters.excluded, elapsed,

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "entries": [
+    {"key": "app/tray/snap_menu.py", "counts": {"unwatched-loop": 1}},
+    {"key": "app/webapp/routers/archive.py", "counts": {"unwatched-loop": 2}},
+    {"key": "app/webapp/routers/settings.py", "counts": {"scan-per-request": 1}},
+    {"key": "app/webapp/server.py", "counts": {"timing-middleware": 1}},
+    {"key": "src/email/batch/sync.py", "counts": {"unwatched-loop": 1}},
+    {"key": "src/email/indexer.py", "counts": {"unwatched-loop": 1}},
+    {"key": "src/outlook/process.py", "counts": {"unwatched-loop": 1}},
+    {"key": "src/scan_runner.py", "counts": {"unwatched-loop": 1}},
+    {"key": "src/window_front.py", "counts": {"unwatched-loop": 1}}
+  ]
+}

@@ -292,3 +292,42 @@ paths    = ["app/webapp/static/**"]
 enabled      = true
 baseline     = ".request-budget-ratchet-baseline.json"
 handler_dirs = ["app/webapp/routers"]
+
+# Server loops that wake faster than the ratchet's 5 s floor. Each is a bounded wait: it
+# runs only while a caller waits on it and ends at its deadline. None runs while idle.
+
+[[request_budget.loops]]
+path       = "app/webapp/routers/archive.py"
+function   = "pending"
+interval_s = 0.025
+why        = "long poll inside the Archive page's own request: ends when a hand-off arrives, at the wait cap of at most 25 s, or when the page disconnects"
+
+[[request_budget.loops]]
+path       = "app/webapp/routers/archive.py"
+function   = "followup"
+interval_s = 0.025
+why        = "long poll inside the Archive page's own request for a filing's follow-up: ends when it is done, at the wait cap of at most 25 s, or when the page disconnects"
+
+[[request_budget.loops]]
+path       = "src/email/batch/sync.py"
+function   = "_wait"
+interval_s = 0.25
+why        = "bounded wait on the Send/Receive one archive verb started; ends when Outlook reports an end or at the verb's timeout"
+
+[[request_budget.loops]]
+path       = "src/email/indexer.py"
+function   = "take_lock"
+interval_s = 0.5
+why        = "bounded wait for another email run's lock, inside a run someone started; raises EmailBusy at the caller's deadline"
+
+[[request_budget.loops]]
+path       = "src/outlook/process.py"
+function   = "ensure_running"
+interval_s = 1
+why        = "bounded wait for an Outlook this verb just started to publish its COM object; ends at the timeout and ends the process it started"
+
+[[request_budget.loops]]
+path       = "src/window_front.py"
+function   = "follow"
+interval_s = 0.015
+why        = "bounded wait, after a tap on Open on this PC, for the File Explorer window to appear so it can be brought forward; ends within 5 s"

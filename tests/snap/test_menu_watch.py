@@ -34,7 +34,7 @@ def test_the_menu_is_redrawn_once_per_change_to_config_json(isolated: Path) -> N
                 os.utime(path, ns=(stamp, stamp))
             return False
 
-    snap_menu.refresh_when_config_changes(lambda: redraws.append(1), Stop(), interval=0)  # type: ignore[arg-type]
+    snap_menu.refresh_when_config_changes(lambda: redraws.append(1), Stop())  # type: ignore[arg-type]
     assert redraws == [1, 1]
 
 
@@ -57,5 +57,19 @@ def test_a_failed_redraw_does_not_end_the_watch(isolated: Path) -> None:
         calls.append(1)
         raise RuntimeError("the tray is closing")
 
-    snap_menu.refresh_when_config_changes(refresh, Stop(), interval=0)  # type: ignore[arg-type]
+    snap_menu.refresh_when_config_changes(refresh, Stop())  # type: ignore[arg-type]
     assert calls == [1, 1, 1]
+
+
+def test_the_watch_waits_the_request_budget_floor_between_looks(isolated: Path) -> None:
+    (isolated / "config.json").write_text("{}", encoding="utf-8")
+    waits: list[float] = []
+
+    class Stop:
+        def wait(self, interval: float) -> bool:
+            waits.append(interval)
+            return len(waits) >= 3
+
+    snap_menu.refresh_when_config_changes(lambda: None, Stop())  # type: ignore[arg-type]
+    assert waits == [snap_menu.WATCH_INTERVAL_S] * 3
+    assert snap_menu.WATCH_INTERVAL_S >= 5.0

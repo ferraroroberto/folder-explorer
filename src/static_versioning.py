@@ -139,6 +139,7 @@ def expand_includes(body: str, static_dir: Path) -> str:
     """
 
     def _sub(match: "re.Match[str]") -> str:
+        # path-sep-exempt: an include name parsed from this repo's own HTML, written with forward slashes
         fragment = (static_dir / match.group(1)).read_text(encoding="utf-8")
         return fragment.rstrip()
 

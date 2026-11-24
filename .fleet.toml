@@ -163,6 +163,7 @@ subject_text = { src = "src/subject_text.py", sha = "3e4f46013f4a1bda6a7e33a0e39
 request_budget_ratchet = { src = "scripts/request_budget_ratchet.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_ratchet.py" }
 request_budget_scan = { src = "scripts/request_budget_scan.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "scripts/request_budget_scan.py" }
 request_timing = { src = "src/request_timing.py", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "src/request_timing.py" }
+request_budget_probe = { src = "tests/e2e/budget/_request_budget.py", sha = "be7de0edb225505f0b4773736b4eaf6b34a49363", dest = "tests/e2e/budget/_request_budget.py" }
 poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app/webapp/static/_vendored/poll" }
 
 # [structure_ratchet] -- scripts/structure_ratchet.py fails when a file passes 1,000
@@ -293,6 +294,12 @@ paths    = ["app/webapp/static/**"]
 enabled      = true
 baseline     = ".request-budget-ratchet-baseline.json"
 handler_dirs = ["app/webapp/routers"]
+
+# Measured on the main page (tests/e2e/test_request_budget.py): 22 reads in a visible minute, 20 of
+# them the Archive hand-off poll re-asking every 3 s when the server answers at once (a held poll is
+# about 3 a minute); nothing is read while hidden. The budget leaves a few requests of slack above that.
+[request_budget]
+visible_requests_per_minute = 26
 
 # Server loops that wake faster than the ratchet's 5 s floor. Each is a bounded wait: it
 # runs only while a caller waits on it and ends at its deadline. None runs while idle.

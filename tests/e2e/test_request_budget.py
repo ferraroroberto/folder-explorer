@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page
 
-from tests.e2e.budget._request_budget import assert_request_budget, measure_request_budget, visible_budget
+from tests.e2e.budget._request_budget import (
+    assert_request_budget,
+    measure_request_budget,
+    visible_budget,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

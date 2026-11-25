@@ -6,7 +6,7 @@ REM  Creates .venv on first run. Remote access, port and roots come from
 REM  config.json (see config.example.json).
 REM ============================================================================
 setlocal
-set "SCRIPT_DIR=%~dp0"
+for %%I in ("%~dp0..") do set "SCRIPT_DIR=%%~fI\"
 cd /d "%SCRIPT_DIR%"
 
 if not exist ".venv\Scripts\python.exe" (

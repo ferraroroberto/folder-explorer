@@ -23,7 +23,7 @@ folder-explorer: a public disk-space explorer, read-only apart from mail filing 
 ## Run / restart
 
 - **Restart recipe:** run the one command `.\.venv\Scripts\python.exe -m src.restart_check restart --port 8453` (`./.venv/Scripts/python.exe` in Git Bash; same in every shell), in the foreground. It runs this checkout's `tray.bat --restart` by absolute path, then polls `GET /api/version` (http or https) until a different process serves a `git_sha` matching `HEAD`, and exits non-zero otherwise. The bat runs the shared `tray_lifecycle.ps1` (kills this repo's tray subtree, reclaims port 8453 by command line, starts the tray; on a PC without that helper, `scripts/standalone_restart.py` does the same for this checkout). Never type the bare `tray.bat --restart`: it is not found from any shell here (by hand only `.\tray.bat` in PowerShell, `./tray.bat` in Git Bash), and Git Bash `cmd.exe /c "tray.bat --restart"` exits 0 having restarted nothing. A `/healthz` 200 alone proves nothing about the build. Agents may run this recipe without asking; it touches only this app.
-- **Console:** `start.bat` / `python -m app.webapp` (no tray).
+- **Console:** `scripts\start.bat` / `python -m app.webapp` (no tray).
 - **Scans:** `python -m app.cli scan` (disk walk, then the email stage); the nightly app-launcher Job runs exactly that, so the in-app schedule stays `off` on this PC. `python -m app.cli email index [--root FOLDER]` runs the email stage alone under its own lock.
 - The live signal is the Explore tree rendering the root's folders with sizes, not a health check.
 

@@ -13,7 +13,7 @@ On Windows with Git and Python 3.11+, clone the repo and run `.\scripts\install.
 ## Run
 
 - **Tray (always on):** `tray.bat`. Starts the tray, which starts the web app and restarts it if it dies. `tray.bat --restart` restarts both. `scripts\install.bat --startup` starts the tray at sign-in.
-- **Console only:** `start.bat` (or `& .\.venv\Scripts\python.exe -m app.webapp`); Ctrl-C stops it.
+- **Console only:** `scripts\start.bat` (or `& .\.venv\Scripts\python.exe -m app.webapp`); Ctrl-C stops it.
 - Open `http://127.0.0.1:8453/` on this PC. With remote access on, the tailnet address is `https://<this-pc>.<tailnet>.ts.net:8453/`.
 
 ## Remote access (phone)

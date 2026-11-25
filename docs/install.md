@@ -22,7 +22,7 @@ You need Windows, Git and Python 3.11 or newer (from python.org, with the `py` l
 3. Read the checklist at the end. Each row is `ok`, `missing` or `unknown`, and a `missing` row names the command that fixes it:
    - **sign-in password**, **sign-in token**, **tailnet certificate**: needed only to open the app from a phone over the tailnet (README, Remote access). This PC uses the app without them.
    - **start at sign-in**: optional. `.\scripts\install.bat --startup` adds a shortcut to `tray.bat` in your Startup folder. Skip it if something else already starts the tray.
-   - **app running**: start it with `tray.bat` (the tray) or `start.bat` (a console), then open `http://127.0.0.1:8453/`.
+   - **app running**: start it with `tray.bat` (the tray) or `scripts\start.bat` (a console), then open `http://127.0.0.1:8453/`.
 4. Set the rest in the app, under Settings: the folders to scan, the email folders, and **Available features** (switch off a block this PC cannot run). Then press **Rescan** in the Scans tab. [setup-and-migration.md](setup-and-migration.md) has the details for each setting and what to copy from another PC.
 
 Check it worked: the installer's own lines end with `Result:`, the checklist shows `ok` for `.venv`, `requirements` and `config`, and the Explore tab shows each root's folders with sizes after the first scan.

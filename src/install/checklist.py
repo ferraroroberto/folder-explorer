@@ -109,5 +109,5 @@ def build(root: Path, env: Mapping[str, str], cfg: dict[str, Any] | None, *, ven
         # Named by port and build: another checkout on the same port would answer too, and its build tells them apart.
         checks.append(Check("app running", OK if sha else MISSING,
                             f"port {port} answers with build {sha}" if sha
-                            else f"nothing answers on port {port}: start tray.bat (or start.bat for a console)"))
+                            else f"nothing answers on port {port}: start tray.bat (or scripts/start.bat for a console)"))
     return checks

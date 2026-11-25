@@ -27,3 +27,6 @@ config/app_password.json
 
 # scratch an agent or a tool leaves at the root
 tmp/
+
+# Top-up backups of a settings file hold its values (src/installer.py)
+*.json.bak-*

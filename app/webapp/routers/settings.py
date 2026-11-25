@@ -16,6 +16,7 @@ from app.webapp.feature_gate import require
 from app.webapp.routers.archive import OFF_REASON, archive_status, bridge_off
 from app.webapp.state import REQUEST_STATS
 from src import config, features, file_assoc, folder_lists, password, store
+from src.health_routes import health_router
 from src.secrets_env import PASSWORD_VAR, TOKEN_VAR, get_secret
 from src.snap import settings as snap_settings
 from src.snap.folder import open_save_folder
@@ -23,6 +24,8 @@ from src.snap.folder import open_save_folder
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+# The fleet's standard liveness and build identity routes (vendored).
+router.include_router(health_router(service="folder-explorer", identity=BUILD_INFO.as_dict()))
 
 # The bind this process actually started with, set by app.webapp.__main__;
 # a process started some other way (a test harness) reports what config
@@ -65,16 +68,6 @@ def settings_body(pc: bool) -> dict[str, Any]:
         "features": feature_blocks(cfg),
         "md_assoc": {"state": file_assoc.state() if pc else "pc_only"},
     }
-
-
-@router.get("/healthz")
-def healthz() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@router.get("/api/version")
-def version() -> dict[str, str]:
-    return BUILD_INFO.as_dict()
 
 
 @router.get("/api/request-stats")

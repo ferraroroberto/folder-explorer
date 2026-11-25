@@ -167,12 +167,60 @@ request_timing = { src = "src/request_timing.py", sha = "2e2a4cca9d3180980db6f8c
 request_budget_probe = { src = "tests/e2e/budget/_request_budget.py", sha = "b31f6d06caeb02d1fd8ddc7ff7bc4d502e415b31", dest = "tests/e2e/budget/_request_budget.py" }
 webkit_budget_check = { src = "scripts/tools/webkit_budget_check.py", sha = "d15277a91fdaff7d24790c19a0d187baa559228a", dest = "scripts/tools/webkit_budget_check.py" }
 poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app/webapp/static/_vendored/poll" }
+installer = { src = "src/installer.py", sha = "c23c5bf575a3f375a4ddbfb99a31763a80c6bee5", dest = "src/installer.py" }
+self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
+ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
+
+# [install] -- what `setup.bat` (src/installer.py, vendored) does for this app; docs/install.md.
+# config.json is the one settings file (topped up with the keys config.example.json has and it lacks); .env is
+# created from .env.example when missing and never merged. mailboxes.json is deliberately not declared: its sample
+# holds invented addresses, and the app runs on the one Outlook mailbox without the file. requirements.txt is the
+# web app; the dependency step adds the tray's, the email block's and the Outlook archive's packages.
+[install]
+samples  = []
+settings = ["config.json"]
+
+[[install.config]]
+sample = "config.example.json"
+target = "config.json"
+
+[[install.config]]
+sample = ".env.example"
+target = ".env"
+
+[install.deps]
+command = ["{python}", "-m", "pip", "install", "--disable-pip-version-check", "-r", "requirements-tray.txt", "-r", "requirements-email.txt", "-r", "requirements-outlook.txt"]
+inputs  = ["requirements-tray.txt", "requirements-email.txt", "requirements-outlook.txt"]
+
+[install.startup]
+check    = ["{python}", "-m", "src.install.startup", "status"]
+register = ["{python}", "-m", "src.install.startup", "enable"]
+
+# Sign-in and the tailnet certificate matter only for phone access (config.json `remote_access`); this PC alone uses
+# the app without them, so each hint says so.
+[[install.check]]
+name    = "Sign-in password"
+command = ["{python}", "-m", "src.install.probes", "password"]
+hint    = 'phone access only: .venv\Scripts\python.exe -m src.password set'
+
+[[install.check]]
+name    = "Sign-in token"
+command = ["{python}", "-m", "src.install.probes", "token"]
+hint    = 'phone access only: .venv\Scripts\python.exe scripts\gen_token.py'
+
+[[install.check]]
+name  = "Tailnet certificate"
+paths = ["webapp/certificates/cert.pem", "webapp/certificates/key.pem"]
+hint  = 'phone access only: .venv\Scripts\python.exe scripts\gen_tailscale_cert.py'
+
+[[install.check]]
+name    = "App answering on its port"
+command = ["{python}", "-m", "src.install.probes", "running"]
+hint    = 'start it with tray.bat (or scripts\start.bat for a console)'
 
 # [structure_ratchet] -- scripts/structure_ratchet.py fails when a file passes 1,000
 # lines, a function 100 lines or a directory 40 modules, when src/ imports app/, and
 # when the root folders do not match `shape` plus `extra_roots`. Exit 3 fails the gate.
-self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
-ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
 
 [structure_ratchet]
 enabled  = true

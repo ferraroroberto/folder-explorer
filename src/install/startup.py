@@ -1,9 +1,12 @@
 """The installer's one machine-level registration: a shortcut to ``tray.bat`` in the user's Startup folder.
 
-Opt-in (``scripts\\install.bat --startup``), because a PC may already start the tray some other way (a scheduler job, another
+Opt-in (``setup.bat -Startup``), because a PC may already start the tray some other way (a scheduler job, another
 launcher), and a second start entry would race the first. Detection reads only the Startup folder's own entries:
 any one that names this checkout's folder and ``tray.bat`` counts as present, whoever made it, and is reported kept.
-``--uninstall`` removes only the shortcut this module names and only when it points at this checkout.
+``disable`` removes only the shortcut this module names and only when it points at this checkout.
+
+``python -m src.install.startup status|enable|disable`` is the entry ``[install.startup]`` in ``.fleet.toml`` declares:
+``status`` exits 0 when an entry starts this checkout's tray, 1 when none does and 2 when the Startup folder is unknown.
 
 Standard library only, plus one ``powershell.exe -Command`` for the shortcut itself (the shell's ``WScript.Shell``
 object writes ``.lnk`` files); a ``-Command`` string is not a script file, so no execution policy applies to it.
@@ -13,12 +16,14 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 
 from src.no_window import NO_WINDOW
 
 POWERSHELL_EXE = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+ROOT = Path(__file__).resolve().parents[2]
 SHORTCUT_NAME = "folder-explorer tray.lnk"
 _ENTRY_SUFFIXES = (".lnk", ".bat", ".cmd", ".vbs", ".url")
 _CREATE_TIMEOUT_S = 60
@@ -82,3 +87,31 @@ def removable(folder: Path, root: Path) -> Path | None:
     """This module's own shortcut when it points at this checkout, else None (a foreign entry is never removed)."""
     link = folder / SHORTCUT_NAME
     return link if link in find_entries(folder, root) else None
+
+
+def main(argv: list[str] | None = None, root: Path = ROOT, env: Mapping[str, str] | None = None) -> int:
+    args = sys.argv[1:] if argv is None else argv
+    if len(args) != 1 or args[0] not in ("status", "enable", "disable"):
+        print("usage: python -m src.install.startup {status|enable|disable}", file=sys.stderr)
+        return 2
+    folder = startup_dir(os.environ if env is None else env)
+    if folder is None:
+        print("APPDATA is not set", file=sys.stderr)
+        return 2
+    if args[0] == "status":
+        return 0 if find_entries(folder, root) else 1
+    if args[0] == "enable":
+        if not find_entries(folder, root):
+            print(f"created {create_shortcut(folder, root).name}")
+        return 0
+    link = removable(folder, root)
+    if link is None:
+        print("no shortcut of this installer's points here")
+        return 0
+    link.unlink()
+    print(f"removed {link.name}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

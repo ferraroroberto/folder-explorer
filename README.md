@@ -8,11 +8,11 @@ It replaces two older tools: email-archiver (the Outlook archive, its email inde
 
 ## Install
 
-On Windows with Git and Python 3.11+, clone the repo and run `.\scripts\install.bat` (`-WhatIf` first to see what it would do). It creates `.venv`, installs the requirements each switched-on feature block needs, creates `config.json` and `.env` from their templates only when they're missing, and ends with a checklist of what works and what still needs you. It never overwrites a setting: on a PC that already runs the app it only adds config keys a newer version needs, after a backup, and a second run reports `unchanged`. An update is `git pull --ff-only` then `tray.bat --restart`. Fresh PC, already-configured PC and uninstall: [docs/install.md](docs/install.md). What to copy from an old machine: [docs/setup-and-migration.md](docs/setup-and-migration.md).
+On Windows with Git and Python 3.11+, clone the repo and run `.\setup.bat` (`-WhatIf` first to see what it would do). It creates `.venv`, installs the requirements, creates `config.json` and `.env` from their templates only when they're missing, and ends with a checklist of what works and what still needs you. It never overwrites a setting: on a PC that already runs the app it only adds config keys a newer version needs, after a backup, and a second run reports `unchanged`. An update is `git pull --ff-only` then `tray.bat --restart`. Fresh PC, update, migrating an existing install and uninstall: [docs/install.md](docs/install.md). What each setting means and what to edit after a move: [docs/setup-and-migration.md](docs/setup-and-migration.md).
 
 ## Run
 
-- **Tray (always on):** `tray.bat`. Starts the tray, which starts the web app and restarts it if it dies. `tray.bat --restart` restarts both. `scripts\install.bat --startup` starts the tray at sign-in.
+- **Tray (always on):** `tray.bat`. Starts the tray, which starts the web app and restarts it if it dies. `tray.bat --restart` restarts both. `setup.bat -Startup` starts the tray at sign-in.
 - **Console only:** `scripts\start.bat` (or `& .\.venv\Scripts\python.exe -m app.webapp`); Ctrl-C stops it.
 - Open `http://127.0.0.1:8453/` on this PC. With remote access on, the tailnet address is `https://<this-pc>.<tailnet>.ts.net:8453/`.
 

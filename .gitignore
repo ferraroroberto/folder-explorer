@@ -10,8 +10,9 @@ __pycache__/
 .env
 config.json
 config.json.tmp
-# the timestamped copies the installer keeps before it adds a missing key (app/install.py)
+# the timestamped copies setup.bat keeps before it adds a missing key (src/installer.py: config.json.bak-<date>-<time>)
 *.bak
+*.bak-*
 # The mailbox registry: personal addresses, machine-local (mailboxes.sample.json is the template)
 mailboxes.json
 # The tailnet certificate and key, issued per machine

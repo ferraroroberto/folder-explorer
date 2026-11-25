@@ -30,7 +30,7 @@ windows_only = pytest.mark.skipif(sys.platform != "win32", reason="PowerShell ex
 
 # What a session, a tray run, a restart and the gate write inside the checkout, one file each.
 RUNTIME_FILES = (
-    "config.json", "config.json.tmp", "config.json.20260101-120000.bak", ".env", "mailboxes.json",
+    "config.json", "config.json.tmp", "config.json.bak-20260101-120000", ".env", "mailboxes.json",
     "config/app_password.json", "webapp/certificates/cert.pem", "webapp/certificates/key.pem", "tray.log",
     "tmp/scratch.txt", ".proof/x.json", ".ruff_cache/x", ".pytest_cache/x", ".mypy_cache/x", "app/__pycache__/x.pyc",
     "src/x.pyc", "test-results/x",

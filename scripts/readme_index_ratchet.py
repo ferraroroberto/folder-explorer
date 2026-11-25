@@ -53,7 +53,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 README = REPO_ROOT / "README.md"
-DEFAULT_BASELINE = REPO_ROOT / ".readme-index-ratchet-baseline.json"
+DEFAULT_BASELINE = REPO_ROOT / ".ratchets" / "readme-index.json"
 DEFAULT_MAX_WORDS = 60
 BASELINE_VERSION = 1
 
@@ -221,7 +221,7 @@ def _report(rose: list[str], bullets: list[Bullet], baseline: dict[str, int], ma
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0] if __doc__ else None)
-    parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE, help="baseline file (default: repo root)")
+    parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE, help="baseline file (default: .ratchets/readme-index.json)")
     parser.add_argument("--max-words", type=int, default=DEFAULT_MAX_WORDS,
                         help=f"word cap for a bullet with no baseline entry (default: {DEFAULT_MAX_WORDS})")
     mode = parser.add_mutually_exclusive_group()

@@ -18,6 +18,7 @@ from src.search_window.model import (
     MARK_START,
     QuickSearchModel,
     Status,
+    folder_row,
 )
 from src.search_window.view import QuickSearchView
 
@@ -83,7 +84,7 @@ def _text(view: QuickSearchView) -> str:
 
 def test_typing_searches_after_a_pause_and_paints_the_rows(window: tuple[QuickSearchView, FakeApi]) -> None:
     view, fake = window
-    assert "Every word must match" in _text(view)
+    assert "Folders holding every word come first" in _text(view)
     view.query.set("harbour")
     _settle(view)
     assert "harbour-trip" in _text(view) and "Photos\\2024\\harbour-trip" in _text(view)
@@ -96,7 +97,7 @@ def test_the_emails_tab_searches_the_same_query(window: tuple[QuickSearchView, F
     view, fake = window
     view.query.set("budget")
     _settle(view)
-    assert "No folder matches every word." in _text(view)
+    assert "No folder matches." in _text(view)
     view.switch(EMAILS)
     _settle(view)
     assert view.model.tab == EMAILS and "Q4 budget" in _text(view) and "Ana Lopez" in _text(view)
@@ -178,3 +179,8 @@ def test_a_second_show_reuses_the_one_window_thread(monkeypatch: pytest.MonkeyPa
     quick.show()
     quick.show()
     assert started == ["run"] and quick._requests.qsize() == 2
+
+
+def test_a_folder_below_the_exact_hits_leads_its_meta_with_the_tier() -> None:
+    assert folder_row({"name": "Budget", "tier": "similar", "files": 2}, []).meta == "Similar · 2 files"
+    assert folder_row({"name": "Budget", "tier": "exact", "files": 1}, []).meta == "1 file"

@@ -56,16 +56,16 @@ An email index no run built (imported) or one owned by another app (`email.index
 
 | Parameter | Default | |
 | --- | --- | --- |
-| `q` | `""` | words, split on spaces or `;`; every word must appear in the folder's full path. No words answers `ok` with no results. |
+| `q` | `""` | words, split on spaces or `;`. Folders holding every word come first, then the other tiers (below). No words answers `ok` with no results. |
 | `limit` | 30 | 1 to 200 |
 | `within` | none | a folder path; repeat it for several. Only those folders and everything below them are searched (a root's own path keeps the whole root). It is also the fast path: a scoped search reads an id range, not every folder on every drive. |
 
-Matching is the Search tab's: case and accents never matter, a word of six letters or more one typo off still matches below the exact hits, a folder of people (subfolders named like email addresses) folds into one result (`folder_search.prune_people`), and a OneDrive folder is listed once (`folder_search.onedrive_prevails`).
+Matching is the Search tab's (docs/folder-search.md): case and accents never matter, and results come in tiers that never interleave, `exact` (every word), `partial` (at least half), `similar` (at least half counting a near spelling) and, only when nothing else matched, up to 20 `closest` folders by name. A folder of people (subfolders named like email addresses) folds into one result (`folder_search.prune_people`), and a OneDrive folder is listed once (`folder_search.onedrive_prevails`).
 
 ```json
 {"schema_version": 1, "state": "ok", "reason": null, "query": "alpha budget",
  "results": [{"root": "d", "root_name": "D:", "kind": "local", "id": 812, "name": "Budget",
-              "path": "D:\\Projects\\Alpha\\Budget", "depth": 3, "score": 1.0, "size": 48000, "files": 4, "people": 0}],
+              "path": "D:\\Projects\\Alpha\\Budget", "depth": 3, "tier": "exact", "score": 1.0, "size": 48000, "files": 4, "people": 0}],
  "total": 1, "truncated": false, "needs_rescan": [], "missing": [], "page": "/#search?mode=folders&q=alpha%20budget"}
 ```
 
@@ -75,7 +75,8 @@ Matching is the Search tab's: case and accents never matter, a word of six lette
 | `id` | the folder's id in that root's current index (changes with each scan) |
 | `name`, `path` | the folder's own name and its full path on disk; a caller folds `path` onto its own placeholders |
 | `depth` | levels below the root (the root is 0) |
-| `score` | 0 to 1: 1 when every word matched exactly, lower for a near word |
+| `tier` | `exact`, `partial`, `similar` or `closest`; results are sorted tier first |
+| `score` | 0 to 1: the mean of the words' scores, 1 for an exact word, lower for a near one, 0 for a missing one; for `closest`, how alike the names are |
 | `size`, `files` | bytes and file count under the folder at the last scan |
 | `people` | for a folder of people, how many people folders it holds, else 0 |
 

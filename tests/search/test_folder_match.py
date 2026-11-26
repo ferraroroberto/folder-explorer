@@ -6,7 +6,7 @@ import shutil
 import sqlite3
 from pathlib import Path
 
-from src.folder_match import edits, fold, fuzzy, near_score
+from src.folder_match import edits, fold, fuzzy
 from src.folder_search import search
 from src.index import Index, open_index
 from src.roots import Root
@@ -45,7 +45,6 @@ def test_one_edit_spellings_and_who_gets_them() -> None:
     near = edits("budget")
     assert {"budgt", "bduget", "budgat", "budgest"} <= near and "budget" not in near
     assert fuzzy("budget") and not fuzzy("notes") and not fuzzy("q1-2025")
-    assert near_score("budget") == 0.833
 
 
 def test_a_query_without_accents_finds_the_accented_folder_and_the_reverse(tmp_path: Path) -> None:
@@ -65,15 +64,19 @@ def test_a_one_letter_typo_still_finds_the_folder_below_exact_hits(tmp_path: Pat
     assert [s for _, s in found] == sorted((s for _, s in found), reverse=True)
     # A typo plus a suffix: one edit from the start of "presupuestos".
     assert hits(root, ix, "presupesto") == [("Presupuestos 2025", 0.9)]
-    # Every word must still match, the near one included.
+    # Both words held, one through a near word: it leads the folders holding just one of them.
     assert [n for n, _ in hits(root, ix, "presupesto 2025")] == ["Presupuestos 2025"]
-    assert hits(root, ix, "presupesto kestrel") == []
+    # A near word alone is below a word held exactly: Kestrel's folders lead, the near one follows.
+    tiered = [(r["name"], r["tier"]) for r in search([(root, ix)], "presupesto kestrel", prune=True, skip=0)["results"]]
+    assert tiered[-1] == ("Presupuestos 2025", "similar") and {t for _, t in tiered[:-1]} == {"partial"}
 
 
 def test_short_words_match_exactly_only(tmp_path: Path) -> None:
     root, ix, _ = scanned(tmp_path)
     assert hits(root, ix, "nota") == [("Notas", 1.0)]
-    assert hits(root, ix, "notaz") == []
+    # Too short for a near word: nothing matches, so the closest names are offered instead.
+    closest = search([(root, ix)], "notaz", prune=True, skip=0)["results"]
+    assert closest[0]["name"] == "Notas" and {r["tier"] for r in closest} == {"closest"}
 
 
 def test_an_index_from_before_accent_folding_still_answers(tmp_path: Path) -> None:

@@ -37,7 +37,7 @@ DEFAULT_LIMIT = 30
 MAX_LIMIT = 200
 
 # The folder-hit and email-hit fields of the contract, in the order docs/service-api.md lists them.
-FOLDER_FIELDS = ("root", "root_name", "kind", "id", "name", "path", "depth", "score", "size", "files", "people")
+FOLDER_FIELDS = ("root", "root_name", "kind", "id", "name", "path", "depth", "tier", "score", "size", "files", "people")
 EMAIL_FIELDS = ("id", "subject", "from_name", "from_addr", "recipients", "date", "folder", "path", "filename",
                 "snippet", "flagged", "attachments", "size")
 

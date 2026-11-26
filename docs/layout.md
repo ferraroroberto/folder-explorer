@@ -49,7 +49,8 @@ folder-explorer/
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
-│   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
+│   ├── folder_search.py        # folder search over every root's index: the tiers from the words' subtrees, folders of people
+│   ├── search_tiers.py         # the exact / partial / similar / closest tiers folder and email search rank by, and word similarity
 │   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
 │   ├── search_api.py           # the v1 search contract: its states, hit shapes and the page link
 │   ├── archive_api.py          # the v1 archive contract: outcomes, acknowledged vs confirmed, the envelope
@@ -112,6 +113,7 @@ folder-explorer/
 │                               #   tests/install the installer on temp checkouts, the standalone restart, and the clean-pull and AllSigned checks,
 │                               #   tests/scan what a scan logs: the progress heartbeat over a fake clock, each root's result as it ends,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
+│                               #   tests/search folder search: matching, accents and near words, the tiers and their timing on a large synthetic index,
 │                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this

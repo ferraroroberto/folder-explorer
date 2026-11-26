@@ -80,12 +80,24 @@ function emailRow(h, i) {
     (h.flagged ? '<span class="is-flag" title="Flagged">' + glyph('flag') + '</span>' : '') + '</span></button></li>';
 }
 
+// The label each tier below exact carries, and what it means; an exact hit carries none.
+const TIER_CHIP = {
+  partial: ['Partial', 'Holds at least half of the words'],
+  similar: ['Similar', 'A word is spelled a little differently'],
+  closest: ['Closest', 'Nothing matched: the folders whose names look most like the words'],
+};
+
+function tierChip(tier) {
+  const t = TIER_CHIP[tier];
+  return t ? '<span class="chip tier-chip" title="' + esc(t[1]) + '">' + t[0] + '</span>' : '';
+}
+
 function folderRow(f, i, terms) {
   return '<li><button type="button" class="result-row is-folder" role="option" data-i="' + i + '" aria-selected="' + (i === S.selected) + '" title="' + esc(winPath(f.path)) + '" data-track="folder-result">' +
     '<span class="rr-who">' + glyph(f.people ? 'users' : 'folder') + '<span data-user-content>' + hl(f.name, terms) + '</span></span>' +
     '<span class="rr-when">' + fmtBytes(f.size) + '</span>' +
     '<span class="rr-snip" data-user-content>' + hl(f.display, terms) + '</span>' +
-    '<span class="rr-meta"><span class="rr-score">' + scoreChip(f.score) + '</span>' + plural(f.files, 'file') + (f.people ? ' · <span class="chip tone-accent">' + plural(f.people, 'person', 'people') + '</span>' : '') +
+    '<span class="rr-meta">' + tierChip(f.tier) + '<span class="rr-score">' + scoreChip(f.score) + '</span>' + plural(f.files, 'file') + (f.people ? ' · <span class="chip tone-accent">' + plural(f.people, 'person', 'people') + '</span>' : '') +
     (f.kind === 'synced' ? ' · ' + glyph('cloud') + 'OneDrive' : '') + '</span></button></li>';
 }
 
@@ -120,9 +132,9 @@ function renderResults() {
   $('resultsMeta').textContent = plural(S.total, MODE_UI[mode].noun);
   const notes = S.notes.map((n) => '<li class="search-note">' + glyph('info') + '<span>' + esc(n) + '</span></li>').join('');
   let rows;
-  if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Every word must match.', false);
+  if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Folders holding every word come first.', false);
   else if (mode === 'docs' && !S.results.length) rows = emptyRow('file-text', q ? 'No document name matches every word.' : 'No Markdown or HTML files in the scanned roots.', !!q);
-  else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches every word.' : 'No emails match. Remove a filter or use fewer words.', !!q);
+  else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches.' : 'No emails match. Remove a filter or use fewer words.', !!q);
   else {
     const terms = q.split(/[\s;]+/).filter(Boolean);
     const draw = { folders: folderRow, docs: docRow, emails: emailRow }[mode];

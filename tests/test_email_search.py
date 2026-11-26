@@ -1,7 +1,11 @@
-"""Email search: the operator parser, the SQL it builds, ranking, facets and highlighting, on invented mail."""
+"""Email search: the operator parser, the SQL it builds, ranking, tiers, facets and highlighting, on invented mail."""
 
 from __future__ import annotations
 
+import json
+import shutil
+import sqlite3
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -9,6 +13,7 @@ import pytest
 
 from src.email.query import compile_query, date_bounds, newer_than, size_bytes, tokenize
 from src.email.search import MARK_END, MARK_START, EmailIndex, open_ro, split_address
+from src.no_window import NO_WINDOW
 from tests.email_fixture import build_email_index
 
 TODAY = date(2026, 11, 5)
@@ -42,6 +47,26 @@ TOKEN_CASES = [
 @pytest.mark.parametrize("text,expected", TOKEN_CASES)
 def test_tokenizer_splits_words_phrases_and_operators(text: str, expected: list) -> None:
     assert [(t.neg, t.key, t.value) for t in tokenize(text)] == expected
+
+
+def test_the_page_splits_the_box_the_same_way() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.fail("node is not on PATH: query.js cannot be checked")
+    module = (Path(__file__).resolve().parent.parent / "app" / "webapp" / "static" / "query.js").as_uri()
+    script = ("const {tokenize} = await import(%s); console.log(JSON.stringify(%s.map((text) => tokenize(text)"
+              ".map((t) => [t.neg, t.key || '', t.key ? t.val : t.word]))))") % (
+                  json.dumps(module), json.dumps([text for text, _ in TOKEN_CASES]))
+    done = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=60, creationflags=NO_WINDOW)
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == [[list(t) for t in expected] for _, expected in TOKEN_CASES]
+
+
+def test_only_free_words_are_left_to_relax() -> None:
+    q = compile_query('budget "draft plan" kick OR off from:ana subject:q4 -old', {"sender"}, TODAY)
+    assert q.loose == [["budget"], ["kick", "off"]]
+    assert q.strict == ['"draft plan"', 'sender : "ana"*', 'subject : "q4"*']
 
 
 def test_or_joins_two_words_into_one_alternative() -> None:
@@ -127,3 +152,93 @@ def test_one_mail_marks_its_preview(index: EmailIndex) -> None:
 def test_an_empty_box_lists_the_newest_mail(index: EmailIndex) -> None:
     result = index.search("", today=TODAY)
     assert result["total"] == 5 and subjects(result)[0] == "Site visit photos"
+
+
+def listed(result: dict) -> list[tuple[str, str]]:
+    return list(zip(subjects(result), [h["tier"] for h in result["hits"]]))
+
+
+def test_one_wrong_word_still_finds_the_others_as_partial(index: EmailIndex) -> None:
+    assert listed(index.search("kickoff agenda zeppelin", today=TODAY)) == [("Kickoff agenda", "partial")]
+    result = index.search("budget zeppelin", today=TODAY)
+    assert {h["tier"] for h in result["hits"]} == {"partial"} and result["total"] == 3
+    assert result["hits"][0]["score"] == 0.5 and not result["truncated"]
+    assert MARK_START in result["hits"][0]["subject"] + result["hits"][0]["snippet"]
+
+
+def test_exact_hits_come_first_and_a_full_page_of_them_adds_nothing(index: EmailIndex) -> None:
+    result = index.search("budget kickoff", today=TODAY)
+    assert [h["tier"] for h in result["hits"]] == ["exact", "partial", "partial"]
+    assert result["hits"][0]["score"] == 1.0 and subjects(result)[0] == "Kickoff agenda"
+    assert listed(index.search("budget kickoff", limit=1, today=TODAY)) == [("Kickoff agenda", "exact")]
+    first = index.search("budget kickoff", limit=2, today=TODAY)
+    second = index.search("budget kickoff", limit=2, offset=2, today=TODAY)
+    assert first["total"] == second["total"] == 3
+    assert subjects(first) + subjects(second) == subjects(result) and second["facets"] is None
+
+
+def test_a_typo_finds_the_mail_as_similar_and_marks_it(index: EmailIndex) -> None:
+    result = index.search("kikcoff", today=TODAY)
+    assert listed(result) == [("Kickoff agenda", "similar")]
+    assert 0 < result["hits"][0]["score"] < 1 and MARK_START in result["hits"][0]["subject"]
+    mail = index.email(result["hits"][0]["id"], "kikcoff", today=TODAY)
+    assert MARK_START + "Kickoff" + MARK_END in mail["subject"] and "kickoff" in mail["words"]
+
+
+def test_a_near_word_raises_a_partial_hit(index: EmailIndex) -> None:
+    result = index.search("budget kikcoff", today=TODAY)
+    assert listed(result)[0] == ("Kickoff agenda", "partial")
+    assert result["hits"][0]["score"] > result["hits"][1]["score"] == 0.5
+
+
+def test_the_newest_sort_keeps_the_tiers_apart(index: EmailIndex) -> None:
+    result = index.search("budget kickoff", sort="newest", today=TODAY)
+    assert listed(result) == [("Kickoff agenda", "exact"), ("Q4 budget draft", "partial"), ("Re: budget notes", "partial")]
+
+
+@pytest.mark.parametrize("text,allowed", [
+    ("from:ana kikcoff", {"Q4 budget draft", "Re: budget notes"}),
+    ("-agenda kikcoff", {"Q4 budget draft", "Re: budget notes", "Site visit photos", "Invoice 0042"}),
+    ("before:2025 kikcoff", {"Q4 budget draft", "Re: budget notes", "Invoice 0042"}),
+    ("is:flagged kikcoff", {"Q4 budget draft"}),
+])
+def test_operators_and_exclusions_are_never_relaxed(index: EmailIndex, text: str, allowed: set[str]) -> None:
+    # The one near spelling sits in "Kickoff agenda", which each filter leaves out: only filtered mails may stand in.
+    result = index.search(text, today=TODAY)
+    assert set(subjects(result)) <= allowed
+    assert all(h["tier"] == "closest" for h in result["hits"])
+
+
+def test_a_quoted_phrase_stays_exact_in_every_tier(index: EmailIndex) -> None:
+    assert index.search('"notes budget"', today=TODAY)["total"] == 0
+    assert index.search('"notes budget" kikcoff', today=TODAY)["total"] == 0
+    assert set(subjects(index.search('"budget notes" agnd', today=TODAY))) <= {"Re: budget notes"}
+
+
+def test_closest_fills_an_empty_result_only(index: EmailIndex) -> None:
+    result = index.search("invce", today=TODAY)
+    assert result["hits"] and {h["tier"] for h in result["hits"]} == {"closest"}
+    assert subjects(result)[0] == "Invoice 0042" and MARK_START in result["hits"][0]["subject"]
+    assert "closest" not in {h["tier"] for h in index.search("budget zeppelin", today=TODAY)["hits"]}
+
+
+def test_an_or_pair_counts_as_one_word(index: EmailIndex) -> None:
+    result = index.search("kickoff OR invoice zeppelin", today=TODAY)
+    assert set(listed(result)) == {("Kickoff agenda", "partial"), ("Invoice 0042", "partial")}
+
+
+def test_facets_count_the_listed_tiers(index: EmailIndex) -> None:
+    facets = index.search("budget zeppelin", today=TODAY)["facets"]
+    assert facets["years"] == [{"value": "2026", "count": 1}, {"value": "2025", "count": 2}]
+
+
+def test_the_vocabulary_follows_another_connections_writes(tmp_path: Path) -> None:
+    path = build_email_index(tmp_path / "emails.db", tmp_path / "Mail")
+    index = EmailIndex(open_ro(path))
+    assert "zeppelin" not in index.vocabulary().words
+    writer = sqlite3.connect(str(path))
+    writer.execute("INSERT INTO emails (file_path, folder_path, filename, subject, file_mtime) "
+                   "VALUES ('x', 'y', 'z', 'Zeppelin tour', 0)")
+    writer.commit()
+    writer.close()
+    assert listed(index.search("zepelin", today=TODAY)) == [("Zeppelin tour", "similar")]

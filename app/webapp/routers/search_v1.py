@@ -108,7 +108,7 @@ def folders(q: str = "", limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
 def emails(q: str = "", sort: str = Query("relevance", pattern=_SORT_PATTERN), offset: int = Query(0, ge=0),
            limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT), facets: bool = False) -> JSONResponse:
     """One page of archived mails for the query (newest first when it is empty), with the match marks."""
-    empty: dict[str, Any] = {"query": q, "hits": [], "total": 0, "notes": [], "facets": None,
+    empty: dict[str, Any] = {"query": q, "hits": [], "total": 0, "truncated": False, "notes": [], "facets": None,
                              "marks": search_api.MARKS, "page": search_api.page_link("emails", q)}
     cfg = config.load()
     part, (state, reason) = _emails(cfg, resolve_roots(cfg["roots"]))
@@ -122,7 +122,8 @@ def emails(q: str = "", sort: str = Query("relevance", pattern=_SORT_PATTERN), o
         logger.warning("⚠️ v1 email search failed: %s", exc)
         return _answer(doc(search_api.ERROR, "the email index could not be read: " + str(exc), **empty))
     return _answer(doc(OK, **{**empty, "hits": [search_api.email_hit(h) for h in found["hits"]],
-                              "total": found["total"], "notes": found["notes"], "facets": found["facets"]}))
+                              "total": found["total"], "truncated": found["truncated"], "notes": found["notes"],
+                              "facets": found["facets"]}))
 
 
 @mail_router.get("/flagged")

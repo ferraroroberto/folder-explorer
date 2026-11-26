@@ -315,7 +315,7 @@ flowchart LR
 - **Reach:** the results card under the box
 - **Holds:**
   - the count
-  - one row per result (a mail, a folder or a document) as a listbox; a folder row below the exact hits carries its tier (Partial, Similar or Closest)
+  - one row per result (a mail, a folder or a document) as a listbox; a folder or mail row below the exact hits carries its tier (Partial, Similar or Closest), and a mail row found by words its score
   - Show next results
   - on a mouse, a keys line naming the shortcuts
 - **Does:**
@@ -323,7 +323,8 @@ flowchart LR
   - j and k move, Enter opens the preview sheet (see keys.search)
 - **States:**
   - a folder box with no text asks for part of a folder name
-  - folder results come in tiers, never mixed: every word, then at least half, then a near spelling, then (only when nothing matched) the closest names
+  - folder and mail results come in tiers, never mixed: every word, then at least half, then a near spelling, then (only when nothing matched) the closest ones
+  - a capped mail list reads *Best N results*
   - no match says so, with Clear search
   - notes above the rows say what a filter left out or that a root needs a rescan
 - **Leads to:**

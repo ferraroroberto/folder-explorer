@@ -10,7 +10,8 @@ swapped), or that start with such a spelling, so ``presupesto`` still finds
 ``presupuestos``. A near word scores below an exact hit's 1
 (``src.search_tiers.edit_score``).
 
-This holds no state and reads nothing: ``src/index.py`` asks the index.
+This holds no state and reads nothing: ``src/index.py`` asks the index. The email
+search folds and edits words the same way (``src/email/relaxed.py``).
 """
 
 from __future__ import annotations

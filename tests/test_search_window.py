@@ -96,7 +96,9 @@ def test_the_emails_tab_lists_what_the_search_tab_gets(api: TestClient) -> None:
         assert [r.target["id"] for r in answer.rows] == [h["id"] for h in page["hits"]] and answer.total == page["total"]
     budget = fetch(_client(api), EMAIL_TAB, "budget")
     assert any(mark for row in budget.rows for _, mark in row.title), "the index's match marks become highlighted runs"
-    assert budget.rows[0].path.endswith(".msg")
+    assert budget.rows[0].path.endswith(".msg") and not budget.rows[0].meta.startswith("Partial")
+    wrong = fetch(_client(api), EMAIL_TAB, "budget zeppelin")
+    assert wrong.rows and all(r.meta.startswith("Partial") for r in wrong.rows)
 
 
 def test_words_split_on_spaces_and_semicolons_and_every_word_match_leads(api: TestClient) -> None:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from playwright.sync_api import Page
 
 from tests.e2e.budget._request_budget import (
@@ -21,7 +20,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 HIDDEN_FLUSH = "/api/usage/events"
 
 
-@pytest.mark.desktop_only
 def test_main_page_keeps_its_request_budget(own_page: Page, app_url: str) -> None:
     # The suite's contexts answer the Archive hand-off long poll at once, so the page re-asks
     # every PENDING_MS: the visible count is the fastest cadence a server could drive.

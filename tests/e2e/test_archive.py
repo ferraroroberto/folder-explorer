@@ -14,6 +14,8 @@ from playwright.sync_api import Locator, Page, Route, expect
 
 from tests.e2e._layout_lint import assert_layout_clean
 from tests.e2e._surface import surface
+from tests.e2e._waits import wait_until
+from tests.e2e.conftest import HANDOFF_POLL_MS
 
 ROOT = "/archive/Mail"
 MAIL = {"subject": "Kickoff agenda", "sender": "leo@example.org", "date_sent": "2026-11-05T09:12:00",
@@ -271,15 +273,19 @@ def test_the_current_explorer_folder_is_offered_with_its_path_and_each_failure_s
     assert asked == [1, 1, 1, 1] and errors == []
 
 
-def test_the_macro_hand_off_shows_the_mail_first_fills_its_folders_in_and_a_failure_says_why(page: Page, app_url: str,
+def test_the_macro_hand_off_shows_the_mail_first_fills_its_folders_in_and_a_failure_says_why(clock_page: Page, app_url: str,
                                                                                             browser_name: str) -> None:
+    page = clock_page
     errors = _errors(page)
     asked: list[str] = []
+    handed: list[int] = []  # for each mail handed out, the number of the poll that took it
     queue = [{"mail": dict(PREPARED, from_macro=True, suggestions=[], ranking=True)}]
     _archive_ready(page)
 
     def pending(route: Route) -> None:
         asked.append(route.request.url)
+        if queue:
+            handed.append(len(asked))
         _json(route, queue.pop(0) if queue else {"mail": None})
 
     page.route("**/api/archive/pending*", pending)
@@ -302,7 +308,10 @@ def test_the_macro_hand_off_shows_the_mail_first_fills_its_folders_in_and_a_fail
     sheet.locator("[data-close]").click()
     # The same hand-off ranked again after the sheet closed leaves it closed.
     queue.append({"mail": dict(PREPARED, from_macro=True, ranking=False)})
-    page.wait_for_timeout(4000)
+    page.clock.run_for(HANDOFF_POLL_MS)
+    # The page asks again only once it has handled the mail a poll brought.
+    wait_until(page, lambda: not queue and len(asked) > handed[-1], "the page handling the hand-off with the sheet closed")
+    page.clock.run_for(HANDOFF_POLL_MS + 1000)  # and nothing opens the sheet later
     expect(sheet).not_to_be_visible()
 
     # Opened by hand while Outlook is unreachable, the sheet says why and offers a retry.

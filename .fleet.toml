@@ -317,6 +317,13 @@ enabled    = true
 baseline   = ".ratchets/runtime-write.json"
 safe_calls = ["data_dir", "index_dir", "state_path", "runtime_data_dir"]
 
+# [e2e] -- read by /e2e and /e2e-audit. test_budget holds the browser suite at its collected size
+# (every test on both projections): lower it when a test goes, never raise it without a reason.
+# junit_xml holds the per-test seconds: the gate writes it in the checkout it runs in, git-ignored.
+[e2e]
+test_budget = 140
+junit_xml   = ".pytest_cache/e2e-junit.xml"
+
 # [usage_track_ratchet] -- every web control carries a constant data-track id and
 # every <dialog> a data-track-view; usage-log-wired holds the app to its usage log.
 [usage_track_ratchet]

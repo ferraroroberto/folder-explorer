@@ -6,14 +6,15 @@ requests), never by a real mailbox or window.
 
 from __future__ import annotations
 
-from typing import Callable, Iterator
+from typing import Iterator
 
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
 from tests.e2e._filters import choose_root
 from tests.e2e._layout_lint import assert_layout_clean
-from tests.e2e.conftest import LIVE_PORT
+from tests.e2e._waits import wait_until
+from tests.e2e.conftest import HANDOFF_POLL_MS, LIVE_PORT
 from tests.fixture_tree import DOCS_FOLDER
 
 BLOCKS = {"email": "Email", "archive": "Archive", "documents": "Documents", "screenshot": "Screenshot"}
@@ -35,15 +36,6 @@ def all_on(page: Page, app_url: str) -> Iterator[None]:
 
 def _off(page: Page) -> list[str]:
     return (page.evaluate("document.documentElement.dataset.featuresOff") or "").split()
-
-
-def _wait_for(page: Page, enough: Callable[[], bool], what: str) -> None:
-    """Wait up to 8 s for ``enough()`` to hold; fail naming ``what``."""
-    for _ in range(80):
-        if enough():
-            return
-        page.wait_for_timeout(100)
-    pytest.fail("never happened: " + what)
 
 
 def _settings(page: Page, app_url: str) -> None:
@@ -151,21 +143,23 @@ def test_email_off_hides_its_card_and_mode_and_stops_asking(page: Page, app_url:
     expect(page.locator("#emailCard")).to_be_visible()
 
 
-def test_archive_off_stops_the_hand_off_poll_and_hides_its_rows(page: Page, app_url: str) -> None:
+def test_archive_off_stops_the_hand_off_poll_and_hides_its_rows(clock_page: Page, app_url: str) -> None:
+    page = clock_page
     polls: list[str] = []
     page.on("request", lambda r: polls.append(r.url) if "/api/archive/pending" in r.url else None)
     _settings(page, app_url)
     expect(page.locator("#groupOutlook")).to_be_visible()
-    _wait_for(page, lambda: len(polls) > 0, 'the hand-off poll while the block is on')
+    wait_until(page, lambda: len(polls) > 0, 'the hand-off poll while the block is on')
     _flip(page, "archive", False)
     expect(page.locator("#groupOutlook")).to_be_hidden()
     expect(page.locator("#showMacro")).to_be_hidden()
-    # The poll that was already in flight ends; the next one is never made.
+    # The poll that was already in flight ends; the next one is never made, however late: jump past it.
     page.wait_for_timeout(300)
     before = len(polls)
-    page.wait_for_timeout(3600)
+    page.clock.run_for(HANDOFF_POLL_MS + 600)
+    page.evaluate("() => fetch('/healthz').then((r) => r.ok)")  # a request the jump made is reported before this answer
     assert len(polls) == before, "no hand-off poll while the block is off"
     assert page.request.get(app_url + "/api/archive/macro").status == 404
     _flip(page, "archive", True)
     expect(page.locator("#groupOutlook")).to_be_visible()
-    _wait_for(page, lambda: len(polls) > before, 'the hand-off poll again once the block is back on')
+    wait_until(page, lambda: len(polls) > before, 'the hand-off poll again once the block is back on')

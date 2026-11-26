@@ -99,11 +99,13 @@ def test_the_emails_tab_lists_what_the_search_tab_gets(api: TestClient) -> None:
     assert budget.rows[0].path.endswith(".msg")
 
 
-def test_words_split_on_spaces_and_semicolons_and_every_word_must_match(api: TestClient) -> None:
+def test_words_split_on_spaces_and_semicolons_and_every_word_match_leads(api: TestClient) -> None:
     assert words(" alpha;beta  gamma; ") == ["alpha", "beta", "gamma"]
     both = fetch(_client(api), FOLDERS, "photos;garden")
-    assert [plain(r.title) for r in both.rows] == ["garden"]
-    assert fetch(_client(api), FOLDERS, "photos;nothing-like-this").status is Status.EMPTY
+    # The folder holding both words leads; folders holding one of them follow, labelled Partial.
+    assert plain(both.rows[0].title) == "garden" and not both.rows[0].meta.startswith("Partial")
+    assert len(both.rows) > 1 and all(r.meta.startswith("Partial") for r in both.rows[1:])
+    assert all(r.meta.startswith("Partial") for r in fetch(_client(api), FOLDERS, "photos;nothing-like-this").rows)
 
 
 def test_a_folder_of_people_folds_into_one_row_unless_pruning_is_off(api: TestClient) -> None:

@@ -10,6 +10,7 @@ against the live process table without ending anything.
 from __future__ import annotations
 
 import os
+import re
 import socket
 import sys
 from pathlib import Path
@@ -198,7 +199,7 @@ def test_tray_bat_routes_a_missing_helper_restart_to_the_standalone_restart() ->
     assert "-m scripts.standalone_restart stop" in text
     assert "-m scripts.standalone_restart verify" in text
     # The helper path keeps its own invocation, ahead of both standalone labels.
-    assert text.index("ReadAllText($env:TRAY_PS))) launch @a") < text.index("\n:standalone_start")
+    assert text.index('-m src.ps_script "%TRAY_PS%" launch') < text.index("\n:standalone_start")
 
 
 def test_the_webapp_child_alone_is_not_taken_for_the_tray() -> None:
@@ -222,5 +223,5 @@ def test_with_no_config_the_owned_port_is_the_default(isolated: Path) -> None:
 
 def test_tray_bat_carries_no_port_of_its_own() -> None:
     text = (Path(__file__).resolve().parents[2] / "tray.bat").read_text(encoding="ascii")
-    assert "OWNED_PORTS=" not in text and "8453" not in text
+    assert not re.search(r"OWNED_PORTS=\d", text) and "8453" not in text
     assert "-m scripts.standalone_restart ports" in text

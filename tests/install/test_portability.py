@@ -158,20 +158,17 @@ def test_the_gate_starts_and_loads_its_sibling_under_allsigned(tmp_path: Path) -
 
 @windows_only
 @pytest.mark.skipif(not TRAY_HELPER.is_file(), reason="this PC has no shared tray helper")
-def test_tray_bat_starts_the_shared_helper_under_allsigned(tmp_path: Path) -> None:
-    """tray.bat's own -Command line, run with the read-only ``detect`` action instead of ``launch``."""
+def test_tray_bat_starts_the_shared_helper_under_allsigned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """tray.bat's launcher line and the arguments it sets, doing the read-only ``detect`` instead of ``launch``."""
     bat = (REPO_ROOT / "tray.bat").read_text(encoding="ascii")
-    match = re.search(r'^%PS% -NoProfile -NonInteractive -Command "(.*)"\r?$', bat, re.MULTILINE)
-    assert match and " launch @a " in match.group(1)
-    command = match.group(1).replace(" launch @a ", " detect @a ")
-    env = {**os.environ, "PSExecutionPolicyPreference": "AllSigned", "TRAY_PS": str(TRAY_HELPER), "TRAY_VENV": str(tmp_path),
-           "TRAY_APP_NAME": "probe", "SCRIPT_DIR_ARG": str(tmp_path), "TRAY_LAUNCH": "-m app.tray",
-           "TRAY_PY": str(REPO_ROOT / ".venv" / "Scripts" / "python.exe")}
-    done = subprocess.run([POWERSHELL, "-NoProfile", "-NonInteractive", "-Command", command], check=False,
-                          capture_output=True,
-                          text=True, timeout=PS_TIMEOUT_S, env=env, cwd=REPO_ROOT, creationflags=NO_WINDOW)
+    assert '-m src.ps_script "%TRAY_PS%" launch' in bat
+    for name in re.findall(r'^set "PSL_ARG_(\w+)=', bat, re.MULTILINE):
+        monkeypatch.setenv(f"PSL_ARG_{name}", str(tmp_path))
+    monkeypatch.setenv("PSL_ARG_TrayMatch", r"-m\s+probe")
+    done = _launch(TRAY_HELPER, ["detect"], "AllSigned")
     assert done.returncode == 0, done.stderr
-    assert "cannot be loaded" not in done.stderr and done.stdout.strip() == ""
+    assert "ScriptBlock" in done.stderr and "cannot be loaded" not in done.stderr
+    assert done.stdout.strip() == ""
 
 
 def test_no_script_overrides_the_policy_or_carries_a_signature() -> None:

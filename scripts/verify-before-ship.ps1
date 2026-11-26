@@ -133,7 +133,8 @@ $runtimeSnapshot = Join-Path ([IO.Path]::GetTempPath()) "runtime-write-snapshot-
 Invoke-Stage "runtime write probe (snapshot)" { & $py "scripts/runtime_write_ratchet.py" --snapshot $runtimeSnapshot }
 Invoke-Stage "pytest"            { & $py -m pytest -q tests --ignore=tests/e2e }
 $env:FOLDER_EXPLORER_E2E_AUTOBOOT = "1"
-Invoke-Stage "e2e"               { & $py -m pytest -q tests/e2e }
+# The per-test seconds /e2e-audit reads (.fleet.toml [e2e] junit_xml), overwritten each run.
+Invoke-Stage "e2e"               { & $py -m pytest -q tests/e2e --junitxml ".pytest_cache/e2e-junit.xml" }
 # The Mac nightly runs the request-budget tests on WebKit. 0 passes; 4 (WebKit not
 # installed) and 5 (no budget test) are "not run", printed as such and never as a
 # pass; anything else, 3 (not confirmed) included, fails the gate.

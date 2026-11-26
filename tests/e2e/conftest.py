@@ -35,6 +35,8 @@ AUTOBOOT_ENV = "FOLDER_EXPLORER_E2E_AUTOBOOT"
 _BOOT_TIMEOUT_S = 20.0
 # Playwright's own 30 s default turns a stuck locator into a silent wait; 15 s names it sooner.
 _DEFAULT_TIMEOUT_MS = 15_000
+#: The page's pause between two hand-off polls the server answers at once (PENDING_MS in archive.js).
+HANDOFF_POLL_MS = 3_000
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -70,15 +72,35 @@ def context(browser: Browser, browser_context_args: dict[str, Any]) -> Iterator[
     and the HTTP cache warm across the run. ``page`` below hands each case a new tab and resets
     what a context keeps between cases.
     """
-    shared = browser.new_context(**browser_context_args)
-    shared.set_default_timeout(_DEFAULT_TIMEOUT_MS)
-    shared.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
-    # The server holds the page's hand-off poll open for up to 25 s, and screenshot settling waits for an
-    # idle network. A test that hands a mail over routes the poll on its page, which takes precedence.
-    shared.route("**/api/archive/pending*", lambda route: route.fulfill(status=200, content_type="application/json",
-                                                                        body='{"mail": null}'))
+    shared = _open_context(browser, browser_context_args)
     yield shared
     shared.close()
+
+
+def _open_context(browser: Browser, args: dict[str, Any]) -> BrowserContext:
+    opened = browser.new_context(**args)
+    opened.set_default_timeout(_DEFAULT_TIMEOUT_MS)
+    opened.set_default_navigation_timeout(_DEFAULT_TIMEOUT_MS)
+    # The server holds the page's hand-off poll open for up to 25 s, and screenshot settling waits for an
+    # idle network. A test that hands a mail over routes the poll on its page, which takes precedence.
+    opened.route("**/api/archive/pending*", lambda route: route.fulfill(status=200, content_type="application/json",
+                                                                        body='{"mail": null}'))
+    return opened
+
+
+@pytest.fixture
+def clock_page(browser: Browser, browser_context_args: dict[str, Any]) -> Iterator[Page]:
+    """A page whose timers a test can jump (``page.clock``), to prove that nothing happens later.
+
+    It has a context of its own: the clock belongs to the whole context, so on the shared one it would
+    stay installed for every later case. Time still passes by itself until a test jumps it.
+    """
+    own = _open_context(browser, browser_context_args)
+    try:
+        own.clock.install()
+        yield own.new_page()
+    finally:
+        own.close()
 
 
 def _reset_context_state(context: BrowserContext, page: Page, app_url: str) -> None:

@@ -163,9 +163,3 @@ def test_every_tier_stays_inside_its_budget_on_a_large_index(synthetic: tuple[Ro
         assert result["results"], query
         assert result["results"][0]["tier"] == want, (query, result["results"][0])
         assert ms < BUDGET_MS, "%s query %r took %.0f ms" % (want, query, ms)
-
-
-def test_the_quick_search_window_labels_a_folder_below_the_exact_hits() -> None:
-    from src.search_window.model import folder_row
-    assert folder_row({"name": "Budget", "tier": "similar", "files": 2}, []).meta == "Similar · 2 files"
-    assert folder_row({"name": "Budget", "tier": "exact", "files": 1}, []).meta == "1 file"

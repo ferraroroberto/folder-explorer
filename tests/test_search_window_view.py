@@ -18,6 +18,7 @@ from src.search_window.model import (
     MARK_START,
     QuickSearchModel,
     Status,
+    folder_row,
 )
 from src.search_window.view import QuickSearchView
 
@@ -178,3 +179,8 @@ def test_a_second_show_reuses_the_one_window_thread(monkeypatch: pytest.MonkeyPa
     quick.show()
     quick.show()
     assert started == ["run"] and quick._requests.qsize() == 2
+
+
+def test_a_folder_below_the_exact_hits_leads_its_meta_with_the_tier() -> None:
+    assert folder_row({"name": "Budget", "tier": "similar", "files": 2}, []).meta == "Similar · 2 files"
+    assert folder_row({"name": "Budget", "tier": "exact", "files": 1}, []).meta == "1 file"

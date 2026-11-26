@@ -145,8 +145,10 @@ def test_folder_search_opens_from_a_link_matches_every_word_and_runs_the_card_ke
     expect(page.locator("#q")).to_have_value("harbour 2024")
     expect(page.locator('#modeSeg [data-value="folders"]')).to_have_attribute("aria-pressed", "true")
     rows = page.locator("#results .result-row")
+    # The rows holding every word carry no tier chip; partial ones (only "2024") follow them.
+    exact_rows = page.locator("#results .result-row:not(:has(.tier-chip))")
     # Each invented root holds the same tree, so each gives one match.
-    expect(rows).to_have_count(roots_count)
+    expect(exact_rows).to_have_count(roots_count)
     expect(rows.first).to_contain_text("harbour-trip")
     rows.first.click()
     preview = _preview(page, browser_name)
@@ -161,7 +163,7 @@ def test_folder_search_opens_from_a_link_matches_every_word_and_runs_the_card_ke
 
     if browser_name == "chromium":
         page.context.grant_permissions(["clipboard-read", "clipboard-write"])
-        expect(rows).to_have_count(roots_count)
+        expect(exact_rows).to_have_count(roots_count)
         rows.first.click()
         expect(preview.locator(".pv-path")).to_contain_text("harbour-trip")
         expect(page.locator("#keysLine")).to_contain_text("open in File Explorer")

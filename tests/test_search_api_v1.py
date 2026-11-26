@@ -80,7 +80,9 @@ def test_folders_answer_in_the_documented_shape(drive: Path) -> None:
         assert tuple(hit) == search_api.FOLDER_FIELDS and hit["path"].startswith(str(drive)) and hit["depth"] >= 1
         assert c.get("/api/v1/search/folders", params={"q": "garden", "limit": 0}).status_code == 422
         nothing = c.get("/api/v1/search/folders", params={"q": "zebra-quartz"})
-        assert nothing.status_code == 200 and nothing.json()["results"] == [] and nothing.json()["state"] == "ok"
+        # Nothing matches, so only the closest folders by name come back, each labelled so.
+        assert nothing.status_code == 200 and nothing.json()["state"] == "ok"
+        assert {r["tier"] for r in nothing.json()["results"]} == {"closest"}
 
 
 def test_within_keeps_the_search_to_those_folders(drive: Path) -> None:

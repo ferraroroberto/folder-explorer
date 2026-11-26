@@ -7,8 +7,8 @@ folded the same way, so ``comparacion`` and ``comparación`` find each other.
 A word of ``FUZZY_MIN`` letters or more also finds its near words: the
 folder words one edit away from it (a letter dropped, added, changed or two
 swapped), or that start with such a spelling, so ``presupesto`` still finds
-``presupuestos``. A near word scores ``1 - 1 / letters``, always below an
-exact hit's 1.
+``presupuestos``. A near word scores below an exact hit's 1
+(``src.search_tiers.edit_score``).
 
 This holds no state and reads nothing: ``src/index.py`` asks the index.
 """
@@ -47,11 +47,6 @@ def name_words(folded_name: str) -> set[str]:
 def fuzzy(folded_word: str) -> bool:
     """Whether a query word is long enough, and one word, to look for its near words."""
     return len(folded_word) >= FUZZY_MIN and folded_word.isalnum()
-
-
-def near_score(folded_word: str) -> float:
-    """What a near word scores for this query word: one edit in its length."""
-    return round(1 - 1 / len(folded_word), 3)
 
 
 def edits(folded_word: str) -> set[str]:

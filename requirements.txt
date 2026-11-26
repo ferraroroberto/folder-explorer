@@ -6,3 +6,5 @@ cryptography>=42
 markdown-it-py>=3.0
 mdit-py-plugins>=0.4
 pygments>=2.17
+# Folder search's similar and closest tiers (src/search_tiers.py); the email part's suggester uses it too.
+rapidfuzz>=3.0

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
 
 from src import runtime_files
-from src.folder_match import edits, unpack_ids
+from src.folder_match import edits, name_words, unpack_ids
 from src.winfs import ONLINE_ONLY_ATTRS
 
 BASES = ("size", "disk")
@@ -32,8 +32,14 @@ MAX_TYPES = 60
 
 # Values per ``IN (...)``, well under SQLite's bound-parameter limit.
 _SQL_CHUNK = 900
-# Near words kept per query word, the shortest first; each widens the paths read.
+# Near words kept per query word, the shortest first; each widens the folders a near match reads.
 MAX_NEAR = 40
+# Folder words read for one query word's word-start range; past it the word is too common to look up by name.
+MAX_PREFIX_WORDS = 2000
+# Folders one query word's words may name before it is checked against paths instead: each one costs a subtree lookup.
+MAX_NAMED = 20_000
+# Folder words held in memory for the similar and closest tiers; a larger index ranks over the first ones only.
+MAX_VOCABULARY = 1_000_000
 # Above every character, so ``word < prefix + _PAST_PREFIX`` ends a prefix's key range.
 _PAST_PREFIX = "\U0010ffff"
 
@@ -64,6 +70,8 @@ class Index:
         self._types: dict[tuple[int, str], dict[str, Any]] = {}
         self._knows_hidden: Optional[bool] = None
         self._folds_accents: Optional[bool] = None
+        self._root_words: Optional[set[str]] = None
+        self._vocabulary: Optional[dict[int, list[str]]] = None
 
     def knows_hidden(self) -> bool:
         """Whether this index marks hidden items (one written before the ``hidden`` column does not)."""
@@ -308,14 +316,51 @@ class Index:
                 (*chunk, _PAST_PREFIX)))
         return sorted((w for w in found if folded_word not in w), key=lambda w: (len(w), w))[:MAX_NEAR]
 
-    def word_spans(self, words: list[str]) -> tuple[set[int], list[tuple[int, int]]]:
-        """The folders whose own name holds one of ``words``, and their subtrees as merged ``(lo, hi)`` id ranges."""
+    def prefix_words(self, prefix: str, cap: int = MAX_PREFIX_WORDS) -> Optional[list[str]]:
+        """The folder-name words starting with ``prefix``, a key-range seek; ``None`` when more than ``cap`` do."""
+        rows = self.conn.execute("SELECT word FROM folder_words WHERE word >= ? AND word < ? LIMIT ?",
+                                 (prefix, prefix + _PAST_PREFIX, cap + 1)).fetchall()
+        return None if len(rows) > cap else [r[0] for r in rows]
+
+    def root_words(self) -> set[str]:
+        """The words of the root's own stored path, which every folder's path starts with."""
+        if self._root_words is None:
+            row = self.conn.execute("SELECT lpath FROM folder_paths WHERE id = 0").fetchone()
+            self._root_words = name_words(row[0]) if row else set()
+        return self._root_words
+
+    def root_span(self) -> tuple[int, int]:
+        """The ``(lo, hi)`` id range of the whole root."""
+        row = self.conn.execute("SELECT lo, hi FROM folders WHERE id = 0").fetchone()
+        return (int(row[0]), int(row[1])) if row else (0, 0)
+
+    def word_ids(self, word: str) -> list[int]:
+        """The folders whose own name holds ``word``, in id order."""
+        row = self.conn.execute("SELECT ids FROM folder_words WHERE word = ?", (word,)).fetchone()
+        return list(unpack_ids(row[0])) if row else []
+
+    def vocabulary(self) -> dict[int, list[str]]:
+        """Every folder-name word by its length, read once per open index (at most ``MAX_VOCABULARY``)."""
+        if self._vocabulary is None:
+            by_length: dict[int, list[str]] = {}
+            for (word,) in self.conn.execute("SELECT word FROM folder_words LIMIT ?", (MAX_VOCABULARY,)):
+                by_length.setdefault(len(word), []).append(word)
+            self._vocabulary = by_length
+        return self._vocabulary
+
+    def word_spans(self, words: list[str], cap: Optional[int] = None) -> Optional[tuple[set[int], list[tuple[int, int]]]]:
+        """The folders whose own name holds one of ``words``, and their subtrees as merged ``(lo, hi)`` id ranges.
+
+        ``None`` when the words name more than ``cap`` folders, before any subtree is looked up.
+        """
         named: set[int] = set()
         for start in range(0, len(words), _SQL_CHUNK):
             chunk = words[start:start + _SQL_CHUNK]
             for (blob,) in self.conn.execute(
                     "SELECT ids FROM folder_words WHERE word IN (%s)" % ",".join("?" * len(chunk)), chunk):
                 named.update(unpack_ids(blob))
+            if cap is not None and len(named) > cap:
+                return None
         ids = sorted(named)
         spans: list[tuple[int, int]] = []
         for start in range(0, len(ids), _SQL_CHUNK):

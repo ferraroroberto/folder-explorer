@@ -154,8 +154,9 @@ def test_folder_search_opens_from_a_link_matches_every_word_and_runs_the_card_ke
     _lint(page)
     if browser_name == "webkit":
         page.locator("#previewDialog [data-close]").click()
+    # A word no folder holds still lists the folders holding the other one, labelled as partial.
     page.locator("#q").fill("harbour nothing-like-this")
-    expect(page.locator("#results .empty-state-message")).to_have_text("No folder matches every word.")
+    expect(rows.first.locator(".tier-chip")).to_have_text("Partial")
     page.locator("#q").fill("harbour 2024")
 
     if browser_name == "chromium":

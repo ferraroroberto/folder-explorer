@@ -320,7 +320,7 @@ function foundHtml() {
     out.push('<li class="arch-crumb"><button type="button" class="icon-button" id="archBack" aria-label="Back" title="Back" data-track="archive-back">' + glyph('chevron-left') +
       '</button><span class="arch-crumb-path">' + esc(A.trail.map((l) => l.name).join(' › ')) + '</span></li>');
   }
-  const note = A.foundNote || (folders.length ? '' : A.trail.length ? 'No subfolders.' : 'No folder matches every word.');
+  const note = A.foundNote || (folders.length ? '' : A.trail.length ? 'No subfolders.' : 'No folder matches.');
   if (note) out.push('<li><p class="row-note' + (A.foundNote ? ' tone-danger-text' : '') + '">' + esc(note) + '</p></li>');
   folders.forEach((f, i) => {
     out.push('<li class="arch-found-row"><button type="button" class="arch-pick' + (f.fileable ? '' : ' is-outside') + '" data-found="' + i + '" aria-pressed="' + (i === A.sel) +

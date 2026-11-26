@@ -37,14 +37,19 @@ def names(result: dict) -> list[str]:
     return [r["name"] for r in result["results"]]
 
 
+def exact(result: dict) -> list[str]:
+    """The names in the ``exact`` tier: the folders holding every word."""
+    return [r["name"] for r in result["results"] if r["tier"] == "exact"]
+
+
 def test_every_word_must_appear_somewhere_in_the_path(tmp_path: Path) -> None:
     root, ix = scanned(tmp_path)
     result = search([(root, ix)], "alpha budget", prune=True, skip=0)
-    assert names(result) == ["Budget"]
+    assert exact(result) == ["Budget"] and names(result)[0] == "Budget"
     hit = result["results"][0]
     assert hit["path"].replace("\\", "/").endswith("Projects/Alpha/2025/Budget") and hit["size"] == 500
-    assert names(search([(root, ix)], "BUDGET;design", prune=True, skip=0)) == ["Budget"]
-    assert search([(root, ix)], "nothing-like-this", prune=True, skip=0)["total"] == 0
+    assert exact(search([(root, ix)], "BUDGET;design", prune=True, skip=0)) == ["Budget"]
+    assert {r["tier"] for r in search([(root, ix)], "nothing-like-this", prune=True, skip=0)["results"]} <= {"closest"}
     assert search([(root, ix)], "   ", prune=True, skip=0)["results"] == []
 
 
@@ -52,7 +57,7 @@ def test_a_folder_of_people_folds_its_matches_into_one_result(tmp_path: Path) ->
     root, ix = scanned(tmp_path)
     pruned = search([(root, ix)], "northwind", prune=True, skip=0)
     assert names(pruned) == ["Northwind"] and pruned["results"][0]["people"] == 2
-    assert names(search([(root, ix)], "2025 example", prune=True, skip=0)) == ["Northwind"]
+    assert exact(search([(root, ix)], "2025 example", prune=True, skip=0)) == ["Northwind"]
     full = search([(root, ix)], "northwind", prune=False, skip=0)
     assert set(names(full)) == {"Northwind", "ana@example.com", "leo@example.org", "Contracts", "2025"}
     # "cl@ve" has no dotted domain, so it is an ordinary folder, not a person.

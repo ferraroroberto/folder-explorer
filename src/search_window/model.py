@@ -24,9 +24,9 @@ TABS = ((FOLDERS, "Folders"), (EMAILS, "Emails"))
 # The private-use characters the email index wraps a match in (``src.email.search.MARK_START`` / ``MARK_END``).
 MARK_START, MARK_END = chr(0xE000), chr(0xE001)
 
-HINTS = {FOLDERS: "Type part of a folder name. Every word must match.",
+HINTS = {FOLDERS: "Type part of a folder name. Folders holding every word come first.",
          EMAILS: "Type words from a mail: subject, sender or text."}
-EMPTY = {FOLDERS: "No folder matches every word.", EMAILS: "No emails match. Use fewer words."}
+EMPTY = {FOLDERS: "No folder matches.", EMAILS: "No emails match. Use fewer words."}
 
 Segments = tuple[tuple[str, bool], ...]
 
@@ -112,8 +112,13 @@ class Row:
     target: dict[str, Any]
 
 
+# The label a folder below the exact hits leads its meta line with (``src.search_tiers``); an exact hit has none.
+TIER_LABELS = {"partial": "Partial", "similar": "Similar", "closest": "Closest"}
+
+
 def folder_row(hit: dict[str, Any], marks: list[str]) -> Row:
-    meta = [plural(int(hit.get("files") or 0), "file")]
+    meta = [TIER_LABELS[hit["tier"]]] if hit.get("tier") in TIER_LABELS else []
+    meta.append(plural(int(hit.get("files") or 0), "file"))
     if hit.get("people"):
         meta.append("{:,} {}".format(hit["people"], "person" if hit["people"] == 1 else "people"))
     if hit.get("kind") == "synced":

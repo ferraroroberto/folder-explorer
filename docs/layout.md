@@ -49,7 +49,8 @@ folder-explorer/
 │           └── _vendored/      # fleet UI components, byte-for-byte from project-scaffolding
 ├── src/                        # logic, never imports app/
 │   ├── winfs.py                # metadata-only directory listing and the cloud-state classifier
-│   ├── folder_search.py        # folder search over every root's index: every word in the path, folders of people
+│   ├── folder_search.py        # folder search over every root's index: the tiers from the words' subtrees, folders of people
+│   ├── search_tiers.py         # the exact / partial / similar / closest tiers folder and email search rank by, and word similarity
 │   ├── folder_match.py         # how a search word matches: accent folding, one-edit spellings, near-match score
 │   ├── search_api.py           # the v1 search contract: its states, hit shapes and the page link
 │   ├── archive_api.py          # the v1 archive contract: outcomes, acknowledged vs confirmed, the envelope

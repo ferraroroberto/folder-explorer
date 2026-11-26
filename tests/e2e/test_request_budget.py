@@ -22,10 +22,11 @@ HIDDEN_FLUSH = "/api/usage/events"
 
 
 @pytest.mark.desktop_only
-def test_main_page_keeps_its_request_budget(page: Page, app_url: str) -> None:
-    # The suite's context answers the Archive hand-off long poll at once, so the page re-asks
+def test_main_page_keeps_its_request_budget(own_page: Page, app_url: str) -> None:
+    # The suite's contexts answer the Archive hand-off long poll at once, so the page re-asks
     # every PENDING_MS: the visible count is the fastest cadence a server could drive.
-    reading = measure_request_budget(page, f"{app_url}/")
+    # The probe installs a fake clock, so the case takes a context of its own.
+    reading = measure_request_budget(own_page, f"{app_url}/")
     flushes = reading.hidden.pop(HIDDEN_FLUSH, 0)
     assert flushes <= 1, f"{flushes} usage flushes while hidden, one on the hide only ({reading.summary()})"
     assert_request_budget(reading, visible_budget(REPO_ROOT))

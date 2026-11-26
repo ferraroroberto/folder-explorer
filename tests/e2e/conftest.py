@@ -89,18 +89,27 @@ def _open_context(browser: Browser, args: dict[str, Any]) -> BrowserContext:
 
 
 @pytest.fixture
-def clock_page(browser: Browser, browser_context_args: dict[str, Any]) -> Iterator[Page]:
-    """A page whose timers a test can jump (``page.clock``), to prove that nothing happens later.
+def own_page(browser: Browser, browser_context_args: dict[str, Any]) -> Iterator[Page]:
+    """A page in a context of its own, for a case that leaves something on the context a reset cannot drop.
 
-    It has a context of its own: the clock belongs to the whole context, so on the shared one it would
-    stay installed for every later case. Time still passes by itself until a test jumps it.
+    A fake clock is the one such thing: it belongs to the whole context, so on the shared one it would
+    stay installed for every later case. A case whose helper installs the clock itself takes this.
     """
     own = _open_context(browser, browser_context_args)
     try:
-        own.clock.install()
         yield own.new_page()
     finally:
         own.close()
+
+
+@pytest.fixture
+def clock_page(own_page: Page) -> Page:
+    """A page whose timers a test can jump (``page.clock``), to prove that nothing happens later.
+
+    Time still passes by itself until a test jumps it.
+    """
+    own_page.clock.install()
+    return own_page
 
 
 def _reset_context_state(context: BrowserContext, page: Page, app_url: str) -> None:
@@ -112,6 +121,10 @@ def _reset_context_state(context: BrowserContext, page: Page, app_url: str) -> N
     page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
     context.clear_cookies()
     context.clear_permissions()
+    # A clock belongs to the whole context and cannot be uninstalled, so name the case that left one.
+    assert page.evaluate("() => String(setTimeout).includes('[native code]')"), (
+        "this case left a fake clock on the shared context, where every later case would run on it: "
+        "take own_page, or clock_page to jump timers")
 
 
 @pytest.fixture

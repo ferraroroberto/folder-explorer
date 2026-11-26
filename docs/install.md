@@ -58,7 +58,7 @@ Run `.\setup.bat` as well when the pull brought a new requirement or a new confi
 - **`mailboxes.json`**: never created or changed. The app runs without it (it uses the one Outlook mailbox), and `mailboxes.sample.json` shows its shape for when you need more than one.
 - **`.venv`**: kept. Requirements are installed into it only when a requirements file changed.
 
-A PC with an AllSigned PowerShell execution policy needs nothing different: `setup.bat` is a batch file, and `tray.bat` and the gate load their PowerShell as text. Run the gate on such a PC through the launcher: `& .\.venv\Scripts\python.exe -m src.ps_script scripts\verify-before-ship.ps1`.
+A PC with an AllSigned PowerShell execution policy needs nothing different: `setup.bat` is a batch file, and `tray.bat` starts the shared tray helper through `src\ps_script.py` and the gate loads its PowerShell as text. Run the gate on such a PC through the launcher: `& .\.venv\Scripts\python.exe -m src.ps_script scripts\verify-before-ship.ps1`.
 
 ## Migrate from an existing install
 

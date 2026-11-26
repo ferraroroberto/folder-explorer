@@ -170,6 +170,7 @@ poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8
 installer = { src = "src/installer.py", sha = "bafa9446b907dcb7fc6d833c1edfb1a069b7ca38", dest = "src/installer.py" }
 self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
+ps_script = { src = "src/ps_script.py", sha = "2d786d295c9b8d545aaf35703889638096f251ad", dest = "src/ps_script.py" }
 
 # [install] -- what `setup.bat` (src/installer.py, vendored) does for this app; docs/install.md.
 # config.json is the one settings file (topped up with the keys config.example.json has and it lacks); .env is

@@ -9,7 +9,9 @@ the sheet and the build line can render before sign-in.
 No API request from an opaque origin passes, from this PC or any other
 (``Origin: null``, or a cross-site no-cors fetch): that is what a page in a
 sandboxed frame sends (the HTML viewer draws a file's page in one, scripts
-on), and the loopback exemption must not hand it the API.
+on), and the loopback exemption must not hand it the API. A page on another
+site may navigate to the app but never send it a request that changes
+something.
 """
 
 from __future__ import annotations
@@ -85,6 +87,25 @@ def _framed_page_mark(scope: Scope) -> Optional[str]:
     return None
 
 
+_READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _other_site_mark(scope: Scope) -> Optional[str]:
+    """The method of an API request another site's page sent that would change something, or None.
+
+    The browser marks every request a page on another site starts ``Sec-Fetch-Site: cross-site``, a top-level
+    navigation included. Such a page may still open a link into the app, but only the app's own page (same-origin) and
+    clients that aren't browsers (no such header) may change anything, since a caller on this PC needs no token.
+    """
+    if not str(scope.get("path", "")).startswith("/api/"):
+        return None
+    method = str(scope.get("method", "GET")).upper()
+    if method in _READ_ONLY_METHODS:
+        return None
+    headers = dict(scope.get("headers") or [])
+    return method if headers.get(b"sec-fetch-site", b"").lower() == b"cross-site" else None
+
+
 class SignInMiddleware:
     """Plain ASGI gate (not ``BaseHTTPMiddleware``, which re-chunks every body)."""
 
@@ -96,6 +117,13 @@ class SignInMiddleware:
         if mark is not None:
             logger.info("ℹ️ refused an API request from a sandboxed page (%s): %s", mark, scope.get("path", ""))
             refused = JSONResponse({"detail": "a page shown in the viewer cannot call the app", "reason": "framed_page"},
+                                   status_code=403)
+            await refused(scope, receive, send)
+            return
+        method = _other_site_mark(scope) if scope["type"] == "http" else None
+        if method is not None:
+            logger.info("ℹ️ refused a %s from another site's page: %s", method, scope.get("path", ""))
+            refused = JSONResponse({"detail": "a page on another site can only open the app", "reason": "other_site"},
                                    status_code=403)
             await refused(scope, receive, send)
             return

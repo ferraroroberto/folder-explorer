@@ -49,7 +49,7 @@ has a cap, so a slow PC and a huge index stay interactive:
 | `CANDIDATES` 5,000 | `src/folder_search.py` | folders ranked per root |
 | `CLOSEST_IDS` 20, `CLOSEST_LIMIT` 20 | `src/folder_search.py`, `src/search_tiers.py` | folders per closest word, and closest results |
 
-`tests/test_search_tiers.py` holds every tier under 100 ms on a synthetic
+`tests/search/test_search_tiers.py` holds every tier under 100 ms on a synthetic
 index of about 110,000 folders. On a real index of 4.3 million folders and
 570,000 words a query answers in 25 to 100 ms, where the former path scan
 took about 800 ms; the first `closest` or two-edit lookup on an index also

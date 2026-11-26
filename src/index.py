@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Iterator, Optional, Sequence
 
 from src import runtime_files
-from src.folder_match import edits, name_words, unpack_ids
+from src.folder_match import edits, unpack_ids
 from src.winfs import ONLINE_ONLY_ATTRS
 
 BASES = ("size", "disk")
@@ -70,7 +70,7 @@ class Index:
         self._types: dict[tuple[int, str], dict[str, Any]] = {}
         self._knows_hidden: Optional[bool] = None
         self._folds_accents: Optional[bool] = None
-        self._root_words: Optional[set[str]] = None
+        self._root_path: Optional[str] = None
         self._vocabulary: Optional[dict[int, list[str]]] = None
 
     def knows_hidden(self) -> bool:
@@ -322,12 +322,12 @@ class Index:
                                  (prefix, prefix + _PAST_PREFIX, cap + 1)).fetchall()
         return None if len(rows) > cap else [r[0] for r in rows]
 
-    def root_words(self) -> set[str]:
-        """The words of the root's own stored path, which every folder's path starts with."""
-        if self._root_words is None:
+    def root_path(self) -> str:
+        """The root's own stored path, which every folder's path starts with."""
+        if self._root_path is None:
             row = self.conn.execute("SELECT lpath FROM folder_paths WHERE id = 0").fetchone()
-            self._root_words = name_words(row[0]) if row else set()
-        return self._root_words
+            self._root_path = row[0] if row else ""
+        return self._root_path
 
     def root_span(self) -> tuple[int, int]:
         """The ``(lo, hi)`` id range of the whole root."""
@@ -348,11 +348,8 @@ class Index:
             self._vocabulary = by_length
         return self._vocabulary
 
-    def word_spans(self, words: list[str], cap: Optional[int] = None) -> Optional[tuple[set[int], list[tuple[int, int]]]]:
-        """The folders whose own name holds one of ``words``, and their subtrees as merged ``(lo, hi)`` id ranges.
-
-        ``None`` when the words name more than ``cap`` folders, before any subtree is looked up.
-        """
+    def word_folders(self, words: list[str], cap: Optional[int] = None) -> Optional[set[int]]:
+        """The folders whose own name holds one of ``words``; ``None`` when more than ``cap`` do."""
         named: set[int] = set()
         for start in range(0, len(words), _SQL_CHUNK):
             chunk = words[start:start + _SQL_CHUNK]
@@ -361,6 +358,21 @@ class Index:
                 named.update(unpack_ids(blob))
             if cap is not None and len(named) > cap:
                 return None
+        return named
+
+    def names_holding(self, ids: set[int], text: str) -> set[int]:
+        """Which of ``ids`` hold ``text`` in their own folded name, one key lookup each."""
+        ordered = sorted(ids)
+        out: set[int] = set()
+        for start in range(0, len(ordered), _SQL_CHUNK):
+            chunk = ordered[start:start + _SQL_CHUNK]
+            rows = self.conn.execute(
+                "SELECT id, lpath FROM folder_paths WHERE id IN (%s)" % ",".join("?" * len(chunk)), chunk)
+            out.update(int(fid) for fid, path in rows if text in path.rpartition("/")[2])
+        return out
+
+    def subtrees(self, named: set[int]) -> list[tuple[int, int]]:
+        """The subtrees of the ``named`` folders as merged ``(lo, hi)`` id ranges."""
         ids = sorted(named)
         spans: list[tuple[int, int]] = []
         for start in range(0, len(ids), _SQL_CHUNK):
@@ -372,7 +384,15 @@ class Index:
                     spans[-1] = (spans[-1][0], max(spans[-1][1], hi))
                 else:
                     spans.append((lo, hi))
-        return named, spans
+        return spans
+
+    def word_spans(self, words: list[str], cap: Optional[int] = None) -> Optional[tuple[set[int], list[tuple[int, int]]]]:
+        """The folders whose own name holds one of ``words``, and their subtrees as merged ``(lo, hi)`` id ranges.
+
+        ``None`` when the words name more than ``cap`` folders, before any subtree is looked up.
+        """
+        named = self.word_folders(words, cap)
+        return None if named is None else (named, self.subtrees(named))
 
     def paths_in(self, spans: list[tuple[int, int]]) -> Iterator[tuple[int, str]]:
         """``(id, path)`` of every folder in the ``(lo, hi)`` ranges, in id order, read a batch of ranges at a time as asked."""

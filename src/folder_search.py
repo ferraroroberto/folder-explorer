@@ -31,7 +31,7 @@ from typing import Any, Iterable, Iterator, Optional, Sequence
 
 from src import search_tiers as tiers
 from src import store
-from src.folder_match import fold, fuzzy
+from src.folder_match import WORD_RE, fold, fuzzy, name_words
 from src.index import MAX_NAMED, Index, open_index
 from src.roots import Root, normalize, relative_parts
 from src.scanner import search_key
@@ -39,8 +39,12 @@ from src.scanner import search_key
 # Folders read per root before ranking, and results returned in all.
 CANDIDATES = 5000
 LIMIT = 200
-# Paths read per root to check a word that is not looked up by name, so a common or punctuated word stays interactive.
+# Paths read per root to check a word that is not looked up by name, so such a word stays interactive.
 CHECK_READS = 50_000
+# A punctuated word's candidates cost one key lookup each and no subtree, so its parts may name more than a whole
+# word's: "202" starts every year and date stamp, and checking those names still costs a fraction of a path scan.
+JOINED_PREFIX_WORDS = 20_000
+JOINED_CANDIDATES = 100_000
 # Folders a closest word contributes: a word naming thousands adds nothing a person could pick from.
 CLOSEST_IDS = 20
 # Sorts after any folder id, so a bisect on ``(id, NO_END)`` lands on the span starting at or before ``id``.
@@ -161,9 +165,11 @@ class Term:
 
     A single word (letters and digits) is looked up in the folder words: the
     folders whose own name has a word starting with it, or every folder when
-    the root's own path does, and everything below them. A word with other
-    characters in it, a word the index names too many folders for, or an
-    index from before accent folding is checked against the stored paths.
+    the root's own path does, and everything below them. A word joined by
+    punctuation (``017-052``) is looked up the same way by the parts after a
+    separator, then kept to the names holding it as typed. A word the folder
+    words can't narrow, one the index names too many folders for, or an index
+    from before accent folding is checked against the stored paths.
     """
 
     def __init__(self, word: str, index: Index) -> None:
@@ -173,11 +179,11 @@ class Term:
         self.named: set[int] = set()
         self.near: list[tuple[float, list[Span]]] = []
         self.spans: Optional[list[Span]] = None
-        if index.folds_accents() and self.folded.isalnum():
-            self.spans = self._exact_spans(index)
+        if index.folds_accents():
+            self.spans = self._exact_spans(index) if self.folded.isalnum() else self._joined_spans(index)
 
     def _exact_spans(self, index: Index) -> Optional[list[Span]]:
-        if any(w.startswith(self.folded) for w in index.root_words()):
+        if any(w.startswith(self.folded) for w in name_words(index.root_path())):
             return [index.root_span()]
         words = index.prefix_words(self.folded)
         found = index.word_spans(words, MAX_NAMED) if words is not None else None
@@ -185,6 +191,36 @@ class Term:
             return None
         self.named, spans = found
         return spans
+
+    def _joined_spans(self, index: Index) -> Optional[list[Span]]:
+        """The subtrees of the folders whose own name holds this punctuated word; ``None`` when no part narrows them.
+
+        A part after a separator starts a word of the name holding it, a whole
+        word when a separator follows it too, so the folder words name the only
+        candidates and just their names are read. A word holding ``/`` spans
+        names, and one with no part after a separator (``c#``) has nothing to
+        look up.
+        """
+        if "/" in self.folded:
+            return None
+        if self.folded in index.root_path():
+            return [index.root_span()]
+        candidates: Optional[set[int]] = None
+        for part in WORD_RE.finditer(self.folded):
+            if part.start() == 0:
+                continue
+            whole = part.end() < len(self.folded)
+            words = [part.group()] if whole else index.prefix_words(part.group(), JOINED_PREFIX_WORDS)
+            ids = None if words is None else index.word_folders(words, JOINED_CANDIDATES)
+            if ids is not None:
+                candidates = ids if candidates is None else candidates & ids
+        if candidates is None:
+            return None
+        named = index.names_holding(candidates, self.folded)
+        if len(named) > MAX_NAMED:
+            return None
+        self.named = named
+        return index.subtrees(named)
 
     def find_near(self, index: Index) -> None:
         """Look up the folders under this word's near words; only asked when the tiers above leave room."""

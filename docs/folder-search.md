@@ -25,12 +25,18 @@ word held exactly, `1 - edits / letters` for a near one, 0 for a missing
 one; a `closest` result scores how alike the names are. The page labels
 every tier below `exact`, and the API and the CLI return each hit's `tier`.
 
-A word with punctuation in it (`q1-2025`, `cl@ve`) or one so common its
-words name more than 20,000 folders (`a`) is not looked up by name: it is
-checked against the paths of the folders the other words found, or, when
-no word can be looked up, every word is matched as a substring of the
-stored paths, `exact` only. An index built before accent folding is
-matched that way too, until the next scan replaces it.
+A word with punctuation in it (a number like `017-052`, `q1-2025`,
+`cl@ve`) matches a folder whose path holds it as typed. It is looked up
+by name too: a part after a separator (`052`) starts a word of the name
+holding it, so only the names the folder words give for that part are read.
+
+A word the folder words can't narrow is not looked up by name: one with no
+part after a separator (`c#`), one holding a path separator, a single word
+naming more than 20,000 folders (`a`), or a punctuated one past its caps
+below (`017-2`). It is checked against the paths of the folders the other
+words found, or, when no word can be looked up, every word is matched as a
+substring of the stored paths, `exact` only. An index built before accent folding is matched that way too,
+until the next scan replaces it.
 
 ### Speed and the caps
 
@@ -43,9 +49,10 @@ has a cap, so a slow PC and a huge index stay interactive:
 | --- | --- | --- |
 | `MAX_PREFIX_WORDS` 2,000 | `src/index.py` | words read for one query word's word start |
 | `MAX_NAMED` 20,000 | `src/index.py` | folders one word may name before it is checked against paths |
+| `JOINED_PREFIX_WORDS` 20,000, `JOINED_CANDIDATES` 100,000 | `src/folder_search.py` | words and candidate names read for one part of a punctuated word (one key lookup a name, about 100 ms for 77,000) |
 | `MAX_NEAR` 40, `MAX_TWO_EDIT` 40 | `src/index.py`, `src/search_tiers.py` | near words per query word |
 | `MAX_VOCABULARY` 1,000,000 | `src/index.py` | words held in memory for the two-edit and closest lookups, read once per open index |
-| `CHECK_READS` 50,000 | `src/folder_search.py` | paths read to check a punctuated or common word |
+| `CHECK_READS` 50,000 | `src/folder_search.py` | paths read to check a word that can't be looked up by name |
 | `CANDIDATES` 5,000 | `src/folder_search.py` | folders ranked per root |
 | `CLOSEST_IDS` 20, `CLOSEST_LIMIT` 20 | `src/folder_search.py`, `src/search_tiers.py` | folders per closest word, and closest results |
 

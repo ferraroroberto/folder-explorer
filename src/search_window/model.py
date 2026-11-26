@@ -26,7 +26,7 @@ MARK_START, MARK_END = chr(0xE000), chr(0xE001)
 
 HINTS = {FOLDERS: "Type part of a folder name. Folders holding every word come first.",
          EMAILS: "Type words from a mail: subject, sender or text."}
-EMPTY = {FOLDERS: "No folder matches.", EMAILS: "No emails match. Use fewer words."}
+EMPTY = {FOLDERS: "No folder matches.", EMAILS: "No emails match. Remove a filter or quotes."}
 
 Segments = tuple[tuple[str, bool], ...]
 
@@ -112,7 +112,7 @@ class Row:
     target: dict[str, Any]
 
 
-# The label a folder below the exact hits leads its meta line with (``src.search_tiers``); an exact hit has none.
+# The label a hit below the exact ones leads its meta line with (``src.search_tiers``); an exact hit has none.
 TIER_LABELS = {"partial": "Partial", "similar": "Similar", "closest": "Closest"}
 
 
@@ -131,13 +131,14 @@ def folder_row(hit: dict[str, Any], marks: list[str]) -> Row:
 def email_row(hit: dict[str, Any]) -> Row:
     title = marked(hit.get("subject") or "") or (("(no subject)", False),)
     meta = [short_folder(hit.get("folder") or "")]
+    tier = [TIER_LABELS[hit["tier"]]] if hit.get("tier") in TIER_LABELS else []
     if hit.get("attachments"):
         meta.append(plural(int(hit["attachments"]), "attachment"))
     if hit.get("flagged"):
         meta.append("Flagged")
     who = hit.get("from_name") or hit.get("from_addr") or "(no sender)"
     return Row(EMAILS, title, mail_date(hit.get("date") or "", long=False), marked(hit.get("snippet") or ""),
-               " · ".join([who] + [m for m in meta if m]), win_path(hit.get("path") or ""), {"id": hit.get("id")})
+               " · ".join(tier + [who] + [m for m in meta if m]), win_path(hit.get("path") or ""), {"id": hit.get("id")})
 
 
 _UNITS = ("KB", "MB", "GB", "TB", "PB")

@@ -76,8 +76,8 @@ folder-explorer/
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
 │   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window's shown tab (the Archive sheet and window offer it)
-│   ├── email/                  # the email part: settings, query parser, search, sanitize, body,
-│   │   │                       #   schema (emails.sqlite3), manifest, stage, indexer (lock + history),
+│   ├── email/                  # the email part: settings, query parser, search, relaxed (the tiers below an exact
+│   │   │                       #   match, docs/email-search.md), sanitize, body, schema (emails.sqlite3), manifest, stage, indexer (lock + history),
 │   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths
 │   │   │                       #   (the email-folder guard), archive_settings, mailboxes, repository,
 │   │   │                       #   suggester, renumber, archive_sheet (the Archive sheet's suggest and file)
@@ -124,7 +124,7 @@ folder-explorer/
 │                               #   design_review_synthetic (prints that instance's URL for `/design-review --synthetic` and `measure --e2e`)
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, install.md (fresh PC, update, migrate, uninstall), setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, install.md (fresh PC, update, migrate, uninstall), setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, email-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

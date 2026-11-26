@@ -6,6 +6,10 @@ connection is ``mode=ro`` (never ``immutable``) and every answer reads a
 consistent snapshot. Relevance is ``bm25(emails_fts, 10, 3, 3, 1)``: a subject
 match counts most; ties go to the newest mail.
 
+A query with fewer exact matches than one page also lists the lower tiers of
+``src.search_tiers`` (``src/email/relaxed.py``), so one wrong or misspelled
+word never empties the list; each hit carries its ``tier`` and ``score``.
+
 Matches come back wrapped in ``MARK_START`` / ``MARK_END`` (private-use
 characters no mail contains), so the page escapes the text first and only then
 turns the markers into ``<mark>``.
@@ -13,6 +17,7 @@ turns the markers into ``<mark>``.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from datetime import date
@@ -20,6 +25,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src import runtime_files
+from src import search_tiers as tiers
+from src.email import relaxed
 from src.email.query import (
     FLAG_FLAGGED,
     FTS_PREVIEW,
@@ -75,6 +82,17 @@ class EmailIndex:
         if not {"subject", "sender", "file_path"} <= self.columns:
             raise ValueError("not an email index: the emails table is missing")
         self._select = ", ".join("e." + c for c in _HIT_COLUMNS + _OPTIONAL if c in self.columns)
+        # The index's words with the data version they were read at.
+        self._words: Optional[tuple[int, relaxed.Vocabulary]] = None
+
+    def vocabulary(self) -> relaxed.Vocabulary:
+        """Every word the index holds, read again only after another connection has written to it."""
+        version = int(self.conn.execute("PRAGMA data_version").fetchone()[0])
+        if self._words is None or self._words[0] != version:
+            self.conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp.emails_vocab USING fts5vocab(main, emails_fts, 'row')")
+            words = relaxed.Vocabulary(r[0] for r in self.conn.execute("SELECT term FROM temp.emails_vocab"))
+            self._words = (version, words)
+        return self._words[1]
 
     def count(self) -> int:
         return int(self.conn.execute("SELECT COUNT(*) FROM emails").fetchone()[0])
@@ -94,33 +112,68 @@ class EmailIndex:
             sql += " AND " + clause
         return sql, args + list(q.args)
 
+    def _rows(self, match: Optional[str], body: str, args: list[Any], order: str, limit: int,
+              offset: int) -> list[sqlite3.Row]:
+        """The hit rows of one FROM + WHERE, with the words of ``match`` marked."""
+        extra = ""
+        if match:
+            extra = ", %s AS rank, %s AS hl_subject, %s AS hl_sender, snippet(emails_fts, %d, '%s', '%s', '…', %d) AS snip" % (
+                _BM25, _hl(FTS_SUBJECT), _hl(FTS_SENDER), FTS_PREVIEW, MARK_START, MARK_END, SNIPPET_TOKENS)
+        return self.conn.execute("SELECT " + self._select + extra + body + " ORDER BY " + order + " LIMIT ? OFFSET ?",
+                                 args + [limit, offset]).fetchall()
+
+    def _tiered_page(self, q: Compiled, exact: list[sqlite3.Row], lower: relaxed.Lower, offset: int,
+                     limit: int) -> list[dict[str, Any]]:
+        """One page of the exact rows followed by the lower tiers' mails, each marked with the words that found it."""
+        listed = {r["id"]: self._hit(r, bool(q.match)) for r in exact}
+        page = ([r["id"] for r in exact] + lower.ids)[offset:offset + limit]
+        wanted = [i for i in page if i not in listed]
+        if wanted:
+            body = (" FROM emails_fts JOIN emails e ON e.id = emails_fts.rowid WHERE emails_fts MATCH ?"
+                    " AND e.id IN (SELECT value FROM json_each(?))")
+            for r in self._rows(lower.match, body, [lower.match, json.dumps(wanted)], "e.id", len(wanted), 0):
+                listed[r["id"]] = self._hit(r, True, *lower.hits[r["id"]])
+        return [listed[i] for i in page if i in listed]
+
     def search(self, text: str, sort: str = "relevance", offset: int = 0, limit: int = PAGE,
                today: Optional[date] = None, facets: bool = True) -> dict[str, Any]:
         """One page of hits for ``text``, the total, the facets (first page only) and any notes on skipped operators.
 
-        Facets cost most of a broad query's time, so a caller that shows none passes ``facets=False``.
+        With fewer exact matches than ``limit`` the lower tiers follow them, and the total and the facets count
+        what is listed; ``truncated`` says their cap cut it. Facets cost most of a broad query's time, so a
+        caller that shows none passes ``facets=False``.
         """
         if sort not in SORTS:
             raise ValueError("sort must be relevance or newest")
         q = compile_query(text, self.columns, today or date.today())
         body, args = self._from(q)
         if q.match:
-            extra = ", %s AS rank, %s AS hl_subject, %s AS hl_sender, snippet(emails_fts, %d, '%s', '%s', '…', %d) AS snip" % (
-                _BM25, _hl(FTS_SUBJECT), _hl(FTS_SENDER), FTS_PREVIEW, MARK_START, MARK_END, SNIPPET_TOKENS)
             order = "rank, e.date_sent DESC" if sort == "relevance" else "e.date_sent DESC, rank"
         else:
-            extra, order = "", "e.date_sent DESC, e.id DESC"
-        limit = max(1, min(limit, MAX_PAGE))
+            order = "e.date_sent DESC, e.id DESC"
+        limit, offset = max(1, min(limit, MAX_PAGE)), max(0, offset)
         try:
-            rows = self.conn.execute("SELECT " + self._select + extra + body + " ORDER BY " + order + " LIMIT ? OFFSET ?",
-                                     args + [limit, max(0, offset)]).fetchall()
             total = int(self.conn.execute("SELECT COUNT(*)" + body, args).fetchone()[0])
+            lower = relaxed.Lower()
+            exact: list[sqlite3.Row] = []
+            if q.loose and total < limit:
+                exact = self._rows(q.match, body, args, order, limit, 0)
+                lower = relaxed.lower_tiers(self.conn, q, [r["id"] for r in exact], limit, sort == "newest",
+                                            self.vocabulary)
+            if lower.ids:
+                hits = self._tiered_page(q, exact, lower, offset, limit)
+                listed = [r["id"] for r in exact] + lower.ids
+                total = len(listed)
+                body, args = " FROM emails e WHERE e.id IN (SELECT value FROM json_each(?))", [json.dumps(listed)]
+            else:
+                hits = [self._hit(r, bool(q.match)) for r in self._rows(q.match, body, args, order, limit, offset)]
             chips = self._facets(body, args) if facets and offset == 0 else None
         except sqlite3.OperationalError as exc:
             # A query FTS5 refuses (rare: the terms are always quoted) answers empty with the reason.
-            return {"hits": [], "total": 0, "facets": None, "notes": ["the search could not run: " + str(exc)], "words": q.words}
-        return {"hits": [self._hit(r, bool(q.match)) for r in rows], "total": total, "facets": chips,
-                "notes": q.notes, "words": q.words}
+            return {"hits": [], "total": 0, "facets": None, "notes": ["the search could not run: " + str(exc)],
+                    "words": q.words, "truncated": False}
+        return {"hits": hits, "total": total, "facets": chips, "notes": q.notes, "words": q.words,
+                "truncated": lower.truncated}
 
     def flagged(self, offset: int = 0, limit: int = PAGE) -> dict[str, Any]:
         """One page of the flagged mails, oldest first, with the count of all of them.
@@ -144,7 +197,7 @@ class EmailIndex:
                 "subject": r["subject"] or "", "sender": r["sender"] or "", "from_name": name, "from_addr": addr,
                 "date": r["date_sent"] or "", "preview": r["body_preview"] or ""}
 
-    def _hit(self, r: sqlite3.Row, matched: bool) -> dict[str, Any]:
+    def _hit(self, r: sqlite3.Row, matched: bool, tier: str = tiers.EXACT, score: float = 1.0) -> dict[str, Any]:
         keys = r.keys()
         name, addr = split_address(r["sender"] or "")
         preview = r["body_preview"] or ""
@@ -159,6 +212,8 @@ class EmailIndex:
             "filename": r["filename"] or "",
             "snippet": (r["snip"] if matched and r["snip"] else preview[:200]) or "",
             "flagged": r["flag_status"] == FLAG_FLAGGED,
+            "tier": tier,
+            "score": score,
         }
         if "attachment_names" in keys:
             hit["attachments"] = len([a for a in (r["attachment_names"] or "").split("\n") if a])
@@ -193,17 +248,31 @@ class EmailIndex:
 
     # ------------------------------------------------------------- one mail
 
+    def _marked(self, row_id: int, match: str) -> Optional[sqlite3.Row]:
+        """One mail's subject and preview with ``match`` marked, or ``None`` when it does not satisfy it."""
+        return self.conn.execute(
+            "SELECT %s, %s FROM emails_fts WHERE emails_fts MATCH ? AND rowid = ?" % (_hl(FTS_SUBJECT), _hl(FTS_PREVIEW)),
+            (match, row_id)).fetchone()
+
     def email(self, row_id: int, text: str = "", today: Optional[date] = None) -> dict[str, Any]:
-        """One mail's indexed fields, with the query's words marked in the subject and preview."""
+        """One mail's indexed fields, with the query's words marked in the subject and preview.
+
+        A mail listed below the exact tier is marked with the words that found it, which ``words`` then carries too.
+        """
         r = self.conn.execute("SELECT " + self._select + " FROM emails e WHERE e.id = ?", (row_id,)).fetchone()
         if r is None:
             raise KeyError("no such email in the index")
         q = compile_query(text, self.columns, today or date.today())
         subject, preview = r["subject"] or "", r["body_preview"] or ""
+        words = q.words
         if q.match:
-            marked = self.conn.execute(
-                "SELECT %s, %s FROM emails_fts WHERE emails_fts MATCH ? AND rowid = ?" % (_hl(FTS_SUBJECT), _hl(FTS_PREVIEW)),
-                (q.match, row_id)).fetchone()
+            marked = self._marked(row_id, q.match)
+            if marked is None:
+                for match, extra in relaxed.markings(q, self.vocabulary):
+                    marked = self._marked(row_id, match)
+                    if marked is not None:
+                        words = q.words + extra
+                        break
             if marked is not None:
                 subject, preview = marked[0] or subject, marked[1] or preview
         keys = r.keys()
@@ -217,7 +286,7 @@ class EmailIndex:
             "flagged": r["flag_status"] == FLAG_FLAGGED, "message_id": r["message_id"] or "",
             "attachments": [a for a in (r["attachment_names"] or "").split("\n") if a] if "attachment_names" in keys else None,
             "size": r["size"] if "size" in keys else None,
-            "words": q.words,
+            "words": words,
         }
         return out
 

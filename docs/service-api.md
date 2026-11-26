@@ -92,15 +92,16 @@ Matching is the Search tab's (docs/folder-search.md): case and accents never mat
 | `limit` | 30 | 1 to 200 |
 | `facets` | `false` | `true` adds the sender, folder and year counts on the first page; they cost most of a broad query's time |
 
-Relevance is `bm25(emails_fts, 10, 3, 3, 1)` (subject, sender, recipients, preview); ties go to the newest mail.
+Relevance is `bm25(emails_fts, 10, 3, 3, 1)` (subject, sender, recipients, preview); ties go to the newest mail. A query with fewer exact mails than `limit` also lists the lower tiers, `partial`, `similar` and, only when nothing else matched, `closest`, never interleaved; operators, `-word` and phrases are required in all of them ([email-search.md](email-search.md)).
 
 ```json
 {"schema_version": 1, "state": "ok", "reason": null, "query": "budget",
  "hits": [{"id": 17, "subject": "Q4 \ue000budget\ue001 draft", "from_name": "Ana Lopez", "from_addr": "ana@example.com",
            "recipients": "leo@example.org", "date": "2025-10-14T09:12:00+02:00", "folder": "D:\\Mail\\Clients\\Northwind",
            "path": "D:\\Mail\\Clients\\Northwind\\001 - Q4 budget draft.msg", "filename": "001 - Q4 budget draft.msg",
-           "snippet": "Here is the revised \ue000budget\ue001 for…", "flagged": true, "attachments": 2, "size": 412000}],
- "total": 3, "notes": [], "facets": null, "marks": {"start": "\ue000", "end": "\ue001"},
+           "snippet": "Here is the revised \ue000budget\ue001 for…", "flagged": true, "attachments": 2, "size": 412000,
+           "tier": "exact", "score": 1.0}],
+ "total": 3, "truncated": false, "notes": [], "facets": null, "marks": {"start": "\ue000", "end": "\ue001"},
  "page": "/#search?mode=emails&q=budget"}
 ```
 
@@ -112,8 +113,9 @@ Relevance is `bm25(emails_fts, 10, 3, 3, 1)` (subject, sender, recipients, previ
 | `folder`, `path`, `filename` | where the `.msg` sits on disk |
 | `flagged` | the mail was flagged in Outlook |
 | `attachments`, `size` | the attachment count and bytes, or `null` on an index without those fields |
+| `tier`, `score` | `exact`, `partial`, `similar` or `closest`, and 0 to 1, as for folders |
 
-`notes` lists operators the index has no field for (left out, never faked) and a query the index refused. A caller wanting a mail's full text or an Outlook action uses this app's page, through `page`.
+`total` counts every exact match, or, once lower tiers are listed, every mail listed; `truncated` says their cap (200) cut it. `notes` lists operators the index has no field for (left out, never faked) and a query the index refused. A caller wanting a mail's full text or an Outlook action uses this app's page, through `page`.
 
 
 ## `GET /api/v1/mail/flagged`

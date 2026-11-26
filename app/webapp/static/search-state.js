@@ -16,6 +16,8 @@ export const S = {
   sort: 'relevance',
   results: [],
   total: 0,
+  // Whether a cap cut the list the total counts.
+  truncated: false,
   facets: null,
   notes: [],
   words: [],

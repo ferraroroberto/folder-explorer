@@ -10,6 +10,11 @@ matches only itself). ``OR`` between two words takes either; ``-`` excludes a wo
 index cannot answer yet (a column it does not have) is reported in ``notes``
 and left out, never silently turned into "no results".
 
+The query is compiled twice over: as one MATCH holding everything (the
+``exact`` tier), and split into the free words the lower tiers may relax
+(``loose``) and what every tier requires (``strict``, ``where``): operators,
+exclusions and quoted phrases (``src/email/relaxed.py``).
+
 The page's ``static/query.js`` holds the same tokenizer, so a chip and the box
 always agree; ``tests/test_email_search.py`` pins both to one table of cases.
 """
@@ -91,6 +96,11 @@ def fts_term(value: str, prefix: bool = True) -> str:
     return '"' + value.replace('"', '""') + '"' + ("*" if prefix and len(value) >= MIN_PREFIX else "")
 
 
+def any_of(exprs: list[str]) -> str:
+    """FTS5 expressions as one that takes any of them."""
+    return exprs[0] if len(exprs) == 1 else "(" + " OR ".join(exprs) + ")"
+
+
 def size_bytes(value: str) -> Optional[int]:
     m = _SIZE_RE.match(value or "")
     return int(float(m.group(1)) * _SIZE_UNITS[m.group(2).lower()]) if m else None
@@ -131,6 +141,10 @@ class Compiled:
     """A query as SQL: one FTS5 MATCH (or none) and filters over ``emails e``."""
 
     match: Optional[str] = None
+    # The free words a lower tier may do without, each as its OR alternatives.
+    loose: list[list[str]] = field(default_factory=list)
+    # The FTS5 expressions every tier requires: quoted phrases and the from: and subject: operators.
+    strict: list[str] = field(default_factory=list)
     where: list[str] = field(default_factory=list)
     args: list[Any] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -170,7 +184,12 @@ def compile_query(text: str, columns: set[str], today: date) -> Compiled:
     positive: list[str] = []
     for group in _word_groups(tokens):
         alts = [fts_term(t.value, prefix=not t.phrase) for t in group]
-        positive.append(alts[0] if len(alts) == 1 else "(" + " OR ".join(alts) + ")")
+        expr = any_of(alts)
+        positive.append(expr)
+        if any(t.phrase for t in group):
+            out.strict.append(expr)
+        else:
+            out.loose.append([t.value for t in group])
     for t in tokens:
         if not t.key and t.neg and searchable(t.value):
             out.add(_IN_FTS, fts_term(t.value, prefix=not t.phrase), neg=True)
@@ -188,6 +207,7 @@ def _fts_column(t: Token, column: str, out: Compiled, positive: list[str]) -> No
         out.add(_IN_FTS, expr, neg=True)
     else:
         positive.append(expr)
+        out.strict.append(expr)
 
 
 def _people(t: Token, columns: set[str], out: Compiled, positive: list[str]) -> None:

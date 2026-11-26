@@ -99,8 +99,11 @@ def test_within_keeps_the_search_to_those_folders(drive: Path) -> None:
 def test_emails_answer_in_the_documented_shape(drive: Path) -> None:
     with TestClient(app, client=LOCAL) as c:
         body = c.get("/api/v1/search/emails", params={"q": "budget"}).json()
-        assert set(body) == STATE_KEYS | {"query", "hits", "total", "notes", "facets", "marks", "page"}
+        assert set(body) == STATE_KEYS | {"query", "hits", "total", "truncated", "notes", "facets", "marks", "page"}
         assert body["total"] == 3 and body["facets"] is None and body["marks"] == search_api.MARKS
+        assert {h["tier"] for h in body["hits"]} == {"exact"} and body["truncated"] is False
+        typo = c.get("/api/v1/search/emails", params={"q": "kikcoff"}).json()
+        assert [h["tier"] for h in typo["hits"]] == ["similar"] and 0 < typo["hits"][0]["score"] < 1
         hit = body["hits"][0]
         assert tuple(hit) == search_api.EMAIL_FIELDS and hit["filename"].endswith(".msg") and hit["recipients"]
         assert search_api.MARKS["start"] in hit["subject"] + hit["snippet"]

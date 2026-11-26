@@ -75,7 +75,8 @@ function emailRow(h, i) {
     '<span class="rr-who" data-user-content>' + esc(h.from_name || h.from_addr || '(no sender)') + '</span><span class="rr-when">' + esc(mailDate(h.date)) + '</span>' +
     '<span class="rr-subj" data-user-content>' + marked(h.subject || '(no subject)') + '</span>' +
     '<span class="rr-snip" data-user-content>' + marked(h.snippet) + '</span>' +
-    '<span class="rr-meta"><span class="chip">' + esc(shortFolder(h.folder)) + '</span>' +
+    '<span class="rr-meta">' + tierChip(h.tier) + (S.words.length ? '<span class="rr-score">' + scoreChip(h.score) + '</span>' : '') +
+    '<span class="chip">' + esc(shortFolder(h.folder)) + '</span>' +
     (h.attachments ? '<span title="' + plural(h.attachments, 'attachment') + '">' + glyph('paperclip') + '</span>' + h.attachments : '') +
     (h.flagged ? '<span class="is-flag" title="Flagged">' + glyph('flag') + '</span>' : '') + '</span></button></li>';
 }
@@ -84,7 +85,7 @@ function emailRow(h, i) {
 const TIER_CHIP = {
   partial: ['Partial', 'Holds at least half of the words'],
   similar: ['Similar', 'A word is spelled a little differently'],
-  closest: ['Closest', 'Nothing matched: the folders whose names look most like the words'],
+  closest: ['Closest', 'Nothing matched: what looks most like the words'],
 };
 
 function tierChip(tier) {
@@ -129,12 +130,13 @@ function renderResults() {
   const mode = effectiveMode();
   const q = box().value.trim();
   const more = S.results.length < S.total && mode !== 'folders';
-  $('resultsMeta').textContent = plural(S.total, MODE_UI[mode].noun);
+  // A capped email list counts only what it holds, so it says so.
+  $('resultsMeta').textContent = (S.truncated && mode === 'emails' ? 'Best ' : '') + plural(S.total, MODE_UI[mode].noun);
   const notes = S.notes.map((n) => '<li class="search-note">' + glyph('info') + '<span>' + esc(n) + '</span></li>').join('');
   let rows;
   if (mode === 'folders' && !q) rows = emptyRow('folder', 'Type part of a folder name. Folders holding every word come first.', false);
   else if (mode === 'docs' && !S.results.length) rows = emptyRow('file-text', q ? 'No document name matches every word.' : 'No Markdown or HTML files in the scanned roots.', !!q);
-  else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches.' : 'No emails match. Remove a filter or use fewer words.', !!q);
+  else if (!S.results.length) rows = emptyRow(mode === 'folders' ? 'folder' : 'mail', mode === 'folders' ? 'No folder matches.' : 'No emails match. Remove a filter, an excluded word or quotes.', !!q);
   else {
     const terms = q.split(/[\s;]+/).filter(Boolean);
     const draw = { folders: folderRow, docs: docRow, emails: emailRow }[mode];
@@ -172,12 +174,13 @@ export async function runSearch() {
   try {
     body = await fetchResults(0);
   } catch (e) {
-    if (seq === S.seq) { S.results = []; S.total = 0; S.notes = [e.message]; S.facets = null; renderResults(); renderFacets(); }
+    if (seq === S.seq) { S.results = []; S.total = 0; S.truncated = false; S.notes = [e.message]; S.facets = null; renderResults(); renderFacets(); }
     return;
   }
   if (seq !== S.seq) return;
   S.results = body.hits || body.results || [];
   S.total = body.total || 0;
+  S.truncated = !!body.truncated;
   S.facets = body.facets || null;
   S.notes = (body.notes || []).concat(body.needs_rescan && body.needs_rescan.length ? ['Rescan to search folders in ' + body.needs_rescan.join(', ')] : [])
     .concat(body.truncated && mode === 'folders' ? ['Showing the best ' + S.results.length + ' folders; add a word to narrow it'] : []);

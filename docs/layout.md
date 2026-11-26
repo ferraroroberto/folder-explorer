@@ -107,7 +107,7 @@ folder-explorer/
 │   ├── static_versioning.py    # the fleet hash stamped on every asset URL; splices a page's `<!--include x.html-->` fragments
 │   └── (vendored)              # build_info, compression, login_alert, login_lockout, no_window, notify/, password, pooled_http, runtime_data, shell_etag, subject_text, usage_log
 ├── tests/                      # unit tests on invented fixture trees; tests/e2e is the browser suite (one browser context per projection shared by every case, reset between cases, so the run
-│                               #   leaves few loopback sockets in TIME_WAIT; a case that jumps the page's timers takes `clock_page`, a context of its own, since a clock belongs to the whole context;
+│                               #   leaves few loopback sockets in TIME_WAIT; a case that jumps the page's timers takes `clock_page`, and one whose helper installs the clock itself takes `own_page`, each a context of its own, since a clock belongs to the whole context and the reset fails a case that leaves one on the shared context;
 │                               #   `_port_pool.py` heads a failure on `ERR_ADDRESS_IN_USE` with PORT POOL EXHAUSTED),
 │                               #   tests/archive the archive verbs over a fake Outlook (and the consumer contract),
 │                               #   tests/tray the tray's respawn path over a fake clock and process table,

@@ -28,6 +28,8 @@ from src.roots import Root, resolve_roots
 router = APIRouter(prefix="/api")
 
 NO_EXT_PARAM = "-"
+# "All nested files" lists only this many, the largest: the page draws a row for each; ``total_items`` counts them all.
+NESTED_ROWS = 100
 
 
 def _ext(type_: Optional[str]) -> Optional[str]:
@@ -87,7 +89,7 @@ def folder_contents(request: Request, root: str, folder: int = 0, basis: str = D
     def run(ix: Index) -> dict[str, Any]:
         node = ix.node(ix.folder(folder), ext)
         if mode == "nested":
-            files = ix.largest(folder, 100, _basis(basis), ext, shown)
+            files = ix.largest(folder, NESTED_ROWS, _basis(basis), ext, shown)
             body: dict[str, Any] = {"items": [{"kind": "file", **f} for f in files], "total_items": node["files"]}
         else:
             body = ix.contents(folder, _basis(basis), ext, shown)

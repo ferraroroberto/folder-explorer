@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 _CABINET_CLASS = "CabinetWClass"
 # Long enough for a cold Explorer on a slow PC; past it the open is logged as not seen.
 FOLLOW_TIMEOUT_S = 5.0
-_POLL_S = 0.015
+# Each look lists every shell window over cross-process COM, taking time from the Explorer being waited for;
+# 100 ms keeps that light and delays bringing the window forward by at most that much.
+_POLL_S = 0.1
 # A window that already showed the folder before the open stands in only once no new one has appeared by then.
 _EXISTING_GRACE_S = 1.5
 

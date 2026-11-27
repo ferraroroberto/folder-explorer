@@ -3,14 +3,15 @@
 import { getJSON, postJSON, ApiError } from './api.js';
 import { bar, esc, fmtAgo, fmtNum, pct, winPath } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
-import { isOn, onFeaturesChange } from './state.js';
+import { singleFlight, startPoll } from './_vendored/poll/poll.js';
+import { isOn, onFeaturesChange, state } from './state.js';
 
 const $ =(id) => document.getElementById(id);
 // How often the card re-reads the run history while a run is going; the same cadence as the folder scans.
 const POLL_MS = 2000;
 
 let body = null;
-let timer = null;
+let poll = null;
 
 const MB = 1024 * 1024;
 
@@ -73,22 +74,27 @@ function render() {
   $('emailRuns').innerHTML = body.runs.length ? body.runs.map(runRow).join('') : '<li class="rows-note">No runs yet.</li>';
 }
 
-export async function loadEmailScans() {
-  if (timer) clearTimeout(timer);
-  timer = null;
-  // The Email block off: the card is gone and nothing asks the server about the index, so no poll runs.
+const readStatus = singleFlight(async () => {
+  // The Email block off: the card is gone and nothing asks the server about the index.
   if (!isOn('email')) {
     body = null;
-    render();
-    return;
-  }
-  try {
-    body = await getJSON('/api/email/status');
-  } catch (e) {
-    body = null;
+  } else {
+    try {
+      body = await getJSON('/api/email/status');
+    } catch (e) {
+      body = null;
+    }
   }
   render();
-  timer = body && body.running && isOn('email') ? setTimeout(() => loadEmailScans(), POLL_MS) : null;
+});
+
+// A run is going and its card is on screen; the vendored poll itself stops while the page is hidden.
+const watching = () => state.tab === 'scans' && isOn('email') && !!body && body.running;
+
+export async function loadEmailScans(read = readStatus) {
+  await read();
+  if (poll) poll.stop();
+  poll = startPoll(readStatus, POLL_MS, { activeWhile: watching });
 }
 
 async function start(root) {
@@ -98,7 +104,7 @@ async function start(root) {
   } catch (e) {
     showToast(e instanceof ApiError && e.status === 409 ? 'The email index is already updating' : e.message, 'error');
   }
-  setTimeout(() => loadEmailScans(), 500);
+  setTimeout(() => loadEmailScans(readStatus.fresh), 500);
 }
 
 async function showFailures() {
@@ -119,7 +125,7 @@ async function showFailures() {
 
 export function initEmailScans() {
   // The block going off clears the card and the poll; going on reads the index's state again, with no restart.
-  onFeaturesChange(() => loadEmailScans());
+  onFeaturesChange(() => loadEmailScans(readStatus.fresh));
   $('indexEmails').addEventListener('click', () => start(null));
   $('indexOne').addEventListener('click', () => start($('emailScope').value));
   $('emailInfo').addEventListener('click', () => $('emailInfoDialog').showModal());

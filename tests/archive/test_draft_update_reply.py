@@ -461,7 +461,7 @@ def test_reply_overrides_are_kept_when_given(tmp_path):
     spec = draft.parse_spec({
         "body_text": "Hello", "reply_to": {"msg_path": str(msg)},
         "to": ["x@example.invalid"], "cc": [], "subject": "Own subject",
-    })
+    }, [tmp_path.resolve()])
 
     assert (spec.to, spec.cc, spec.subject) == (["x@example.invalid"], [], "Own subject")
     assert spec.reply_to == ReplyTarget(REPLY_BY_MSG_PATH, str(msg))
@@ -477,7 +477,6 @@ def test_reply_overrides_are_kept_when_given(tmp_path):
         ({"reply_to": {"message_id": "<>"}}, "`reply_to.message_id` must be a non-empty string"),
         ({"reply_to": {"messageid": "a"}}, "unknown `reply_to` keys: messageid"),
         ({"reply_to": {"msg_path": "relative/saved.msg"}}, "must be an absolute path"),
-        ({"reply_to": {"msg_path": "Z:/definitely/not/here.msg"}}, "not an existing .msg file"),
         ({"reply_all": True}, "`reply_all` needs `reply_to`"),
         ({"reply_to": {"message_id": "a"}, "reply_all": "yes"}, "`reply_all` must be true or false"),
     ],
@@ -487,11 +486,51 @@ def test_an_unusable_reply_spec_is_refused_with_the_field_named(overrides, messa
         draft.parse_spec({"body_text": "Hello", **overrides})
 
 
-def test_a_msg_path_must_be_a_msg_file(tmp_path):
-    other = tmp_path / "saved.txt"
-    other.write_text("x", encoding="utf-8")
+@pytest.mark.parametrize("name", ["saved.txt", "not-here.msg"])
+def test_a_msg_path_must_be_an_existing_msg_file(tmp_path, name):
+    (tmp_path / "saved.txt").write_text("x", encoding="utf-8")
     with pytest.raises(draft.SpecError, match="not an existing .msg file"):
-        draft.parse_spec({"body_text": "Hello", "reply_to": {"msg_path": str(other)}})
+        draft.parse_spec(_reply_by_path(tmp_path / name), [tmp_path.resolve()])
+
+
+def _reply_by_path(path: Path) -> dict:
+    return {"body_text": "Hello", "reply_to": {"msg_path": str(path)}}
+
+
+@pytest.mark.parametrize("roots", [[], ["archive"]], ids=["no-roots", "another-folder"])
+def test_a_msg_path_outside_the_email_folders_is_refused(tmp_path, roots):
+    """Outlook opens whatever this names, so it is fenced to ``email.roots``."""
+    msg = _msg_file(tmp_path)
+    with pytest.raises(draft.SpecError, match="not inside `email.roots`"):
+        draft.parse_spec(_reply_by_path(msg), [tmp_path / name for name in roots])
+
+
+def test_a_msg_path_cannot_climb_out_of_an_email_folder(tmp_path):
+    root = tmp_path / "archive"
+    root.mkdir()
+    _msg_file(tmp_path)
+    with pytest.raises(draft.SpecError, match="not inside `email.roots`"):
+        draft.parse_spec(_reply_by_path(root / ".." / "saved.msg"), [root.resolve()])
+
+
+@pytest.mark.parametrize("inside", [True, False])
+def test_the_command_line_fences_a_msg_path_to_the_configured_email_folders(
+    batch_process, monkeypatch, tmp_path, inside,
+):
+    root = tmp_path / "archive"
+    root.mkdir()
+    msg = _msg_file(root if inside else tmp_path)
+    monkeypatch.setattr(main_batch, "load_config", lambda: {"email": {"roots": [str(root)]}})
+
+    code, doc, clients = batch_process(_reply_by_path(msg))
+
+    if inside:
+        assert code == main_batch.EXIT_OK
+        assert clients[0].drafts[0]["reply_to"] == ReplyTarget(REPLY_BY_MSG_PATH, str(msg.resolve()))
+    else:
+        assert code == main_batch.EXIT_CANNOT_START
+        assert doc["error"]["code"] == "bad_input" and "email.roots" in doc["error"]["message"]
+        assert clients == []
 
 
 @pytest.mark.parametrize("missing", ["to", "subject"])

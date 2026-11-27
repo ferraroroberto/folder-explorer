@@ -1,15 +1,12 @@
-# Install, update and move folder-explorer
+# Install, update and migrate folder-explorer
 
-folder-explorer moves to another Windows PC the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. Neither ever resets or overwrites what a PC has configured. `setup.bat` runs the vendored installer (`src/installer.py`); what is specific to this app is declared in the `[install]` table of `.fleet.toml`.
+folder-explorer installs, updates and migrates the way any app in the toolbox does: clone it and run one `setup.bat`. An update is a pull plus a restart. A migration, onto a fresh clone on the same PC or on another one, is one `setup.bat` call. None of them resets or overwrites what a PC has configured. `setup.bat` runs the vendored installer (`src/installer.py`); what is specific to this app is declared in the `[install]` tables of `.fleet.toml`.
 
 In the commands below, `<repo>` is the folder you cloned into. This page holds the steps; what each setting and state file is, and what each feature block needs, is in [setup-and-migration.md](setup-and-migration.md).
 
-## What you need
+## Install
 
-- Windows 10 or 11, Git, and Python 3.11 or newer (the `py` launcher, or `python` on `PATH`) with Tk (the tray's screenshot needs it).
-- Optional: Tailscale with HTTPS certificates turned on, to open the app from a phone ([README, Remote access](../README.md#remote-access-phone)); Outlook (classic) for the archive verbs.
-
-## Fresh PC
+You need Windows 10 or 11, Git, and Python 3.11 or newer (the `py` launcher, or `python` on `PATH`) with Tk (the tray's screenshot needs it). Optional: Tailscale with HTTPS certificates turned on, to open the app from a phone ([README, Remote access](../README.md#remote-access-phone)); Outlook (classic) for the archive verbs.
 
 ```powershell
 git clone <this repository's URL> folder-explorer
@@ -47,6 +44,14 @@ Optional, once the app runs:
 
 Check it worked: the required list shows `ok` for `.venv`, `Requirements installed`, `config.json` and `.env`, and the Explore tab shows each root's folders with sizes after the first scan.
 
+### Uninstall
+
+1. In Settings, switch off **Associate Markdown files with this app** if you turned it on (it removes its own per-user registry entry).
+2. Quit the tray from its menu.
+3. Remove the log-on shortcut with `.\.venv\Scripts\python.exe -m src.install.startup disable`. It removes only the shortcut `setup.bat -Startup` made, and only when it points at this checkout; an entry you made yourself stays, so delete that one from `shell:startup` by hand.
+4. Remove the Outlook macro in Outlook, and the `FOLDER_EXPLORER_HOME` user environment variable, if you set them. Remove any scheduler job that runs the scan.
+5. Delete `<repo>`. Keep a copy of the files listed under [What to copy](setup-and-migration.md#what-to-copy) first if you may want them back. The scan history and indexes stay in the runtime-data folder, so delete that folder too if you don't want to keep them.
+
 ## Update
 
 ```powershell
@@ -68,30 +73,35 @@ Run `.\setup.bat` as well when the pull brought a new requirement or a new confi
 
 A PC with an AllSigned PowerShell execution policy needs nothing different: `setup.bat` is a batch file, and `tray.bat` starts the shared tray helper through `src\ps_script.py` and the gate loads its PowerShell as text. Run the gate on such a PC through the launcher: `& .\.venv\Scripts\python.exe -m src.ps_script scripts\verify-before-ship.ps1`.
 
-## Migrate from an existing install
+## Migrate
 
-Use this on a PC that already runs an older copy of folder-explorer: one that may not be a git clone, and may live at another path. The old copy keeps running until the new one is verified, and it is deleted only when you say so. Never copy the old folder wholesale, and never copy `.venv`.
+What moves is declared in `[install.migrate]` of `.fleet.toml`: `config.json`, `.env`, `mailboxes.json`, `config\app_password.json` and `webapp\certificates\`, each only when the old copy has it. The runtime-data folder (`C:\sqlite\folder-explorer\` unless an environment variable names another) holds the scan history and indexes; it stays where it is and both copies share it. `.venv` is never copied. The installer does the whole move, and nothing in it deletes the old copy.
 
-In the steps below, `<old>` is the old folder, `<new>` the fresh clone, and `<runtime-data>` the runtime-data folder: `C:\sqlite\folder-explorer\` unless `FOLDER_EXPLORER_DATA_DIR` or `FLEET_DATA_ROOT` names another place. It is never under the repo, so it needs no move when the new copy runs on the same PC.
+**Reinstall in the same folder (the usual case).** From a terminal whose current folder is outside the app:
 
-1. **Clone fresh beside it.** `git clone <this repository's URL> <new>`; never clone over `<old>`.
-2. **Stop the old copy**, so no SQLite file is copied mid-write: quit its tray from the tray menu, or stop `scripts\start.bat`'s console. When the new copy is on another PC, nothing may be running on either. If the old copy started at log on, remove its Startup entry now, or it will start again at the next sign-in.
-3. **Copy this PC's own files across.** From `<old>` into `<new>`, keeping the relative paths, copy what [What to copy](setup-and-migration.md#what-to-copy) lists: it says which files are required, optional or rebuildable, and what differs on another PC. The ones inside the checkout are gitignored, so nothing tracked is touched. Copy `.env` over a private channel, never by mail or a shared folder.
-4. **Top them up.** In `<new>`, run `.\setup.bat -WhatIf` and read what it would change, then `.\setup.bat`. `config.json` gains only the keys it lacks (after a backup); the values you copied stay as they were. On a different PC, also edit the folder paths in `config.json` ([What to edit after copying](setup-and-migration.md#what-to-edit-after-copying)).
-5. **Start the new copy.** `.\tray.bat`, and `.\setup.bat -Startup` if it should start at log on. Then set again what does not travel with a copied file (the Outlook macro, the Markdown association, a scheduler job): the second list under [What to edit after copying](setup-and-migration.md#what-to-edit-after-copying).
-6. **Verify it.** If any check fails, stop the new copy and start the old one again: it is untouched.
-   - `& .\.venv\Scripts\python.exe -m app.cli roots` lists each root and its last scan (none yet on a PC that has not scanned).
-   - Open `http://127.0.0.1:8453/`: `GET /api/version` reports the `git_sha` of `git rev-parse --short HEAD` in `<new>`.
-   - Settings → Available features shows every block you meant to keep on, and a reason on any that cannot run here.
-   - Scans → Rescan (or `.\.venv\Scripts\python.exe -m app.cli scan`) finishes, and Explore shows each root's folders with sizes.
-   - With the Email block on: `.\.venv\Scripts\python.exe -m app.cli email status` shows the index's size and last runs, and Search → Emails finds a mail you know.
-   - With remote access on: open the tailnet address from another device and sign in.
-7. **Retire the old folder, only after you confirm.** Nothing in this playbook or in `setup.bat` deletes the old copy. When you are satisfied, rename it first (for example `<old>.retired`) and run on the new copy for a while; delete it yourself once you are sure. An agent working through this playbook asks you before it deletes anything.
+```powershell
+cd <parent folder of the checkout>
+.\folder-explorer\setup.bat -InPlace -WhatIf    # read the backup name and every step; nothing changes
+.\folder-explorer\setup.bat -InPlace
+```
 
-## Uninstall
+It stops every process that runs from the folder (the tray, the web app, and a scan or an archive verb in flight), renames the folder to `folder-explorer.bak-YYYYMMDD-N`, clones the `origin` remote's default branch into the same path, then copies, installs, starts with `tray.bat --restart` and verifies. It passes only when the new clone serves its own commit. The path is unchanged, so the launcher's app entry, a scheduled scan job, the Startup shortcut and `FOLDER_EXPLORER_HOME` need no edit.
 
-1. In Settings, switch off **Associate Markdown files with this app** if you turned it on (it removes its own per-user registry entry).
-2. Quit the tray from its menu.
-3. Remove the log-on shortcut with `.\.venv\Scripts\python.exe -m src.install.startup disable`. It removes only the shortcut `setup.bat -Startup` made, and only when it points at this checkout; an entry you made yourself stays, so delete that one from `shell:startup` by hand.
-4. Remove the Outlook macro in Outlook, and the `FOLDER_EXPLORER_HOME` user environment variable, if you set them. Remove any scheduler job that runs the scan.
-5. Delete `<repo>`. Keep a copy of the files listed under [What to copy](setup-and-migration.md#what-to-copy) first if you may want them back. The scan history and indexes stay in `<runtime-data>`, so delete that folder too if you don't want to keep them.
+**Beside it (another folder, or an old copy that is not a git clone):**
+
+```powershell
+git clone <this repository's URL> <new folder>
+cd <new folder>
+.\setup.bat -MigrateFrom <old folder> -StopOld
+```
+
+Verify asks `https://127.0.0.1:8453/api/version` and accepts the tailnet certificate there. A PC that serves plain HTTP (`remote_access` off, or no certificate) or another `port` gets `[failed]` on that verify line although the app may be up: compare `http://127.0.0.1:<port>/api/version` with `git rev-parse --short HEAD` yourself.
+
+Only you can do these steps:
+
+- **Before `-InPlace`:** finish and remove any linked git worktree of the old copy. Its link points at the path the fresh clone takes over, so it stops working. Local commits, uncommitted edits and ignored files that are not listed above stay in the backup only.
+- **Repoint** what stores the old path, after a `-MigrateFrom` into another folder: the run lists the Startup links, Run keys and scheduled tasks that still point at it. Also set again what it cannot see: `FOLDER_EXPLORER_HOME` for the Outlook macro, **Associate Markdown files with this app** in Settings, and any launcher job that runs the scan.
+- **Another PC:** copy the old folder across first and use it as `<old folder>`, without `-StopOld`. Then issue a new certificate and edit the folder paths in `config.json` ([What to edit after copying](setup-and-migration.md#what-to-edit-after-copying)). Runtime data does not travel with the installer ([What to copy](setup-and-migration.md#what-to-copy)).
+- **Check the app itself:** Settings → Available features shows every block you meant to keep on; Explore shows each root's folders with sizes; with the Email block on, Search → Emails finds a mail you know; with remote access on, another device can open the tailnet address and sign in.
+- **Fall back** if verify fails (the report names the step): stop the new copy, rename the new folder away and the backup to the original name, and start it with `tray.bat`; it is untouched.
+- **Retire the backup** once you are sure the new copy works, by deleting it yourself. An agent working through this playbook asks you before it deletes anything.

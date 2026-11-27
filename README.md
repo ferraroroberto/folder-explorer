@@ -8,7 +8,7 @@ It replaces two older tools: email-archiver (the Outlook archive, its email inde
 
 ## Install
 
-On Windows with Git and Python 3.11+, clone the repo and run `.\setup.bat` (`-WhatIf` first to see what it would do). It creates `.venv`, installs the requirements, creates `config.json` and `.env` from their templates only when they're missing, and ends with a checklist of what works and what still needs you. It never overwrites a setting: on a PC that already runs the app it only adds config keys a newer version needs, after a backup, and a second run reports `unchanged`. An update is `git pull --ff-only` then `tray.bat --restart`. Fresh PC, update, migrating an existing install and uninstall: [docs/install.md](docs/install.md). What each setting means and what to edit after a move: [docs/setup-and-migration.md](docs/setup-and-migration.md).
+On Windows with Git and Python 3.11+, clone the repo and run `.\setup.bat` (`-WhatIf` first to see what it would do). It creates `.venv`, installs the requirements, creates `config.json` and `.env` from their templates only when they're missing, and ends with a checklist of what works and what still needs you. It never overwrites a setting: on a PC that already runs the app it only adds config keys a newer version needs, after a backup, and a second run reports `unchanged`. An update is `git pull --ff-only` then `tray.bat --restart`. Install, update, migrate and uninstall: [docs/install.md](docs/install.md). What each setting means and what to edit after a move: [docs/setup-and-migration.md](docs/setup-and-migration.md).
 
 ## Run
 
@@ -114,7 +114,7 @@ The first tab searches **Folders**, **Documents** (Markdown and HTML files) or *
 powershell -File scripts\verify-before-ship.ps1
 ```
 
-Byte-compile, the unit tests, the browser suite (Chromium desktop and WebKit iPhone against a disposable instance over an invented tree), the eleven fleet ratchets and this repo's own README feature-bullet ratchet. Needs `requirements-dev.txt` and Node (`npx`) for the static ratchet.
+Byte-compile, the unit tests, the browser suite (Chromium desktop and WebKit iPhone against a disposable instance over an invented tree), the thirteen fleet ratchets and this repo's own README feature-bullet ratchet. Needs `requirements-dev.txt` and Node (`npx`) for the static ratchet.
 
 The last stdout line of a run is `GATE-RESULT: PASS` or `GATE-RESULT: FAIL`, on a pass, a failed stage, a missing `.venv` and an unhandled error; exit codes are 0 and 1. Do not pipe the gate when its exit code matters (`| tail` reports `tail`'s status); a caller that must pipe asserts on that line, and a run without it is not a pass.
 

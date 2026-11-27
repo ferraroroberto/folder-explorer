@@ -25,7 +25,7 @@ All of `config.json`, `.env`, `mailboxes.json`, `config\app_password.json` and `
 
 ## What to copy
 
-The list [a migration](install.md#migrate-from-an-existing-install) works from. The `<runtime-data>` rows apply only when the new copy uses another runtime-data folder than the old one did, which is always the case on another computer.
+The list [a migration](install.md#migrate) works from. The `<runtime-data>` rows apply only when the new copy uses another runtime-data folder than the old one did, which is always the case on another computer.
 
 | What | Required? | Notes |
 | --- | --- | --- |

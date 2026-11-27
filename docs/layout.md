@@ -97,6 +97,8 @@ folder-explorer/
 │   ├── config.py               # config.json with defaults and validation
 │   ├── child.py                # runs one of this app's own modules as a windowless, UTF-8 child (an archive verb, a mail read, the email stage)
 │   ├── installer.py            # vendored: what `setup.bat` runs (docs/install.md); the app's own inputs are the `[install]` table of .fleet.toml
+│   ├── installer_migrate.py  # vendored: `setup.bat -MigrateFrom` (docs/install.md#migrate), loaded by path, never imported by the app
+│   ├── installer_inplace.py  # vendored: `setup.bat -InPlace`, run from a temporary copy beside installer_migrate.py
 │   ├── install/                # the entries that table declares, standard library only: startup (the opt-in Startup shortcut to tray.bat),
 │   │                           #   probes (sign-in token and password, app answering: the checklist's app-specific rows)
 │   ├── ps_script.py            # starts a repo PowerShell script under any execution policy (AllSigned included) without weakening it
@@ -119,7 +121,7 @@ folder-explorer/
 │                               #   tests/repo checks over the repo's own source (each shared rule spelled in one module),
 │                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
-├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this
+├── scripts/                    # the gate, the thirteen vendored ratchets (the UX surface one with its map generator), this
 │                               #   repo's own readme_index_ratchet.py (README feature-bullet word count), gen_icons,
 │                               #   gen_tailscale_cert, gen_token, standalone_restart (tray.bat --restart on a PC without the shared
 │                               #   tray helper, and the owned ports tray.bat reads from the config), disposable_webapp (the throwaway
@@ -127,7 +129,7 @@ folder-explorer/
 │                               #   design_review_synthetic (prints that instance's URL for `/design-review --synthetic` and `measure --e2e`)
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, install.md (fresh PC, update, migrate, uninstall), setup-and-migration.md (reference: the machine-local settings and state files, what to copy and edit on a move, the retired tools, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, email-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, install.md (install, update, migrate, uninstall), setup-and-migration.md (reference: the machine-local settings and state files, what to copy and edit on a move, the retired tools, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, email-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

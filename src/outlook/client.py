@@ -13,8 +13,8 @@ Design decisions:
 - The batch surface (ensure_running / iter_inbox / iter_inbox_received_since /
   find_by_message_id / archive_ref / item_ids / refetch / is_same_object /
   move_to / set_category / clear_category / is_open_in_inspector /
-  view_away_from_inbox) lives here too, so batch.py stays pure orchestration
-  and can be driven by a fake client in tests.
+  view_away_from_inbox) lives here too, so src/email/batch/verbs.py stays pure
+  orchestration and can be driven by a fake client in tests.
 - Every folder (Inbox, Sent, the archive folder, Drafts) comes from
   ``store()``: the store of the mailbox the client was built for, resolved by
   address in outlook/stores.py — never from the namespace's default folders.
@@ -127,7 +127,7 @@ def sent_datetime(mail_item: Any) -> datetime | None:
     """The mail's sent time as a stdlib datetime, or ``None``.
 
     Tries ``SentOn`` (when it was actually sent) before ``ReceivedTime``.
-    ``archiver._get_sent_date_prefix`` formats this same value for its
+    ``src.email.archive._get_sent_date_prefix`` formats this same value for its
     ``YYYY-MM-DD -`` filename prefix, so the date a plan reports and the date
     a prefix carries cannot disagree. pywintypes datetimes are rebuilt field
     by field rather than passed through, which is what the caller sees as a
@@ -237,9 +237,9 @@ class OutlookClient(DraftSurface):
 
     # ------------------------------------------------------ batch surface ---
     #
-    # Used only by src/email/batch/. Everything below keeps COM inside
-    # this class: the batch layer receives InboxMail dataclasses and opaque
-    # item handles, so it can be driven end to end by a fake client.
+    # Used by src/email/batch/, the Archive sheet and the Outlook bridge.
+    # Everything below keeps COM inside this class: callers receive InboxMail
+    # dataclasses and opaque item handles, so a fake client can drive them.
 
     def ensure_running(
         self, timeout: float = DEFAULT_START_TIMEOUT_SECONDS
@@ -324,10 +324,11 @@ class OutlookClient(DraftSurface):
     def iter_inbox(self, preview_len: int = 500) -> Iterator[InboxMail]:
         """Yield every MailItem in the Inbox as an :class:`InboxMail`.
 
-        ``preview_len`` is the scanner's ``scanning.body_preview_length`` so the
-        preview a plan shows and the preview the index stores are the same
-        string. Non-mail items (meeting requests, delivery reports) are skipped:
-        they have no ``SaveAs``-able shape this app archives.
+        The batch verbs pass ``archive_settings.BODY_PREVIEW_LENGTH`` as
+        ``preview_len``, the length the email index stores, so a plan's preview
+        and an indexed one are cut alike. Non-mail items (meeting requests,
+        delivery reports) are skipped: they have no ``SaveAs``-able shape this
+        app archives.
         """
         yield from self._iter_items(self._inbox().Items, preview_len)
 
@@ -493,7 +494,7 @@ class OutlookClient(DraftSurface):
     @staticmethod
     def _flag_status(item: Any) -> int:
         """Outlook's follow-up flag, read from the same MAPI property the
-        scanner reads back out of the archived .msg (0x1090). Absent means
+        email stage reads back out of the archived .msg (0x1090). Absent means
         unflagged, so 0 is a real answer, not a swallowed error."""
         value = safe_com(
             lambda: item.PropertyAccessor.GetProperty(DASL_FLAG_STATUS), None

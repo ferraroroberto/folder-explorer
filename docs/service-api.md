@@ -60,7 +60,7 @@ An email index no run built (imported) or one owned by another app (`email.index
 | `limit` | 30 | 1 to 200 |
 | `within` | none | a folder path; repeat it for several. Only those folders and everything below them are searched (a root's own path keeps the whole root). It is also the fast path: a scoped search reads an id range, not every folder on every drive. |
 
-Matching is the Search tab's (docs/folder-search.md): case and accents never matter, and results come in tiers that never interleave, `exact` (every word), `partial` (at least half), `similar` (at least half counting a near spelling) and, only when nothing else matched, up to 20 `closest` folders by name. A folder of people (subfolders named like email addresses) folds into one result (`folder_search.prune_people`), and a OneDrive folder is listed once (`folder_search.onedrive_prevails`).
+Matching is the Search tab's (docs/folder-search.md): case and accents never matter, and results come in tiers that never interleave, `exact` (every word), `partial` (at least half), `similar` (at least half counting a near spelling) and, only when nothing else matched, up to 20 `closest` folders by name. A folder of people (subfolders named like email addresses) folds into one result (`folder_search.prune_people`), and a folder two roots reach is listed once (docs/folder-search.md#one-row-per-folder; `folder_search.onedrive_prevails` off also lists a OneDrive folder under its drive).
 
 ```json
 {"schema_version": 1, "state": "ok", "reason": null, "query": "alpha budget",

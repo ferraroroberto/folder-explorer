@@ -93,7 +93,7 @@ folder-explorer/
 │   ├── scan_runner.py          # one-at-a-time scan runs, the background worker and the schedule
 │   ├── scan_lock.py            # the cross-process scan lock and its free / held / unreadable probe
 │   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
-│   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated; the path-inside-a-folder tests
+│   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated; the path-inside-a-folder tests, by spelling and by volume serial and file ID
 │   ├── config.py               # config.json with defaults and validation
 │   ├── child.py                # runs one of this app's own modules as a windowless, UTF-8 child (an archive verb, a mail read, the email stage)
 │   ├── installer.py            # vendored: what `setup.bat` runs (docs/install.md); the app's own inputs are the `[install]` table of .fleet.toml

@@ -69,6 +69,43 @@ def relative_parts(inner: str, outer: str) -> Optional[list[str]]:
     return [p for p in a[len(b.rstrip("\\/")):].split(os.sep) if p]
 
 
+def folder_identity(path: str) -> Optional[tuple[int, int]]:
+    """The volume serial and file ID of the folder ``path`` reaches, or ``None`` when they can't be read."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_dev, st.st_ino) if st.st_ino else None
+
+
+def parts_within(inner: str, outer: str) -> Optional[list[str]]:
+    """The folder names from ``outer`` down to ``inner`` by the folders the two paths reach, however they are spelled.
+
+    Empty when both are one folder, ``None`` when ``inner`` is not inside
+    ``outer``. Resolved paths answer first; a spelling they can't relate (a
+    share onto a local folder) is matched by volume serial and file ID.
+    """
+    a, b = normalize(inner), normalize(outer)
+    if key_within(a, b):
+        return [p for p in a[len(b.rstrip("\\/")):].split(os.sep) if p]
+    here, there = os.path.realpath(inner), os.path.realpath(outer)
+    drives = [os.path.splitdrive(p)[0].lower() for p in (here, there)]
+    # Two drive letters are two volumes, and a cloned disk repeats both numbers, so their IDs are never compared.
+    if drives[0] != drives[1] and all(len(d) == 2 for d in drives):
+        return None
+    wanted = folder_identity(there)
+    if wanted is None:
+        return None
+    names: list[str] = []
+    while folder_identity(here) != wanted:
+        parent, name = os.path.split(here)
+        if not name or parent == here:
+            return None
+        names.insert(0, name)
+        here = parent
+    return names
+
+
 def innermost_root(path: str, roots: list[Root]) -> Optional[Root]:
     """The deepest root holding ``path``, which is the one that answers for it; ``None`` when no root does."""
     return next((r for r in sorted(roots, key=lambda r: len(r.path), reverse=True) if is_under(path, r.path)), None)

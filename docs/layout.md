@@ -125,7 +125,7 @@ folder-explorer/
 │                               #   design_review_synthetic (prints that instance's URL for `/design-review --synthetic` and `measure --e2e`)
 ├── assets/                     # tray icon and Stream Deck tile from scripts/gen_icons.py, and ArchiveMacro.bas
 │                               #   (the Outlook macro template, no paths)
-└── docs/                       # this file, install.md (fresh PC, update, migrate, uninstall), setup-and-migration.md (set up on another machine, what to copy, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, email-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
+└── docs/                       # this file, install.md (fresh PC, update, migrate, uninstall), setup-and-migration.md (reference: the machine-local settings and state files, what to copy and edit on a move, the retired tools, the feature blocks), scanning.md, service-api.md (the v1 search and archive API), folder-search.md, email-search.md, desktop-open.md, ux-surfaces.yaml (the UX surface map, the one source) with the ux-surface-map.md page generated from it, and design/ (the search study and the app mock-up, invented data)
 ```
 
 ## Where new code goes

@@ -25,19 +25,19 @@ cd folder-explorer
 2. installs `requirements.txt`, and later reinstalls only when that file changed (its hash is kept inside `.venv`);
 3. runs the dependency step, `pip install` of `requirements-tray.txt`, `requirements-email.txt` and `requirements-outlook.txt`, again only when one of those files changed;
 4. creates `config.json` from `config.example.json` and `.env` from `.env.example` when they are missing;
-5. ends with a checklist that marks each item `ok`, `missing` or `unknown`.
+5. ends with two lists: the required items, each `ok`, `missing` or `unknown`, and the optional features, each `available`, `off` or `unknown` with what it unlocks.
 
 Each step prints `created`, `installed`, `added` or `unchanged`; a `failed` line names what went wrong and the run exits 1. Every key in `config.json` has a default, so it needs no edit until you change something.
 
-The checklist names what still needs you:
+Setup has succeeded when it ends with `Setup complete` and exits 0; an optional feature that is `off` never changes that. The optional features, each needed only for what it unlocks:
 
 - **Sign-in password**, **Sign-in token**, **Tailnet certificate**: needed only to open the app from a phone over the tailnet. This PC alone uses the app without them. They are set with `.\.venv\Scripts\python.exe -m src.password set`, `.\.venv\Scripts\python.exe scripts\gen_token.py` and `.\.venv\Scripts\python.exe scripts\gen_tailscale_cert.py`.
-- **App answering on its port**: `ok` when something answers `/api/version` on the configured port. It does not say which checkout answers, so compare the build it reports with `git rev-parse --short HEAD`.
+- **App answering on its port**: `available` when something answers `/api/version` on the configured port. It does not say which checkout answers, so compare the build it reports with `git rev-parse --short HEAD`.
 - **Start at log on**: optional. `.\setup.bat -Startup` adds a shortcut to `tray.bat` in your Startup folder, only when no Startup entry already starts this checkout's tray.
 
 Then open `http://127.0.0.1:8453/` and set the rest in Settings: the folders to scan, the email folders, and **Available features** (switch off a block this PC cannot run). Press **Rescan** in the Scans tab. [setup-and-migration.md](setup-and-migration.md) has the details for each setting.
 
-Check it worked: the checklist shows `ok` for `.venv`, `Requirements installed`, `config.json` and `.env`, and the Explore tab shows each root's folders with sizes after the first scan.
+Check it worked: the required list shows `ok` for `.venv`, `Requirements installed`, `config.json` and `.env`, and the Explore tab shows each root's folders with sizes after the first scan.
 
 ## Update
 

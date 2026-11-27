@@ -24,7 +24,7 @@ The copy list was derived from the code, not from memory: every path the app rea
 2. Run the app: `tray.bat` for the always-on tray, or `scripts\start.bat` for a console. Open `http://127.0.0.1:8453/`. `.\setup.bat -Startup` starts the tray at sign-in.
 3. In **Settings → Available features** switch off every block this machine cannot run (a block whose dependency is missing says why on its row). Blocks are on by default; a change applies at once, except the Screenshot block, which applies when the tray next starts (`tray.bat --restart`). Every block's packages are installed by `setup.bat`, so switching one on needs no install.
 4. Set the folders: **Folders to scan** (default: every fixed drive and each OneDrive folder), and, if you use the Email block, **Email folders**. Press **Rescan** in the Scans tab, or run `& .\.venv\Scripts\python.exe -m app.cli scan`.
-5. Optional, remote access from a phone: `scripts\gen_tailscale_cert.py`, then `python -m src.password set` and `scripts\gen_token.py`, then restart (README, Remote access). The installer's checklist shows each as `missing` until it is done.
+5. Optional, remote access from a phone: `scripts\gen_tailscale_cert.py`, then `python -m src.password set` and `scripts\gen_token.py`, then restart (README, Remote access). The installer's checklist shows each as `off` until it is done.
 6. Optional, the Outlook macro: set `FOLDER_EXPLORER_HOME` to `<repo>` for the user (Settings → Outlook macro prints the exact line) and import `assets\ArchiveMacro.bas` in Outlook.
 7. Optional, a nightly scan: a scheduler job that runs `& <repo>\.venv\Scripts\python.exe -m app.cli scan`, with Settings → Scan schedule left `off` so two schedules never double-run.
 

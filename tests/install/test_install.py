@@ -167,10 +167,10 @@ def test_the_dependency_step_reruns_when_a_requirements_file_changes(checkout: P
 
 def test_the_checklist_names_the_sign_in_and_certificate_items_with_their_commands(checkout: Path) -> None:
     report = _run(checkout)
-    names = [item for _, item, _ in report.checklist]
+    names = [item for _, item, _ in report.optional]
     for wanted in ("Sign-in password", "Sign-in token", "Tailnet certificate", "App answering on its port", "Start at log on"):
         assert wanted in names
-    cert = next(detail for _state, item, detail in report.checklist if item == "Tailnet certificate")
+    cert = next(detail for _state, item, detail in report.optional if item == "Tailnet certificate")
     assert "gen_tailscale_cert.py" in cert
 
 

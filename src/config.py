@@ -100,6 +100,17 @@ DEFAULTS: dict[str, Any] = {
     "features": dict(features.DEFAULTS),
 }
 
+# The blocks that hold exactly one setting: block -> (its key, what it accepts: bool, or the values to choose from).
+_ONE_SETTING: dict[str, tuple[str, Any]] = {
+    "explore": ("show_hidden", bool),
+    "search": ("markdown", bool),
+    "docs": ("block_remote_html", bool),
+    "desktop": ("reuse_explorer_window", bool),
+    "macro": ("prefer_window", bool),
+    "tray": ("left_click", LEFT_CLICKS),
+    "quick_search": ("open_folder", bool),
+}
+
 # The outlook keys the Settings screen switches; the rest of the block is edited in config.json.
 OUTLOOK_SWITCHES = ("add_category", "move_to_archive")
 
@@ -161,13 +172,8 @@ def _clean(raw: dict[str, Any]) -> dict[str, Any]:
     cfg["exclude"] = _clean_paths(raw.get("exclude"))
     cfg["email"] = _clean_email(raw.get("email"))
     cfg["folder_search"] = _clean_folder_search(raw.get("folder_search"))
-    cfg["explore"] = _clean_explore(raw.get("explore"))
-    cfg["search"] = _clean_search(raw.get("search"))
-    cfg["docs"] = _clean_docs(raw.get("docs"))
-    cfg["desktop"] = _clean_desktop(raw.get("desktop"))
-    cfg["macro"] = _clean_macro(raw.get("macro"))
-    cfg["tray"] = _clean_tray(raw.get("tray"))
-    cfg["quick_search"] = _clean_quick_search(raw.get("quick_search"))
+    for block in _ONE_SETTING:
+        cfg[block] = _clean_one_setting(block, raw.get(block))
     cfg["archive"] = _clean_archive(raw.get("archive"))
     cfg["outlook"] = _clean_outlook(raw.get("outlook"))
     cfg["snap"] = snap_settings.clean(raw.get("snap"))
@@ -248,52 +254,16 @@ def _clean_folder_search(raw: Any) -> dict[str, Any]:
     return out
 
 
-def _clean_explore(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["explore"])
-    if isinstance(raw, dict) and isinstance(raw.get("show_hidden"), bool):
-        out["show_hidden"] = raw["show_hidden"]
-    return out
+def _accepts(allowed: Any, value: Any) -> bool:
+    # A switch takes a real boolean only: 1 and 0 compare equal to True and False.
+    return isinstance(value, bool) if allowed is bool else value in allowed
 
 
-def _clean_search(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["search"])
-    if isinstance(raw, dict) and isinstance(raw.get("markdown"), bool):
-        out["markdown"] = raw["markdown"]
-    return out
-
-
-def _clean_docs(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["docs"])
-    if isinstance(raw, dict) and isinstance(raw.get("block_remote_html"), bool):
-        out["block_remote_html"] = raw["block_remote_html"]
-    return out
-
-
-def _clean_desktop(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["desktop"])
-    if isinstance(raw, dict) and isinstance(raw.get("reuse_explorer_window"), bool):
-        out["reuse_explorer_window"] = raw["reuse_explorer_window"]
-    return out
-
-
-def _clean_macro(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["macro"])
-    if isinstance(raw, dict) and isinstance(raw.get("prefer_window"), bool):
-        out["prefer_window"] = raw["prefer_window"]
-    return out
-
-
-def _clean_tray(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["tray"])
-    if isinstance(raw, dict) and raw.get("left_click") in LEFT_CLICKS:
-        out["left_click"] = raw["left_click"]
-    return out
-
-
-def _clean_quick_search(raw: Any) -> dict[str, Any]:
-    out: dict[str, Any] = dict(DEFAULTS["quick_search"])
-    if isinstance(raw, dict) and isinstance(raw.get("open_folder"), bool):
-        out["open_folder"] = raw["open_folder"]
+def _clean_one_setting(block: str, raw: Any) -> dict[str, Any]:
+    name, allowed = _ONE_SETTING[block]
+    out: dict[str, Any] = dict(DEFAULTS[block])
+    if isinstance(raw, dict) and _accepts(allowed, raw.get(name)):
+        out[name] = raw[name]
     return out
 
 
@@ -334,32 +304,12 @@ def validate_update(updates: dict[str, Any]) -> dict[str, Any]:
             value = _validate_email(value)
         if key == "folder_search":
             value = _validate_folder_search(value)
-        if key == "explore":
-            if not (isinstance(value, dict) and set(value) == {"show_hidden"} and isinstance(value["show_hidden"], bool)):
-                raise ValueError("explore takes show_hidden, true or false")
-        if key == "search":
-            if not (isinstance(value, dict) and set(value) == {"markdown"} and isinstance(value["markdown"], bool)):
-                raise ValueError("search takes markdown, true or false")
-        if key == "docs":
-            if not (isinstance(value, dict) and set(value) == {"block_remote_html"} and isinstance(value["block_remote_html"], bool)):
-                raise ValueError("docs takes block_remote_html, true or false")
-        if key == "desktop":
-            if not (isinstance(value, dict) and set(value) == {"reuse_explorer_window"}
-                    and isinstance(value["reuse_explorer_window"], bool)):
-                raise ValueError("desktop takes reuse_explorer_window, true or false")
-        if key == "macro":
-            if not (isinstance(value, dict) and set(value) == {"prefer_window"} and isinstance(value["prefer_window"], bool)):
-                raise ValueError("macro takes prefer_window, true or false")
-        if key == "tray":
-            if not (isinstance(value, dict) and set(value) == {"left_click"} and value["left_click"] in LEFT_CLICKS):
-                raise ValueError("tray takes left_click, one of " + ", ".join(LEFT_CLICKS))
+        if key in _ONE_SETTING:
+            _validate_one_setting(key, value)
         if key == "snap":
             value = _validate_snap(value)
         if key == "features":
             value = features.validate(value)
-        if key == "quick_search":
-            if not (isinstance(value, dict) and set(value) == {"open_folder"} and isinstance(value["open_folder"], bool)):
-                raise ValueError("quick_search takes open_folder, true or false")
         if key == "outlook":
             if not (isinstance(value, dict) and value and set(value) <= set(OUTLOOK_SWITCHES)
                     and all(isinstance(v, bool) for v in value.values())):
@@ -378,6 +328,13 @@ def _validate_snap(value: Any) -> dict[str, Any]:
     if "folder" in value:
         raise ValueError("The save folder is changed from the tray menu or config.json on this PC, never from a page")
     return snap_settings.validate(value)
+
+
+def _validate_one_setting(block: str, value: Any) -> None:
+    name, allowed = _ONE_SETTING[block]
+    if not (isinstance(value, dict) and set(value) == {name} and _accepts(allowed, value[name])):
+        choices = "true or false" if allowed is bool else "one of " + ", ".join(allowed)
+        raise ValueError(f"{block} takes {name}, {choices}")
 
 
 def _validate_email(value: Any) -> dict[str, Any]:

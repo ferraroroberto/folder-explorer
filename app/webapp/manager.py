@@ -86,6 +86,10 @@ class WebappManager:
             return self._spawn()
 
     def _spawn(self) -> int:
+        # A respawn comes with no stop() first, and Windows cannot unlink a log still open here.
+        if self._log is not None:
+            self._log.close()
+            self._log = None
         log_path = store.data_dir() / "webapp.log"
         if log_path.exists() and log_path.stat().st_size > _LOG_MAX_BYTES:
             log_path.unlink()

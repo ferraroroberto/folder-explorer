@@ -93,6 +93,27 @@ def test_typing_searches_after_a_pause_and_paints_the_rows(window: tuple[QuickSe
     assert [c[1] for c in fake.calls] == ["/api/search/folders"]
 
 
+def test_the_window_never_leans_on_tkinters_default_root(tk_root: tk.Tk, monkeypatch: pytest.MonkeyPatch,
+                                                        caplog: pytest.LogCaptureFixture) -> None:
+    """In the tray the default root is the screenshot's, made first: a variable left to it never sees this window's typing.
+
+    Switching the default root off makes any such variable raise, without starting a second Tcl interpreter here.
+    """
+    monkeypatch.setattr(tk, "_default_root", None)
+    monkeypatch.setattr(tk, "_support_default_root", False)
+    caplog.set_level("INFO", logger="src.search_window.view")
+    view = QuickSearchView(QuickSearchModel(SearchClient(lambda: "", send=FakeApi())), theme.palette(False), tk_root)
+    try:
+        view.build()
+        view.entry.insert("end", "harbour trip")  # typed into the widget, as a person does, not set on the variable
+        _settle(view)
+        assert view.model.status is Status.RESULTS and "harbour-trip" in _text(view)
+        assert "quick search: folders, query length 12: results, 1 rows" in caplog.text
+        assert "harbour" not in caplog.text, "the log holds the length, never the query"
+    finally:
+        view.frame.destroy()
+
+
 def test_the_emails_tab_searches_the_same_query(window: tuple[QuickSearchView, FakeApi]) -> None:
     view, fake = window
     view.query.set("budget")

@@ -98,7 +98,8 @@ folder-explorer/
 │   ├── child.py                # runs one of this app's own modules as a windowless, UTF-8 child (an archive verb, a mail read, the email stage)
 │   ├── installer.py            # vendored: what `setup.bat` runs (docs/install.md); the app's own inputs are the `[install]` table of .fleet.toml
 │   ├── installer_migrate.py  # vendored: `setup.bat -MigrateFrom` (docs/install.md#migrate), loaded by path, never imported by the app
-│   ├── installer_inplace.py  # vendored: `setup.bat -InPlace`, run from a temporary copy beside installer_migrate.py
+│   ├── installer_declaration.py  # vendored: parses [install.migrate] / [install.endpoint]; installer_migrate.py loads it by path
+│   ├── installer_inplace.py  # vendored: `setup.bat -InPlace`, run from a temporary copy beside installer_migrate.py and installer_declaration.py
 │   ├── install/                # the entries that table declares, standard library only: startup (the opt-in Startup shortcut to tray.bat),
 │   │                           #   probes (sign-in token and password, app answering: the checklist's app-specific rows)
 │   ├── ps_script.py            # starts a repo PowerShell script under any execution policy (AllSigned included) without weakening it

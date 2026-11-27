@@ -107,8 +107,8 @@ def item_path(root: Root, index: Index, kind: str, item_id: int) -> str:
 def _listed(index: Index, names: list[str]) -> bool:
     """Whether the scan listed something in the folder ``names`` leads to.
 
-    An empty row (a root that is itself a junction, a folder the scan could not
-    read) must not stand in for another root's copy.
+    An empty row (a folder that was empty when scanned, or that the scan could
+    not read) must not stand in for another root's copy.
     """
     fid = index.find_folder(names)
     if fid is None:

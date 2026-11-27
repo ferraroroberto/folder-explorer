@@ -28,7 +28,7 @@ Checked on a real online-only document before and after full walks of its tree: 
 
 ## Links
 
-A folder whose reparse tag is a name surrogate (a junction, a symlink, a mount point) is counted in `skipped_links` and never followed, so no bytes are counted twice and no walk loops. OneDrive's own cloud reparse tags are not name surrogates, so synced folders are walked normally.
+A folder whose reparse tag is a name surrogate (a junction, a symlink, a mount point) is counted in `skipped_links` and never followed, so no bytes are counted twice and no walk loops. The one exception is a folder you named as a root that is itself a junction or symlink: it is listed at its target, under the path as you configured it, because opening the link itself lists nothing. A junction below such a root is still not followed, and a root whose link leads nowhere fails its scan with the reason in the Scans tab. OneDrive's own cloud reparse tags are not name surrogates, so synced folders are walked normally.
 
 ## The index
 

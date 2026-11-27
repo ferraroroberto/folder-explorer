@@ -8,18 +8,24 @@ write time, so a scan reads both figures without opening a single file. That
 is what keeps an online-only OneDrive placeholder online-only: nothing here
 reads data, so the sync client has nothing to download.
 
+A junction or symlink is listed as the link it is, never its target, except
+one the user named as a root (:func:`name_root`).
+
 Elsewhere (CI, a developer laptop) ``os.scandir`` + ``lstat`` gives the same
 record shape, with ``st_blocks`` standing in for the allocation.
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import stat
 import struct
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 FILE_ATTRIBUTE_HIDDEN = 0x2
 FILE_ATTRIBUTE_SYSTEM = 0x4
@@ -104,6 +110,46 @@ def extended_path(path: str) -> str:
     return "\\\\?\\" + absolute
 
 
+# The configured roots that are themselves links, as ``_spelled`` writes them.
+_linked_roots: set[str] = set()
+
+
+def _spelled(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path)).rstrip("\\/")
+
+
+def _is_link_folder(path: str) -> bool:
+    try:
+        st = os.lstat(os.path.abspath(path))
+    except OSError:
+        return False
+    return bool(getattr(st, "st_reparse_tag", 0) & REPARSE_TAG_NAME_SURROGATE)
+
+
+def name_root(path: str) -> None:
+    """Record that the user named ``path`` as a root.
+
+    A root that is itself a junction or symlink is then listed at its target,
+    or it would list as empty. Every other link stays listed as itself.
+    """
+    key = _spelled(path)
+    if not _is_link_folder(path):
+        _linked_roots.discard(key)
+    elif key not in _linked_roots:
+        _linked_roots.add(key)
+        logger.info("ℹ️ a configured root is itself a link; it is listed at its target")
+
+
+def _folder_to_open(path: str) -> str:
+    """``path``, or the target of the linked root it names; ``OSError`` when that link resolves to no folder."""
+    if not _linked_roots or _spelled(path) not in _linked_roots:
+        return path
+    target = os.path.realpath(path)
+    if _is_link_folder(target):
+        raise OSError("the link does not lead to a folder")
+    return target
+
+
 def _filetime_to_unix(ticks: int) -> int:
     if ticks <= _FILETIME_UNIX_EPOCH:
         return 0
@@ -152,10 +198,11 @@ if sys.platform == "win32":
         """Every record in ``path``, read through one directory handle.
 
         The handle asks for ``FILE_LIST_DIRECTORY`` only and opens the reparse
-        point itself, so neither the folder nor any file in it is read.
+        point itself (a linked root's target aside), so neither the folder nor
+        any file in it is read.
         """
         handle = _k32.CreateFileW(
-            extended_path(path), _FILE_LIST_DIRECTORY, _FILE_SHARE_ALL, None, _OPEN_EXISTING,
+            extended_path(_folder_to_open(path)), _FILE_LIST_DIRECTORY, _FILE_SHARE_ALL, None, _OPEN_EXISTING,
             _FILE_FLAG_BACKUP_SEMANTICS | _FILE_FLAG_OPEN_REPARSE_POINT, None,
         )
         if handle is None or handle == _INVALID_HANDLE:

@@ -14,6 +14,8 @@ import sys
 from dataclasses import dataclass
 from typing import Optional
 
+from src import winfs
+
 # Environment variables the OneDrive client sets for the personal and the
 # work account; either, both or neither may exist, often with the same value.
 ONEDRIVE_ENV_VARS = ("OneDrive", "OneDriveConsumer", "OneDriveCommercial")
@@ -179,7 +181,8 @@ def resolve_roots(configured: Optional[list[str]]) -> list[Root]:
     ``configured`` of ``None`` (the default) means every fixed drive plus each
     OneDrive folder. A list names the root paths explicitly. Paths that do not
     exist are kept, so the Scans tab can say the root is missing rather than
-    silently dropping it.
+    silently dropping it. Each is named to the lister, so a root that is itself
+    a junction lists its target.
     """
     synced = {normalize(p) for p in onedrive_folders()}
     paths = fixed_drives() + onedrive_folders() if configured is None else [p for p in configured if str(p).strip()]
@@ -200,5 +203,6 @@ def resolve_roots(configured: Optional[list[str]]) -> list[Root]:
         while key in keys:
             key, n = stem + "-" + str(n), n + 1
         keys.add(key)
+        winfs.name_root(path)
         roots.append(Root(key, name, path, kind))
     return roots

@@ -66,17 +66,26 @@ def test_a_root_reached_through_a_junction_is_listed_once_and_logged(tmp_path: P
         os.rmdir(above)
 
 
-def test_the_first_configured_root_wins_and_a_root_that_is_a_junction_hides_nothing(tmp_path: Path) -> None:
+def test_the_first_configured_root_wins_and_a_root_that_is_a_junction_is_one_of_them(tmp_path: Path) -> None:
     drive = tmp_path / "drive"
     library = build(drive / "Library")
     inner, outer = entry(tmp_path, "inner", library), entry(tmp_path, "outer", drive)
     assert budgets([outer, inner]) == ["outer"] and budgets([inner, outer]) == ["inner"]
     link = junction(tmp_path / "link", library)
     try:
-        # The scan opens a junction itself, not its target, so this root's index is empty.
-        assert budgets([entry(tmp_path, "empty", link), outer]) == ["outer"]
+        # A root that is a junction lists its target, so it is one more root reaching the same folder.
+        linked = entry(tmp_path, "linked", link)
+        assert budgets([linked, outer]) == ["linked"] and budgets([outer, linked]) == ["outer"]
+        assert budgets([linked, inner]) == ["linked"]
     finally:
         os.rmdir(link)
+
+
+def test_a_root_whose_scan_listed_nothing_hides_no_other_roots_copy(tmp_path: Path) -> None:
+    library = build(tmp_path / "drive" / "Library")
+    scan_to_index(str(library), tmp_path / "empty.sqlite3", lister=lambda path: iter(()))
+    empty = Root("empty", "empty", str(library), "local"), Index(open_index(tmp_path / "empty.sqlite3"))
+    assert budgets([empty, entry(tmp_path, "outer", tmp_path / "drive")]) == ["outer"]
 
 
 def test_two_synced_roots_onto_one_library_are_listed_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

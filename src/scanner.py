@@ -307,10 +307,12 @@ def scan_to_index(
     Raises ``FileNotFoundError`` when the root itself cannot be listed; a
     folder below it that cannot be listed (access denied, vanished mid-walk)
     is counted in ``errors`` and the walk goes on. Junctions, symlinks and
-    mount points are counted in ``skipped_links`` and never followed. A folder
+    mount points are counted in ``skipped_links`` and never followed; a root
+    that is itself one is the exception, listed at its target. A folder
     whose ``exclude_key`` is in ``exclude`` is counted in ``excluded`` and not walked.
     ``root_name`` labels the top folder (the root's display name).
     """
+    winfs.name_root(root_path)
     part = index_path.with_name(index_path.name + ".part")
     conn = _open_index(part)
     walk = _Walk(conn, lister, exclude)

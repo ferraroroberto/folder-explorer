@@ -270,14 +270,20 @@ class CaptureOverlay:
             atomic_write_bytes(path, data.getvalue())
         except Exception:  # noqa: BLE001 - an unwritable folder must not leave the overlay state stuck
             logger.exception("❌ snap: saving the capture failed")
+            if self.config.copy_to_clipboard:
+                if copy_image_to_clipboard(crop):
+                    logger.warning("⚠️ snap: no file was saved, so only the image was put on the clipboard")
+                else:
+                    logger.warning("⚠️ snap: no file was saved and the clipboard stayed locked by another app; the capture is lost")
             self._finish()
             return
-        copied = copy_image_to_clipboard(crop) if self.config.copy_to_clipboard else None
+        as_file = path if self.config.copy_as_file else None
+        copied = copy_image_to_clipboard(crop, as_file) if self.config.copy_to_clipboard else None
         if copied is False:
             logger.warning("⚠️ snap: clipboard stayed locked by another app; the file was saved anyway")
         logger.info(
-            "✅ snap: saved %s (%dx%d, %d bytes), clipboard=%s, release-to-file %.0f ms, hotkey-to-file %.0f ms",
-            path, crop.width, crop.height, path.stat().st_size, copied,
+            "✅ snap: saved %s (%dx%d, %d bytes), clipboard=%s, as_file=%s, release-to-file %.0f ms, hotkey-to-file %.0f ms",
+            path, crop.width, crop.height, path.stat().st_size, copied, bool(copied and as_file),
             (time.perf_counter() - t_release) * 1000, (time.perf_counter() - self._t0) * 1000,
         )
         self._finish()

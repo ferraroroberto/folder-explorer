@@ -23,6 +23,8 @@ DEFAULTS: dict[str, Any] = {
     "hotkey": "ctrl+shift+a",
     "jpeg_quality": 90,
     "copy_to_clipboard": True,
+    # With copy_to_clipboard, the saved file goes on the clipboard beside the image, so it pastes into a folder.
+    "copy_as_file": True,
     "file_prefix": "snap",
     "show_loupe": True,
     # false: click to anchor a corner, move, click again to save; true: press, drag, release.
@@ -38,6 +40,7 @@ class SnapConfig:
     hotkey: str
     jpeg_quality: int
     copy_to_clipboard: bool
+    copy_as_file: bool
     file_prefix: str
     show_loupe: bool
     hold_to_capture: bool
@@ -84,6 +87,7 @@ _CHECKS = {
     "hotkey": _hotkey,
     "jpeg_quality": _quality,
     "copy_to_clipboard": _flag("copy_to_clipboard"),
+    "copy_as_file": _flag("copy_as_file"),
     "file_prefix": _prefix,
     "show_loupe": _flag("show_loupe"),
     "hold_to_capture": _flag("hold_to_capture"),
@@ -120,6 +124,7 @@ def resolve(block: Mapping[str, Any]) -> SnapConfig:
         hotkey=block["hotkey"],
         jpeg_quality=block["jpeg_quality"],
         copy_to_clipboard=block["copy_to_clipboard"],
+        copy_as_file=block["copy_as_file"],
         file_prefix=block["file_prefix"],
         show_loupe=block["show_loupe"],
         hold_to_capture=block["hold_to_capture"],

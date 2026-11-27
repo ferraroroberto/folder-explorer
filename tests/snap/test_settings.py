@@ -25,6 +25,7 @@ def _file(isolated: Path) -> dict:
 def test_no_file_means_the_defaults(synthetic_host: SyntheticHost) -> None:
     cfg = settings.resolve(config.load()["snap"])
     assert (cfg.hotkey, cfg.jpeg_quality, cfg.copy_to_clipboard, cfg.file_prefix, cfg.show_loupe, cfg.hold_to_capture) == ("ctrl+shift+a", 90, True, "snap", True, False)
+    assert cfg.copy_as_file is True
     assert cfg.folder == synthetic_host.home / "Pictures" / "snaps"
 
 
@@ -79,11 +80,12 @@ def test_save_writes_one_key_and_keeps_the_rest_as_written(isolated: Path) -> No
 
 def test_each_setting_round_trips_through_the_file(isolated: Path) -> None:
     out = str(isolated / "out")
-    for key, value in (("copy_to_clipboard", False), ("jpeg_quality", 70), ("file_prefix", "report"), ("show_loupe", False), ("hold_to_capture", True), ("folder", out)):
+    for key, value in (("copy_to_clipboard", False), ("jpeg_quality", 70), ("file_prefix", "report"), ("show_loupe", False), ("hold_to_capture", True), ("folder", out), ("copy_as_file", False)):
         assert config.save_snap({key: value})["snap"][key] == value
     final = settings.resolve(config.load()["snap"])
     assert (final.copy_to_clipboard, final.jpeg_quality, final.file_prefix, final.show_loupe, final.hold_to_capture, final.folder) == (
         False, 70, "report", False, True, Path(out))
+    assert final.copy_as_file is False
 
 
 def test_a_bad_save_leaves_the_file_untouched(isolated: Path) -> None:
@@ -101,7 +103,7 @@ def test_save_creates_a_missing_file(isolated: Path) -> None:
 
 def test_the_settings_api_writes_every_snap_setting_but_the_folder(isolated: Path) -> None:
     (isolated / "config.json").write_text(json.dumps({"snap": {"folder": "~/shots", "jpeg_quality": 60}}), encoding="utf-8")
-    changes = {"copy_to_clipboard": False, "show_loupe": False, "jpeg_quality": 95, "file_prefix": "report", "hotkey": "Ctrl+Alt+S", "hold_to_capture": True}
+    changes = {"copy_to_clipboard": False, "show_loupe": False, "jpeg_quality": 95, "file_prefix": "report", "hotkey": "Ctrl+Alt+S", "hold_to_capture": True, "copy_as_file": False}
     with TestClient(app, client=LOCAL) as c:
         for key, value in changes.items():
             saved = c.post("/api/config", json={"snap": {key: value}})
@@ -120,6 +122,7 @@ def test_the_settings_api_writes_every_snap_setting_but_the_folder(isolated: Pat
     ({"hotkey": "ctrl+shift"}, "hotkey"),
     ({"copy_to_clipboard": "yes"}, "copy_to_clipboard"),
     ({"hold_to_capture": 1}, "hold_to_capture"),
+    ({"copy_as_file": "no"}, "copy_as_file"),
     ({"colour": "red"}, "unknown"),
     ({"hold_to_capture": True, "folder": "X:/Invented"}, "save folder"),
     ({}, "snap takes"),

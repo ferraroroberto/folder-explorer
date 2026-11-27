@@ -26,7 +26,7 @@ export const DEFAULTS = {
     archive_folder: 'Archive', category: 'Archived by task-os', dismiss_category: 'Dismissed by task-os',
     self_address: null, add_category: false, move_to_archive: false,
   },
-  snap: { folder: null, hotkey: 'ctrl+shift+a', jpeg_quality: 90, copy_to_clipboard: true, file_prefix: 'snap', show_loupe: true, hold_to_capture: false },
+  snap: { folder: null, hotkey: 'ctrl+shift+a', jpeg_quality: 90, copy_to_clipboard: true, copy_as_file: true, file_prefix: 'snap', show_loupe: true, hold_to_capture: false },
   features: { email: true, archive: true, documents: true, screenshot: true },
 };
 

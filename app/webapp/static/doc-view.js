@@ -2,18 +2,15 @@
  *
  * A document is named by root, scan id and item id, never a path. The server
  * renders it; this module draws the HTML, fetches each image by its own id
- * (the request carries the sign-in token an <img src> could not), copies code
- * listings, keeps in-page anchors inside the document, and says why a document
- * can't show with the one action that helps.
+ * (the request carries the sign-in token an <img src> could not), wires the code
+ * listings' copy control, keeps in-page anchors inside the document, and says
+ * why a document can't show with the one action that helps.
  */
 
-import { api } from './api.js';
+import { bindCodeListing } from './_vendored/code-listing/code-listing.js';
+import { answered, api, getRaw, postRaw, postRes } from './api.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
 import { esc, glyph } from './fmt.js';
-import { copyText } from './search-state.js';
-
-// How long a listing's copy control shows its check before going back to the copy glyph.
-const COPIED_MS = 1500;
 
 // What each refusal means for the reader, and the one action offered with it.
 const STATES = {
@@ -59,19 +56,16 @@ export function locFromUrl(href) {
   return { root, scan_id: scan, id, fragment: decodeURIComponent(u.hash.slice(1)) };
 }
 
-async function answer(res) {
-  let body = null;
-  try { body = await res.json(); } catch (e) { body = null; }
+function answer({ res, body }) {
   if (res.ok) return { ok: true, doc: body };
   return { ok: false, ...refusal(res.status, body) };
 }
 
 /** Fetch a document rendered; ``download`` is the one tap that lets a cloud-only file come down to the PC. */
 export async function fetchDoc(loc, download) {
-  const post = (path) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ root: loc.root, scan_id: loc.scan_id, id: loc.id }) });
   try {
-    return await answer(await (download ? post('/api/doc/download') : api('/api/doc?' + params(loc))));
+    return answer(await (download ? postRaw('/api/doc/download', { root: loc.root, scan_id: loc.scan_id, id: loc.id })
+      : getRaw('/api/doc?' + params(loc))));
   } catch (e) {
     return { ok: false, ...NO_ANSWER };
   }
@@ -112,11 +106,10 @@ async function showImage(container, img, loc, download) {
     return;
   }
   const res = download
-    ? await api('/api/doc/image/download', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ root: loc.root, scan_id: loc.scan_id, id }) })
+    ? await postRes('/api/doc/image/download', { root: loc.root, scan_id: loc.scan_id, id })
     : await api('/api/doc/image?' + params({ ...loc, id }));
   if (!res.ok) {
-    const r = await answer(res);
+    const r = answer(await answered(res));
     imageOff(img, r.message, r.reason === 'cloud_only');
     return;
   }
@@ -175,19 +168,11 @@ export function scrollToHeading(container, id) {
   return !!el;
 }
 
-async function copyListing(btn) {
-  const listing = btn.closest('.code-listing');
-  const ok = await copyText(listing.querySelector('pre').innerText);
-  const status = listing.querySelector('.code-listing-status');
-  btn.dataset.copied = String(ok);
-  status.textContent = ok ? 'Copied' : 'Copy failed';
-  if (!ok) status.dataset.state = 'error';
-  setTimeout(() => { btn.dataset.copied = 'false'; status.textContent = ''; delete status.dataset.state; }, COPIED_MS);
-}
-
 /** Handle taps inside a document host: ``hooks`` are onDocLink(loc), onDownload(), onExplore(), and getLoc() for images. */
 export function wireDocHost(host, scroller, hooks) {
   releaseDoc(scroller);
+  // One listener on the document, however many hosts and pages ask for it.
+  bindCodeListing();
   host.addEventListener('click', (e) => {
     const a = e.target.closest('a[href]');
     if (a && a.dataset.docId && hooks.onDocLink && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -201,8 +186,6 @@ export function wireDocHost(host, scroller, hooks) {
       if (hooks.onAnchor) hooks.onAnchor();
       return;
     }
-    const copy = e.target.closest('.code-listing-copy');
-    if (copy) { copyListing(copy); return; }
     const act = e.target.closest('[data-doc-act]');
     if (!act) return;
     if (act.dataset.docAct === 'download') hooks.onDownload();

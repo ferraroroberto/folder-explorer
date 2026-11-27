@@ -9,9 +9,10 @@ rather than at this process's environment.
 from __future__ import annotations
 
 import logging
-import ntpath
 from pathlib import Path
 from typing import Any, Optional
+
+from src.roots import same_spelling
 
 logger = logging.getLogger(__name__)
 
@@ -62,19 +63,14 @@ def read_user_variable() -> Optional[str]:
     return str(value)
 
 
-def _same_folder(a: str, b: str) -> bool:
-    def norm(p: str) -> str:
-        return ntpath.normcase(ntpath.normpath(p.strip().strip('"')))
-
-    return norm(a) == norm(b)
-
-
 def state_for(current: Optional[str], home: str) -> str:
     if current is None:
         return STATE_UNKNOWN
     if not current.strip():
         return STATE_UNSET
-    return STATE_OK if _same_folder(current, home) else STATE_DIFFERENT
+    # A value typed into setx can keep the quotes and spaces around it.
+    typed = current.strip().strip('"')
+    return STATE_OK if same_spelling(typed, home.strip().strip('"')) else STATE_DIFFERENT
 
 
 def setup(project_root: Path) -> dict[str, Any]:

@@ -3,7 +3,7 @@
  * On a wide desktop it fills the right-hand pane; on a phone it opens as a sheet.
  */
 
-import { getJSON, postJSON, api } from './api.js';
+import { getJSON, getRaw, postJSON } from './api.js';
 import { BodyState, bodyOf, bodyStep, canLoad } from './body-state.js';
 import { S, $, WIDE, copyText, effectiveMode, hl, mailDate, marked, shortFolder } from './search-state.js';
 import { docUrl } from './doc-view.js';
@@ -227,9 +227,7 @@ async function showAll(d) {
   if (!d.readable || !canLoad(S.body, d.id)) return;
   bodyStep(S.body, d.id, BodyState.LOADING);
   renderPreview();
-  const res = await api('/api/emails/' + d.id + '/body');
-  let data = null;
-  try { data = await res.json(); } catch (e) { data = null; }
+  const { res, body: data } = await getRaw('/api/emails/' + d.id + '/body');
   if (res.ok) bodyStep(S.body, d.id, BodyState.OK, { data });
   else bodyStep(S.body, d.id, BodyState.ERROR, { error: data && data.error, message: (data && data.detail) || 'HTTP ' + res.status });
   renderPreview();

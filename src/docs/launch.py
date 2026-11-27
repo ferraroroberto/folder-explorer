@@ -15,9 +15,8 @@ from typing import Any
 
 from src import store
 from src.docs.reader import is_document
-from src.email.settings import is_under
 from src.index import Index, open_index
-from src.roots import Root
+from src.roots import Root, innermost_root, names_below
 
 MESSAGES = {
     "not_document": "Only Markdown files open in folder-explorer.",
@@ -57,13 +56,13 @@ def place_of(path: str, roots: list[Root]) -> Place:
     name = os.path.basename(path)
     if not is_document(name):
         raise NotPlaced("not_document")
-    root = next((r for r in sorted(roots, key=lambda r: len(r.path), reverse=True) if is_under(path, r.path)), None)
+    root = innermost_root(path, roots)
     if root is None:
         raise NotPlaced("no_root")
     scan = store.current_index(root.key)
     if scan is None:
         raise NotPlaced("not_scanned")
-    names = [p for p in os.path.relpath(os.path.dirname(path), root.path).split(os.sep) if p and p != "."]
+    names = names_below(os.path.dirname(path), root.path)
     conn = open_index(store.index_dir() / scan["index_file"])
     try:
         folder = Index(conn).find_folder(names)

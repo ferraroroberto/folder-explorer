@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, TypeVar
 
 from src.email.archive_settings import index_path
+from src.email.query import FTS_BM25
 from src.email.schema import open_writer
 
 _T = TypeVar("_T")
@@ -244,7 +245,7 @@ class EmailRepository:
         """
         try:
             fts_rows = self._conn.execute(
-                "SELECT rowid, bm25(emails_fts, 10.0, 3.0, 3.0, 1.0) AS rank FROM emails_fts "
+                "SELECT rowid, " + FTS_BM25 + " AS rank FROM emails_fts "
                 "WHERE emails_fts MATCH ? ORDER BY rank LIMIT ?", (fts_query, FTS_ROW_CAP)).fetchall()
         except sqlite3.OperationalError as exc:
             logger.warning("⚠️ FTS query failed (%s) for %r", exc, fts_query)

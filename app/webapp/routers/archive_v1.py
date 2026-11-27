@@ -25,8 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.webapp.auth import is_pc_itself
 from app.webapp.feature_gate import require
 from app.webapp.routers.archive import OFF_REASON, bridge_off
-from src import archive_api
-from src.email import body as child
+from src import archive_api, child
 
 logger = logging.getLogger(__name__)
 

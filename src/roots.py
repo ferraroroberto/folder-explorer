@@ -39,12 +39,44 @@ def normalize(path: str) -> str:
     return os.path.normcase(os.path.realpath(os.path.expandvars(os.path.expanduser(path)))).rstrip("\\/") or path
 
 
+def key_within(inner: str, outer: str) -> bool:
+    """True when ``inner`` is ``outer`` or sits inside it, both already in one spelling (nothing is resolved here)."""
+    return inner == outer or inner.startswith(outer.rstrip("\\/") + os.sep)
+
+
+def is_under(path: str, folder: str) -> bool:
+    """True when ``path`` is ``folder`` or sits inside it, compared case-folded."""
+    return key_within(normalize(path), normalize(folder))
+
+
+def under_any(path: str, folders: list[str]) -> bool:
+    return any(is_under(path, f) for f in folders)
+
+
+def same_spelling(a: str, b: str) -> bool:
+    """True when two strings spell one folder: case, slashes and a trailing separator ignored. Never touches the disk."""
+    def spelled(p: str) -> str:
+        return os.path.normcase(os.path.normpath(p)).rstrip("\\/")
+
+    return spelled(a) == spelled(b)
+
+
 def relative_parts(inner: str, outer: str) -> Optional[list[str]]:
     """The folder names from ``outer`` down to ``inner``, or ``None`` when ``inner`` is not strictly inside ``outer``."""
     a, b = normalize(inner), normalize(outer)
-    if a == b or not a.startswith(b.rstrip("\\/") + os.sep):
+    if a == b or not key_within(a, b):
         return None
     return [p for p in a[len(b.rstrip("\\/")):].split(os.sep) if p]
+
+
+def innermost_root(path: str, roots: list[Root]) -> Optional[Root]:
+    """The deepest root holding ``path``, which is the one that answers for it; ``None`` when no root does."""
+    return next((r for r in sorted(roots, key=lambda r: len(r.path), reverse=True) if is_under(path, r.path)), None)
+
+
+def names_below(path: str, root_path: str) -> list[str]:
+    """The names from ``root_path`` down to ``path``, which must be inside it; none for the root itself."""
+    return [p for p in os.path.relpath(path, root_path).split(os.sep) if p and p != "."]
 
 
 def fixed_drives() -> list[str]:

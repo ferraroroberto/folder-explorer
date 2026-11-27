@@ -24,6 +24,7 @@ from typing import Any, Callable, Optional
 from src.email.archive import DATE_PREFIX_CHOICES, EmailArchiver, planned_names
 from src.email.archive_paths import archive_roots, is_within, resolve_under_roots
 from src.email.archive_settings import (
+    BODY_PREVIEW_LENGTH,
     get_outlook_add_category,
     get_outlook_archive_folder,
     get_outlook_category,
@@ -54,9 +55,6 @@ ERR_NO_ARCHIVE = "no_archive_folder"
 ERR_NOT_IN_MAILBOX = "not_in_mailbox"
 ERR_TIMEOUT = "timeout"
 ERR_FAILED = "failed"
-
-# The live mail's readable text the sheet's preview shows: the index's own preview length.
-PREVIEW_CHARS = 500
 
 # What the sheet, the fallback window and the toast say for each failure.
 MESSAGES = {
@@ -166,7 +164,7 @@ def opening(client: Any, cfg: dict[str, Any], item: Any, where: str = "",
     once and fill the folders in when ``rank`` answers.
     """
     roots = mounted_roots(cfg)
-    mail = client.read_mail(item, PREVIEW_CHARS)
+    mail = client.read_mail(item, BODY_PREVIEW_LENGTH)
     if timer:
         timer.mark("read_mail")
     conn = open_index(cfg)

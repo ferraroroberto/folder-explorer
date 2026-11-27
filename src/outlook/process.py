@@ -14,6 +14,7 @@ import logging
 import time
 from typing import Any
 
+from src.desktop import outlook_exe
 from src.outlook.mapi import OutlookUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -25,40 +26,6 @@ _POLL_INTERVAL_SECONDS = 1.0
 # How long the teardown waits for a terminated Outlook to actually go away
 # before giving up and saying so in the error it raises.
 _TERMINATE_WAIT_SECONDS = 10.0
-
-
-def _outlook_executable() -> str | None:
-    """Path to the registered outlook.exe, or None when it cannot be found.
-
-    Reads the ``App Paths`` registry entry Windows itself uses to resolve
-    ``outlook.exe``, falling back to a PATH lookup. Deliberately not
-    ``Dispatch("Outlook.Application")``: Dispatch starts a *hidden* instance
-    that behaves differently (no explorer, add-ins in a different state) and
-    that the user cannot see or interact with.
-    """
-    import shutil  # noqa: PLC0415
-    import sys  # noqa: PLC0415
-
-    if sys.platform == "win32":
-        try:
-            import winreg  # noqa: PLC0415
-
-            for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
-                try:
-                    with winreg.OpenKey(
-                        hive,
-                        r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
-                        r"\OUTLOOK.EXE",
-                    ) as key:
-                        path, _ = winreg.QueryValueEx(key, "")
-                        if path:
-                            return str(path).strip('"')
-                except OSError:
-                    continue
-        except ImportError:  # pragma: no cover - winreg ships with CPython
-            pass
-
-    return shutil.which("outlook.exe")
 
 
 def get_active_application() -> Any | None:
@@ -195,7 +162,9 @@ def ensure_running(timeout: float = DEFAULT_START_TIMEOUT_SECONDS) -> Any:
     if app is not None:
         return app
 
-    exe = _outlook_executable()
+    # The registered executable, never Dispatch("Outlook.Application"): that starts a hidden instance
+    # with no explorer, which the user can neither see nor use.
+    exe = outlook_exe()
     if exe is None:
         raise OutlookUnavailableError(
             "Outlook is not running and outlook.exe could not be located "

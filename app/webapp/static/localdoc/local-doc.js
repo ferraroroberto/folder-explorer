@@ -11,7 +11,7 @@
  * folder to put one in.
  */
 
-import { api } from '../api.js';
+import { postRaw } from '../api.js';
 import { APP } from '../state.js';
 import { NO_ANSWER } from '../doc-answer.js';
 import { renderBody, toHex } from '../drop-files.js';
@@ -41,14 +41,13 @@ export const withLocal = (doc, handle) => (handle ? { ...doc, local: true } : do
 
 /** The server's read-only render of dropped text: ``{ok: true, body}`` or ``{ok: false, reason, message}``. */
 export async function renderDropped(name, text) {
-  let res;
+  let reply;
   try {
-    res = await api('/api/doc/dropped/render', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(renderBody({ name }, text)) });
+    reply = await postRaw('/api/doc/dropped/render', renderBody({ name }, text));
   } catch (e) {
     return { ok: false, ...NO_ANSWER };
   }
-  let body = null;
-  try { body = await res.json(); } catch (e) { body = null; }
+  const { res, body } = reply;
   if (res.ok) return { ok: true, body };
   return { ok: false, reason: (body && body.reason) || 'app_error', message: (body && typeof body.detail === 'string' && body.detail) || 'The app answered with an error (HTTP ' + res.status + ')' };
 }

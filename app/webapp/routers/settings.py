@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from app.webapp.auth import is_pc_itself
+from app.webapp.auth import is_pc_itself, require_this_pc
 from app.webapp.bind import resolve_bind
 from app.webapp.build import BUILD_INFO
 from app.webapp.feature_gate import require
@@ -108,11 +108,9 @@ def create_config(request: Request) -> JSONResponse:
     return JSONResponse({**settings_body(is_pc_itself(request)), "created": created})
 
 
-@router.post("/api/snap/open-folder", dependencies=[Depends(require("screenshot"))])
-def post_snap_open_folder(request: Request) -> dict[str, str]:
+@router.post("/api/snap/open-folder", dependencies=[Depends(require("screenshot")), Depends(require_this_pc)])
+def post_snap_open_folder() -> dict[str, str]:
     """Settings' Open folder for the screenshot save folder: File Explorer on this PC only, the folder named by config, never by the page."""
-    if not is_pc_itself(request):
-        raise HTTPException(status_code=403, detail="this works on the PC only")
     try:
         open_save_folder(snap_settings.resolve(config.load()["snap"]).folder)
     except FileNotFoundError as exc:
@@ -123,11 +121,9 @@ def post_snap_open_folder(request: Request) -> dict[str, str]:
     return {"status": "opened"}
 
 
-@router.post("/api/md-assoc", dependencies=[Depends(require("documents"))])
-def post_md_assoc(request: Request, body: dict[str, Any] = Body(...)) -> JSONResponse:
+@router.post("/api/md-assoc", dependencies=[Depends(require("documents")), Depends(require_this_pc)])
+def post_md_assoc(body: dict[str, Any] = Body(...)) -> JSONResponse:
     """Settings' "Associate Markdown files with this app": ``{"on": bool}``, for this PC only; answers the state read back."""
-    if not is_pc_itself(request):
-        return JSONResponse({"detail": "Only this PC can change its file associations"}, status_code=403)
     on = body.get("on")
     if not isinstance(on, bool):
         return JSONResponse({"detail": "on must be true or false"}, status_code=400)

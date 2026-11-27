@@ -10,7 +10,6 @@ folder: a ``pythonw`` tray has no console to inherit.
 from __future__ import annotations
 
 import logging
-import os
 import socket
 import subprocess
 import sys
@@ -21,6 +20,7 @@ import requests
 from app.tray.single_instance import cross_process_lock
 from app.webapp.bind import resolve_bind
 from src import config, store
+from src.child import child_env
 from src.config import PROJECT_ROOT
 from src.no_window import NO_WINDOW
 from src.pooled_http import build_session, pooled_request
@@ -94,12 +94,11 @@ class WebappManager:
         if log_path.exists() and log_path.stat().st_size > _LOG_MAX_BYTES:
             log_path.unlink()
         self._log = open(log_path, "ab")
-        env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
         # The webapp child is a console program; under the pythonw tray it
         # would otherwise flash a console window.
         flags = NO_WINDOW | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         self._proc = subprocess.Popen(
-            [sys.executable, "-m", "app.webapp"], cwd=str(PROJECT_ROOT), env=env,
+            [sys.executable, "-m", "app.webapp"], cwd=str(PROJECT_ROOT), env=child_env(),
             stdin=subprocess.DEVNULL, stdout=self._log, stderr=subprocess.STDOUT, creationflags=flags,
         )
         logger.info("🚀 webapp spawned, pid %d", self._proc.pid)

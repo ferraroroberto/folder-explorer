@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -28,7 +29,7 @@ import time
 from typing import Any, Optional, Union
 
 from src import config, window_front
-from src.explorer_window import is_explorer, is_shown_tab, top_level_z_order
+from src.explorer_window import pick_foremost, shown_tabs, top_level_z_order
 from src.no_window import NO_WINDOW
 
 logger = logging.getLogger(__name__)
@@ -86,8 +87,12 @@ def _explorer() -> str:
 
 
 def outlook_exe() -> Optional[str]:
-    """Outlook (classic)'s executable, or None when it isn't installed."""
-    return _app_exe("OUTLOOK.EXE")
+    """Outlook (classic)'s executable, or None when it isn't installed.
+
+    Its App Paths registration, else ``outlook.exe`` on PATH: the one answer for "is Outlook here"
+    and for the batch verbs that start it.
+    """
+    return _app_exe("OUTLOOK.EXE") or shutil.which("outlook.exe")
 
 
 def _app_exe(exe: str) -> Optional[str]:
@@ -102,8 +107,9 @@ def _app_exe(exe: str) -> Optional[str]:
                 value, _ = winreg.QueryValueEx(key, "")
         except OSError:
             continue
-        if value and os.path.isfile(str(value)):
-            return str(value)
+        path = str(value or "").strip('"')
+        if path and os.path.isfile(path):
+            return path
     return None
 
 
@@ -147,25 +153,18 @@ def _reuse_window(folder: str) -> Optional[int]:
     """Navigate the shown tab of the foremost File Explorer window to ``folder``; its handle, or None when there is none to reuse."""
     try:
         import pythoncom  # noqa: PLC0415 - Windows only, imported where it is used
-        import win32com.client  # noqa: PLC0415
 
         pythoncom.CoInitialize()
     except Exception as exc:  # noqa: BLE001
         logger.warning("⚠️ open: can't reach the open Explorer windows, opening a new one: %s", exc)
         return None
     try:
-        windows: dict[int, Any] = {}
-        for window in win32com.client.Dispatch("Shell.Application").Windows():
-            try:
-                if is_explorer(str(window.FullName or "")) and is_shown_tab(window):
-                    windows[int(window.HWND)] = window
-            except Exception:  # noqa: BLE001,S112 - a window can close while the shell lists it
-                continue
-        if not windows:
+        picked = pick_foremost(shown_tabs(), top_level_z_order())
+        if picked is None:
             logger.info("ℹ️ open: no Explorer window to reuse, opening a new one")
             return None
-        hwnd = next((h for h in top_level_z_order() if h in windows), list(windows)[-1])
-        _navigate(windows[hwnd], folder)
+        hwnd, window = picked
+        _navigate(window, folder)
         return hwnd
     except FileNotFoundError:
         raise

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from src.email.archive_settings import get_archive_roots
+from src.roots import key_within
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +38,7 @@ def is_within(child: Path, root: Path) -> bool:
     would refuse a file that is genuinely inside the archive. The trailing
     separator is what stops ``C:\\Archive`` from matching ``C:\\ArchiveOther``.
     """
-    child_s = os.path.normcase(str(child))
-    root_s = os.path.normcase(str(root))
-    if child_s == root_s:
-        return True
-    return child_s.startswith(root_s.rstrip("\\/") + os.sep)
+    return key_within(os.path.normcase(str(child)), os.path.normcase(str(root)))
 
 
 def resolve_under_roots(

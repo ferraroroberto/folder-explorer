@@ -19,7 +19,7 @@ from typing import Any, Optional
 
 from src import features
 from src.email.schema import own_index_path
-from src.roots import Root, normalize
+from src.roots import Root, under_any
 
 MB = 1024 * 1024
 
@@ -44,16 +44,6 @@ class EmailPart:
     @property
     def ready(self) -> bool:
         return self.problem is None
-
-
-def is_under(path: str, folder: str) -> bool:
-    """True when ``path`` is ``folder`` or sits inside it, compared case-folded."""
-    p, f = normalize(path), normalize(folder)
-    return p == f or p.startswith(f.rstrip("\\/") + os.sep)
-
-
-def under_any(path: str, folders: list[str]) -> bool:
-    return any(is_under(path, f) for f in folders)
 
 
 def reader_installed() -> bool:

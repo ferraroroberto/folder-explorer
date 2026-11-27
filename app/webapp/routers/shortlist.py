@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException
 
-from app.webapp.state import POOL
+from app.webapp.state import POOL, place_in
 from src import config, store
 from src.roots import Root, resolve_roots
 
@@ -35,14 +35,11 @@ def _entry(roots: dict[str, Root], row: dict[str, Any]) -> dict[str, Any]:
     out: dict[str, Any] = {"id": row["id"], "root": key, "root_name": root.name if root else key,
                            "name": rel[-1], "folder": rel[:-1], "size": row["size"], "disk": row["alloc"],
                            "scan_id": None, "folder_id": None, "file": None}
-    scan = store.current_index(key) if root else None
-    if scan is None:
+    place = place_in(root, rel, is_file=True) if root else None
+    if place is None:
         return out
-    index, lock = POOL.get(store.index_dir() / scan["index_file"])
-    with lock:
-        folder_id = index.find_folder(rel[:-1])
-        hit = index.find_file(folder_id, rel[-1]) if folder_id is not None else None
-    out.update(scan_id=scan["id"], folder_id=folder_id)
+    out.update(scan_id=place.scan["id"], folder_id=place.folder)
+    hit = place.file
     if hit is not None:
         out["file"] = {"id": hit["id"], "size": hit["size"], "disk": hit["disk"], "online": hit["online"]}
     return out

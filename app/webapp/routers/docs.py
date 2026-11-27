@@ -384,22 +384,18 @@ def find(request: Request, body: dict[str, Any] = Body(...)) -> Any:
 
 def _recent_item(roots: dict[str, Root], root_key: str, rel: list[str]) -> Optional[dict[str, Any]]:
     """A recent document by its names below its root, as the root's current scan numbers it; None when that scan has no such file."""
-    root, scan = roots.get(root_key), store.current_index(root_key)
-    if root is None or scan is None or not rel:
+    root = roots.get(root_key)
+    place = state.place_in(root, rel, is_file=True, folder_names=True) if root and rel else None
+    if place is None or place.folder is None:
         return None
-    index, lock = POOL.get(store.index_dir() / scan["index_file"])
-    with lock:
-        folder = index.find_folder(rel[:-1])
-        hit = index.find_file(folder, rel[-1]) if folder is not None else None
-        names = [p["name"] for p in index.path(folder)] if folder is not None else []
-    if hit is not None:
-        item_id = hit["id"]
+    if place.file is not None:
+        item_id = place.file["id"]
     else:
-        number = store.found_number(root_key, scan["id"], folder, rel[-1]) if folder is not None else None
+        number = store.found_number(root_key, place.scan["id"], place.folder, rel[-1])
         if number is None:
             return None
         item_id = -number
-    return {"root": root_key, "scan_id": scan["id"], "id": item_id, "name": rel[-1], "folder": names}
+    return {"root": root_key, "scan_id": place.scan["id"], "id": item_id, "name": rel[-1], "folder": place.folder_names}
 
 
 @router.get("/recent")

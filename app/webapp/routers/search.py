@@ -16,11 +16,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from app.webapp.auth import is_pc_itself
+from app.webapp.auth import is_pc_itself, require_this_pc
 from app.webapp.feature_gate import require
 from app.webapp.routers.archive import SHOW_TIMEOUT_S, archive_status, bridge
 from app.webapp.routers.browse import scanned_path_or_http
-from app.webapp.state import EMAILS, POOL, doc_hits, folder_hits
+from app.webapp.state import EMAILS, doc_hits, folder_hits, locate
 from src import config, features, store
 from src.desktop import (
     GoneError,
@@ -34,8 +34,8 @@ from src.docs.listing import MAX_PAGE
 from src.docs.listing import PAGE as DOC_PAGE
 from src.email.body import ERR_NOT_SET_UP, ERR_OUTSIDE, failed, fetch_body
 from src.email.search import PAGE, SORTS, EmailIndex
-from src.email.settings import EmailPart, email_part, is_under, under_any
-from src.roots import Root, resolve_roots
+from src.email.settings import EmailPart, email_part
+from src.roots import Root, resolve_roots, under_any
 
 router = APIRouter(prefix="/api")
 
@@ -133,21 +133,9 @@ def search_emails(q: str = "", sort: str = "relevance", offset: int = Query(0, g
 
 def _locate(path: str) -> Optional[dict[str, Any]]:
     """Where a file sits in the scanned tree: its root, folder id and indexed size and cloud state."""
-    for root in sorted(_roots(), key=lambda r: len(r.path), reverse=True):
-        if not is_under(path, root.path):
-            continue
-        scan = store.current_index(root.key)
-        if scan is None:
-            return None
-        names = [p for p in os.path.relpath(path, root.path).split(os.sep) if p and p != "."]
-        index, lock = POOL.get(store.index_dir() / scan["index_file"])
-        with lock:
-            folder = index.find_folder(names[:-1])
-            found = index.find_file(folder, names[-1]) if folder is not None and names else None
-        if folder is None:
-            return None
-        return {"root": root.key, "folder": folder, "scan_id": scan["id"], "file": found}
-    return None
+    place = locate(_roots(), path, is_file=True)
+    return None if place is None else {"root": place.root.key, "folder": place.folder, "scan_id": place.scan["id"],
+                                       "file": place.file}
 
 
 @router.get("/emails/{row_id}")
@@ -187,14 +175,8 @@ def email_body(row_id: int) -> JSONResponse:
     return JSONResponse({"text": result.text, "html": result.html})
 
 
-def _pc_only(request: Request) -> None:
-    if not is_pc_itself(request):
-        raise HTTPException(status_code=403, detail="this works on the PC only")
-
-
-@router.post("/emails/{row_id}/open")
-def open_email(row_id: int, request: Request) -> dict[str, str]:
-    _pc_only(request)
+@router.post("/emails/{row_id}/open", dependencies=[Depends(require_this_pc)])
+def open_email(row_id: int) -> dict[str, str]:
     index = _emails()
     try:
         with index.lock:
@@ -210,10 +192,9 @@ def open_email(row_id: int, request: Request) -> dict[str, str]:
     return {"status": "opened"}
 
 
-@router.post("/emails/{row_id}/reveal")
-def reveal_email(row_id: int, request: Request) -> dict[str, str]:
+@router.post("/emails/{row_id}/reveal", dependencies=[Depends(require_this_pc)])
+def reveal_email(row_id: int) -> dict[str, str]:
     """Show an email's ``.msg`` in File Explorer, its folder open with the file selected; the mail itself is not opened."""
-    _pc_only(request)
     index = _emails()
     try:
         with index.lock:
@@ -231,10 +212,9 @@ def reveal_email(row_id: int, request: Request) -> dict[str, str]:
     return {"status": "opened"}
 
 
-@router.post("/emails/{row_id}/find", dependencies=[Depends(require("archive"))])
-def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
+@router.post("/emails/{row_id}/find", dependencies=[Depends(require("archive")), Depends(require_this_pc)])
+def find_in_mailbox(row_id: int) -> dict[str, Any]:
     """Find in mailbox: open the live copy of an archived mail in Outlook, looked up by its Message-ID."""
-    _pc_only(request)
     index = _emails()
     try:
         with index.lock:
@@ -246,10 +226,9 @@ def find_in_mailbox(row_id: int, request: Request) -> dict[str, Any]:
     return bridge(["show", "--message-id=" + message_id], SHOW_TIMEOUT_S)
 
 
-@router.post("/folders/open")
-def open_folder(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
+@router.post("/folders/open", dependencies=[Depends(require_this_pc)])
+def open_folder(body: dict[str, Any] = Body(...)) -> dict[str, str]:
     started = time.perf_counter()
-    _pc_only(request)
     path = scanned_path_or_http(_roots(), body, "folder")
     try:
         ensure_there(path, True, started)

@@ -20,8 +20,7 @@ from fastapi.testclient import TestClient
 from app.cli import email_batch
 from app.webapp.routers import archive_v1
 from app.webapp.server import app
-from src import archive_api
-from src.email import body as child
+from src import archive_api, child
 from src.outlook import process
 from tests.archive.batch_support import (  # noqa: F401 - fixtures are used by name
     _mail,

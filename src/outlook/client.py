@@ -33,6 +33,7 @@ from datetime import datetime
 from itertools import islice
 from typing import Any
 
+from src.email.archive_settings import BODY_PREVIEW_LENGTH
 from src.email.mailboxes import Mailbox
 from src.email.naming import clean_subject as _clean_subject
 from src.email.naming import normalize_message_id
@@ -321,7 +322,7 @@ class OutlookClient(DraftSurface):
         """Inbox for ``None``, else the named folder under the mailbox root."""
         return self._inbox() if folder_name is None else self._named_folder(folder_name)
 
-    def iter_inbox(self, preview_len: int = 500) -> Iterator[InboxMail]:
+    def iter_inbox(self, preview_len: int = BODY_PREVIEW_LENGTH) -> Iterator[InboxMail]:
         """Yield every MailItem in the Inbox as an :class:`InboxMail`.
 
         The batch verbs pass ``archive_settings.BODY_PREVIEW_LENGTH`` as
@@ -333,7 +334,7 @@ class OutlookClient(DraftSurface):
         yield from self._iter_items(self._inbox().Items, preview_len)
 
     def iter_inbox_received_since(
-        self, since: datetime, preview_len: int = 500
+        self, since: datetime, preview_len: int = BODY_PREVIEW_LENGTH
     ) -> Iterator[InboxMail]:
         """Yield the Inbox mails received at or after ``since``.
 
@@ -349,12 +350,12 @@ class OutlookClient(DraftSurface):
             "the whole Inbox", preview_len,
         )
 
-    def iter_sent(self, preview_len: int = 500) -> Iterator[InboxMail]:
+    def iter_sent(self, preview_len: int = BODY_PREVIEW_LENGTH) -> Iterator[InboxMail]:
         """Yield every MailItem in Sent Items."""
         yield from self._iter_items(self._sent_items().Items, preview_len)
 
     def iter_sent_since(
-        self, since: datetime, preview_len: int = 500
+        self, since: datetime, preview_len: int = BODY_PREVIEW_LENGTH
     ) -> Iterator[InboxMail]:
         """Yield the Sent Items mails sent at or after ``since``.
 

@@ -10,8 +10,8 @@ from pathlib import Path
 from src.email.body import ERR_TIMEOUT, fetch_body
 from src.email.reader import ERR_GONE, ERR_PARSE
 from src.email.sanitize import sanitize_html
-from src.email.settings import email_part, is_under
-from src.roots import Root
+from src.email.settings import email_part
+from src.roots import Root, is_under
 
 ROOT = Path(__file__).resolve().parents[1]
 READER = ROOT / "src" / "email" / "reader.py"

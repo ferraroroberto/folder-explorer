@@ -157,15 +157,14 @@ def revert_cut_names(cfg: dict[str, Any], log_path: str, wait_s: float = 0.0) ->
     A file that is not at its new name (the rename never ran, or it moved since)
     is ``missing`` and a taken old name is a ``clash``; neither is touched.
     Raises ``UndoLogError`` before anything is renamed when the log is unusable,
-    and ``indexer.EmailBusy`` when an index run holds the email lock.
+    and ``indexer.EmailBusy`` when an index run holds the email lock. It reads no
+    mail, so it needs the lock only, not an email stage that can run.
     """
     renames = _read_undo_log(log_path)
     roots = _archive_roots(cfg)
     items: list[dict[str, str]] = []
     updated = 0
-    guard = indexer.lock()
-    indexer.take_lock(guard, wait_s)
-    try:
+    with indexer.held_lock(wait_s):
         conn = open_index(cfg)
         try:
             repo = EmailRepository(conn)
@@ -175,8 +174,6 @@ def revert_cut_names(cfg: dict[str, Any], log_path: str, wait_s: float = 0.0) ->
                 updated += rows
         finally:
             conn.close()
-    finally:
-        guard.release()
     counts = _counts(items, updated)
     logger.info("ℹ️ fix-cut-names revert: %s", counts)
     return {**header("fix-cut-names"), "dry_run": False, "revert": True, "counts": counts, "renames": items,

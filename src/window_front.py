@@ -15,13 +15,13 @@ folder as a string, and the comparison is on that string, never a stat.
 from __future__ import annotations
 
 import logging
-import os
 import threading
 import time
 from collections.abc import Iterable
 from typing import Optional
 
 from src.explorer_window import is_explorer
+from src.roots import same_spelling
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,7 @@ def explorer_hwnds() -> set[int]:
 
 def same_folder(shown: str, folder: str) -> bool:
     """True when the shell's path for a window names ``folder``, ignoring case, slashes and a trailing separator."""
-    def norm(path: str) -> str:
-        return os.path.normcase(path).rstrip("\\/")
-
-    return bool(shown) and norm(shown) == norm(folder)
+    return bool(shown) and same_spelling(shown, folder)
 
 
 def pick_window(shown: dict[int, list[str]], folder: str, before: Iterable[int], waited_s: float,

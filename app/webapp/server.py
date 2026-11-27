@@ -1,10 +1,10 @@
 """The FastAPI app: the browse, search, scan and settings API, sign-in, and the static PWA.
 
-Read-only over the disk: it lists folders through ``src/scanner.py`` and
-never moves or deletes a file. The files it reads are a mail's ``.msg`` for
-"Show all", through ``src/email/reader.py`` in a child process, and a Markdown
-file or an image beside it for the viewer, through ``src/docs/reader.py``. Start it with ``python -m app.webapp``
-(which picks the bind from the ``remote_access`` setting) or from the tray.
+It is not read-only: it saves documents and files mail. What it may read,
+write and open on disk, and the one module allowed to do each, is set by the
+hard rules in ``CLAUDE.md``, which are the single statement of that surface.
+Start it with ``python -m app.webapp`` (which picks the bind from the
+``remote_access`` setting) or from the tray.
 """
 
 from __future__ import annotations

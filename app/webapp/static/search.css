@@ -253,7 +253,6 @@ kbd {
   line-height: 1.6;
 }
 .file-chip .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
-.file-chip .fc-size { color: var(--accent-text); opacity: 0.8; font-family: var(--font); }
 .pv-actions { display: grid; gap: var(--space-sm); }
 .pv-actions .button-primary, .pv-actions .button-tint { width: 100%; }
 .pv-utils { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
@@ -267,8 +266,6 @@ kbd {
 .pv-error strong { display: block; color: var(--danger-text); font-size: var(--font-body); }
 .pv-error .button-ghost { margin-top: var(--space-sm); min-height: var(--control-h); }
 .pv-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
-.pv-people { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.pv-people .chip { margin: 0; }
 .button-primary .icon, .button-tint .icon { width: var(--icon-inline); height: var(--icon-inline); vertical-align: -3px; margin-right: 6px; }
 .is-busy { cursor: progress; }
 
@@ -321,8 +318,6 @@ kbd {
 .search-modes .segmented { grid-auto-columns: minmax(max-content, 1fr); }
 .search-modes .segmented-item { padding: 0 var(--space-sm); }
 .search-modes .segmented-item .icon { width: var(--icon-inline); height: var(--icon-inline); flex: none; }
-.detail-card .ff-col { display: grid; gap: 6px; margin-top: var(--space-sm); }
-.detail-card .ff-col .input-native { width: 100%; box-sizing: border-box; }
 /* A folder pill in the preview wraps instead of cutting the name; the full path is shown below. */
 .pv-fields .reference-pill { border-radius: var(--radius-sm); text-align: left; }
 .pv-fields .reference-pill span { white-space: normal; overflow-wrap: anywhere; }

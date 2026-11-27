@@ -58,6 +58,8 @@ TRAY_PATTERN = re.compile(r"-m\s+app\.tray\b", re.IGNORECASE)
 STOP_TIMEOUT_S = 15.0
 VERIFY_TIMEOUT_S = 30.0
 POLL_S = 0.5
+# A cold PowerShell listing every process can take tens of seconds on a scanned PC; this only ends a hung one.
+POWERSHELL_TIMEOUT_S = 60.0
 EXIT_FAILED = 1
 EXIT_NOT_CONFIRMED = 3
 
@@ -107,7 +109,7 @@ def _powershell(script: str) -> str:
         [str(exe), "-NoProfile", "-NonInteractive", "-Command", prefix + script],
         capture_output=True,
         stdin=subprocess.DEVNULL,
-        timeout=60,
+        timeout=POWERSHELL_TIMEOUT_S,
         check=False,
         creationflags=NO_WINDOW,
     )

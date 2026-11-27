@@ -654,7 +654,7 @@ flowchart LR
   - Recent runs, with a progress bar and counts for a live run
 - **Does:**
   - Failed reads opens the list of failed files
-  - the card polls while an index run is going
+  - the card polls while an index run is going and the Scans tab is on screen
 - **States:**
   - *No email folders yet*, *Not set up here*, *Indexing is off here* and *Cannot tell whether an index run is going* disable the buttons and say why
   - *No runs yet.* before the first run

@@ -116,6 +116,7 @@ folder-explorer/
 │                               #   tests/scan what a scan logs: the progress heartbeat over a fake clock, each root's result as it ends,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
 │                               #   tests/search folder search: matching, accents and near words, the tiers and their timing on a large synthetic index,
+│                               #   tests/repo checks over the repo's own source (each shared rule spelled in one module),
 │                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this

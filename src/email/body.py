@@ -16,12 +16,11 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Optional
 
+from src.child import run_child
 from src.email.reader import ERR_GONE, ERR_NOT_SET_UP, ERR_PARSE, ERR_READ
 from src.email.sanitize import sanitize_html
-from src.no_window import NO_WINDOW
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +29,6 @@ ERR_OUTSIDE = "outside"
 
 # How long one read may take, download included, before the page says it timed out.
 READ_TIMEOUT_S = 30.0
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # What the page shows for each failure: a title and one line on what to do.
 MESSAGES = {
@@ -56,23 +53,6 @@ class Body:
 
 
 Runner = Callable[[list[str], float], "subprocess.CompletedProcess[str]"]
-
-
-def run_child(cmd: list[str], timeout: float) -> "subprocess.CompletedProcess[str]":
-    """Run one of this app's own modules as a windowless child from the repo root, its stdout captured as UTF-8."""
-    env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
-    return subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env, capture_output=True, text=True, encoding="utf-8",
-                          timeout=timeout, creationflags=NO_WINDOW, stdin=subprocess.DEVNULL)
-
-
-def start_child(cmd: list[str]) -> "subprocess.Popen[str]":
-    """Start one of this app's own modules like ``run_child`` does, for a caller that reads its stdout line by line.
-
-    Its stderr is dropped: the child logs to its own file, and an unread pipe would stall it.
-    """
-    env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
-    return subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                            stdin=subprocess.DEVNULL, text=True, encoding="utf-8", creationflags=NO_WINDOW)
 
 
 def failed(code: str, detail: str = "") -> Body:

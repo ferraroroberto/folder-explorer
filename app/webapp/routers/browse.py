@@ -17,9 +17,9 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
-from app.webapp.auth import is_pc_itself
+from app.webapp.auth import is_pc_itself, require_this_pc
 from app.webapp.state import POOL, ScanChanged, scanned_item_path
 from src import config, desktop, store
 from src.index import BASES, DEFAULT_BASIS, Index
@@ -116,12 +116,10 @@ def scanned_path_or_http(roots: list[Root], body: dict[str, Any], kind: str) -> 
         raise HTTPException(status_code=404, detail="no such item") from exc
 
 
-@router.post("/open")
-def open_item(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, str]:
+@router.post("/open", dependencies=[Depends(require_this_pc)])
+def open_item(body: dict[str, Any] = Body(...)) -> dict[str, str]:
     """Ask Windows to open a folder (``explore``) or a file (``open``, ``edit``, ``reveal``) on this PC."""
     started = time.perf_counter()
-    if not is_pc_itself(request):
-        raise HTTPException(status_code=403, detail="this works on the PC only")
     kind, verb = body.get("kind"), body.get("verb")
     verbs = desktop.FOLDER_VERBS if kind == "folder" else desktop.FILE_VERBS if kind == "file" else ()
     if verb not in verbs:

@@ -13,7 +13,7 @@
  * through that (local-doc.js); the editor itself is the same for both.
  */
 
-import { api } from './api.js';
+import { getRaw, postRaw } from './api.js';
 import { esc, glyph } from './fmt.js';
 import { APP } from './state.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
@@ -49,21 +49,8 @@ function writeDraft(key, draft) {
   } catch (e) { /* storage is off: the draft lives only in this page until it is saved */ }
 }
 
-const post = (path, body) => api(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-
-async function json(res) {
-  try { return await res.json(); } catch (e) { return null; }
-}
-
 /** What a request to the server answered: ``{res, body}``, with no ``res`` when it never answered. */
-async function ask(request) {
-  try {
-    const res = await request;
-    return { res, body: await json(res) };
-  } catch (e) {
-    return { res: null, body: null };
-  }
-}
+const ask = (request) => request.catch(() => ({ res: null, body: null }));
 
 /** The editor's side of a document the scan has: named by root, scan id and item id, read and saved by the server. */
 function serverSource(loc) {
@@ -71,9 +58,9 @@ function serverSource(loc) {
   return {
     draftKey: () => APP + '.draft:' + loc.root + ':' + loc.scan_id + ':' + loc.id,
     previewDoc: (body) => ({ ...body, root: loc.root, scan_id: loc.scan_id }),
-    source: () => ask(api('/api/doc/source?' + new URLSearchParams({ root: loc.root, scan: String(loc.scan_id), id: String(loc.id) }))),
-    render: (text) => ask(post('/api/doc/render', { ...where, text })),
-    save: (text, version, overwrite) => ask(post('/api/doc/save', { ...where, text, version, overwrite: !!overwrite })),
+    source: () => ask(getRaw('/api/doc/source?' + new URLSearchParams({ root: loc.root, scan: String(loc.scan_id), id: String(loc.id) }))),
+    render: (text) => ask(postRaw('/api/doc/render', { ...where, text })),
+    save: (text, version, overwrite) => ask(postRaw('/api/doc/save', { ...where, text, version, overwrite: !!overwrite })),
   };
 }
 

@@ -24,10 +24,9 @@ from fastapi.testclient import TestClient
 from app import outlook
 from app.webapp.routers import archive as archive_routes
 from app.webapp.server import app
-from src import config
+from src import child, config
 from src.archive_window.finder import Finder
 from src.email import archive_sheet
-from src.email import body as child
 from src.email.archive_sheet import (
     ERR_GONE,
     ERR_NO_COM,

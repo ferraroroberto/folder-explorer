@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src import search_tiers as tiers
-from src.email.query import Compiled, any_of, fts_term
+from src.email.query import FTS_BM25, Compiled, any_of, fts_term
 from src.folder_match import edits, fold, fuzzy
 from src.index import MAX_NEAR
 
@@ -34,7 +34,6 @@ LOWER_LIMIT = 200
 # Mails one closest word brings, the last indexed first: a word thousands hold tells none of them apart.
 CLOSEST_MAILS = 200
 
-_BM25 = "bm25(emails_fts, 10.0, 3.0, 3.0, 1.0)"
 _IDS = "(SELECT value FROM json_each(?))"
 
 # A mail below the exact tier as ranked: its tier, how many words it holds exactly, and its score.
@@ -130,7 +129,7 @@ class _Index:
         if newest:
             return sorted(by_date, key=lambda i: tiers.rank(found[i][0]))
         bm25 = dict(self.conn.execute(
-            "SELECT rowid, " + _BM25 + " FROM emails_fts WHERE emails_fts MATCH ?", (match,)).fetchall())
+            "SELECT rowid, " + FTS_BM25 + " FROM emails_fts WHERE emails_fts MATCH ?", (match,)).fetchall())
         return sorted(by_date, key=lambda i: (*tiers.sort_key(*found[i]), bm25.get(i, 0.0)))
 
 

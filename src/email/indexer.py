@@ -10,30 +10,28 @@ in ``state.sqlite3`` with its counts.
 
 from __future__ import annotations
 
+import contextlib
 import logging
-import os
 import subprocess
 import sys
 import time
-from pathlib import Path
+from collections.abc import Iterator
 from typing import Any, Optional
 
 from src import config, store
+from src.child import start_child
 from src.email.manifest import Manifest, from_index, walk, without
 from src.email.reader import read_facts
 from src.email.schema import open_writer
-from src.email.settings import EmailPart, email_part, is_under
+from src.email.settings import EmailPart, email_part
 from src.email.stage import Reader, Stage
 from src.index import Index, open_index
-from src.no_window import NO_WINDOW
-from src.roots import Root, resolve_roots
+from src.roots import Root, innermost_root, is_under, resolve_roots
 from src.run_state import Derived, derive_run_state
 from src.scan_lock import ScanBusy, ScanLock, probe_lock
 from src.scanner import exclude_keys
 
 logger = logging.getLogger(__name__)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # How often a run waiting for the lock tries again.
 _RETRY_S = 0.5
@@ -68,20 +66,46 @@ def take_lock(guard: ScanLock, wait_s: float) -> None:
             time.sleep(_RETRY_S)
 
 
+@contextlib.contextmanager
+def held_lock(wait_s: float = 0.0) -> Iterator[None]:
+    """Hold the email stage's lock until the block ends; ``EmailBusy`` past ``wait_s``."""
+    guard = lock()
+    take_lock(guard, wait_s)
+    try:
+        yield
+    finally:
+        guard.release()
+
+
+@contextlib.contextmanager
+def stage_guard(cfg: dict[str, Any], scope: Optional[str] = None,
+                wait_s: float = 0.0) -> Iterator[tuple[EmailPart, list[Root]]]:
+    """Enter the email stage to read its mail: the email part and the scan roots, with the lock held until the block ends.
+
+    Raises ``NotSetUp``, ``UnknownFolder`` (``scope`` is outside every email folder) or ``EmailBusy`` before
+    anything is touched.
+    """
+    roots = resolve_roots(cfg["roots"])
+    part = email_part(cfg, roots)
+    if part.stage_problem is not None or part.index_path is None:
+        raise NotSetUp(part.stage_problem or "no email index")
+    if scope is not None and not any(is_under(scope, f) for f in part.roots):
+        raise UnknownFolder("not inside an email folder: " + scope)
+    with held_lock(wait_s):
+        yield part, roots
+
+
 def _from_scan(folder: str, roots: list[Root]) -> Optional[Manifest]:
     """The manifest of ``folder`` from the current index of the deepest root holding it."""
-    for root in sorted(roots, key=lambda r: len(r.path), reverse=True):
-        if not is_under(folder, root.path):
-            continue
-        scan = store.current_index(root.key)
-        if scan is None:
-            return None
-        ix = Index(open_index(store.index_dir() / scan["index_file"]))
-        try:
-            return from_index(ix, root.path, folder)
-        finally:
-            ix.conn.close()
-    return None
+    root = innermost_root(folder, roots)
+    scan = None if root is None else store.current_index(root.key)
+    if root is None or scan is None:
+        return None
+    ix = Index(open_index(store.index_dir() / scan["index_file"]))
+    try:
+        return from_index(ix, root.path, folder)
+    finally:
+        ix.conn.close()
 
 
 def manifests(part: EmailPart, scope: Optional[str], roots: list[Root], exclude: frozenset[str],
@@ -173,13 +197,8 @@ def spawn(trigger: str, scope: Optional[str] = None, fresh: bool = False) -> "su
         cmd += ["--root", scope]
     if fresh:
         cmd.append("--fresh")
-    env = dict(os.environ, PYTHONUTF8="1", PYTHONUNBUFFERED="1")
-    log = open(store.data_dir() / "email.log", "ab")
-    try:
-        return subprocess.Popen(cmd, cwd=str(PROJECT_ROOT), env=env, stdout=log, stderr=subprocess.STDOUT,
-                                stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
-    finally:
-        log.close()
+    with open(store.data_dir() / "email.log", "ab") as log:
+        return start_child(cmd, log)
 
 
 def _publish(run_id: int, counts: dict[str, int]) -> None:
@@ -194,15 +213,7 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
         fresh: bool = False) -> dict[str, Any]:
     """One email run; raises ``NotSetUp``, ``UnknownFolder`` or ``EmailBusy`` before touching anything."""
     cfg = config.load()
-    roots = resolve_roots(cfg["roots"])
-    part = email_part(cfg, roots)
-    if part.stage_problem is not None or part.index_path is None:
-        raise NotSetUp(part.stage_problem or "no email index")
-    if scope is not None and not any(is_under(scope, f) for f in part.roots):
-        raise UnknownFolder("not inside an email folder: " + scope)
-    guard = lock()
-    take_lock(guard, wait_s)
-    try:
+    with stage_guard(cfg, scope, wait_s) as (part, roots):
         settled = store.settle_email_runs()
         if settled:
             logger.info("ℹ️ marked %d email run(s) left running by a stopped process as interrupted", settled)
@@ -225,5 +236,3 @@ def run(scope: Optional[str] = None, trigger: str = "cli", wait_s: float = 0.0, 
         logger.info("✅ email run %d (%s): %s of %d files in %.1f s", run_id, scope or "all folders", text,
                     counts["files"], time.monotonic() - t0)
         return {"id": run_id, "status": store.STATUS_OK, "message": text, "counts": counts}
-    finally:
-        guard.release()

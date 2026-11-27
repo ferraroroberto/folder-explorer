@@ -24,10 +24,10 @@ folder-explorer/
 │       ├── server.py           # FastAPI app: routers, sign-in gate, gzip, cache-busted static mount
 │       ├── bind.py             # remote_access + certificate -> host, scheme, state
 │       ├── feature_gate.py     # `require(block)`: the router dependency that answers 404 while a feature block is switched off
-│       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out
+│       ├── auth.py             # loopback-exempt bearer gate and /api/login, with the login lock-out; `require_this_pc`, the dependency of a PC-only route
 │       ├── manager.py          # the tray's webapp process: spawn, probe, stop
 │       ├── build.py            # the process's build identity (git SHA, start time, asset hash)
-│       ├── state.py            # the open-index pool, its housekeeping, and the folder search the route, the sheet and the window share
+│       ├── state.py            # the open-index pool, its housekeeping, the one path-to-scan place lookup, and the folder search the route, the sheet and the window share
 │       ├── serve.py            # vendored HTTP/2 launch module (hypercorn, uvicorn fallback)
 │       ├── routers/            # browse (tree, folder, top, percentile, types, summary), docs (the document viewer), search, emails, scans, settings,
 │       │                       #   archive (the Archive sheet and the macro's hand-off), search_v1 (the
@@ -75,7 +75,7 @@ folder-explorer/
 │   ├── desktop.py              # PC-only: open a mail in Outlook, a folder in File Explorer, a /doc app window
 │   ├── file_assoc.py           # PC-only: the per-user Markdown "Open with" registration (HKCU only) and its state
 │   ├── window_front.py         # PC-only: wait for the opened Explorer window, bring it to the front, log the timings
-│   ├── explorer_window.py      # PC-only: the folder of the foremost open File Explorer window's shown tab (the Archive sheet and window offer it)
+│   ├── explorer_window.py      # PC-only: the open File Explorer windows' shown tabs and the foremost one (its folder, for the Archive sheet and window; desktop.py reuses it)
 │   ├── email/                  # the email part: settings, query parser, search, relaxed (the tiers below an exact
 │   │   │                       #   match, docs/email-search.md), sanitize, body, schema (emails.sqlite3), manifest, stage, indexer (lock + history),
 │   │   │                       #   and the archive: naming, archive (the .msg writer), archive_paths
@@ -93,8 +93,9 @@ folder-explorer/
 │   ├── scan_runner.py          # one-at-a-time scan runs, the background worker and the schedule
 │   ├── scan_lock.py            # the cross-process scan lock and its free / held / unreadable probe
 │   ├── run_state.py            # the run state: one derive function over a run row and its lock (docs/run-state.md)
-│   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated
+│   ├── roots.py                # default roots (fixed drives + OneDrive), deduplicated; the path-inside-a-folder tests
 │   ├── config.py               # config.json with defaults and validation
+│   ├── child.py                # runs one of this app's own modules as a windowless, UTF-8 child (an archive verb, a mail read, the email stage)
 │   ├── installer.py            # vendored: what `setup.bat` runs (docs/install.md); the app's own inputs are the `[install]` table of .fleet.toml
 │   ├── install/                # the entries that table declares, standard library only: startup (the opt-in Startup shortcut to tray.bat),
 │   │                           #   probes (sign-in token and password, app answering: the checklist's app-specific rows)
@@ -115,6 +116,7 @@ folder-explorer/
 │                               #   tests/scan what a scan logs: the progress heartbeat over a fake clock, each root's result as it ends,
 │                               #   tests/harness the e2e harness's own checks (the port-pool failure naming),
 │                               #   tests/search folder search: matching, accents and near words, the tiers and their timing on a large synthetic index,
+│                               #   tests/repo checks over the repo's own source (each shared rule spelled in one module),
 │                               #   tests/e2e/_surface.py (vendored) is the `surface(page, id)` hook: a no-op in the gate, and under the design review's capture a test that calls it records that open surface in light and dark,
 │                               #   tests/js the front-end state tables under Node (run by tests/test_body_state_js.py)
 ├── scripts/                    # the gate, the eleven vendored ratchets (the UX surface one with its map generator), this

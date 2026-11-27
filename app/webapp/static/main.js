@@ -1,6 +1,6 @@
 /* Folder explorer: boot, tabs, toolbar, header lines, scan polling, the jump from Search into Explore and the shared click handling. */
 
-import { api, getJSON, postJSON, authHeaders, ApiError } from './api.js';
+import { getJSON, postJSON, postRaw, authHeaders, ApiError } from './api.js';
 import { DEFAULT_BASIS, readPref, rootInfo, state, writePref, APP, loadFeatures, onFeaturesChange } from './state.js';
 import { esc, extLabel, fmtAgo, glyph } from './fmt.js';
 import { initExplore, loadExplore, resetExplore, selectFolder, setMode, setShowHidden, toggleFolder } from './explore.js';
@@ -325,10 +325,8 @@ function wireTheme() {
 
 // The restart sheet reads the POST's status itself (a refusal is an answer, not an error).
 async function postRestart(url, body) {
-  const res = await api(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  let data = null;
-  try { data = await res.json(); } catch (e) { data = null; }
-  return { status: res.status, body: data };
+  const reply = await postRaw(url, body);
+  return { status: reply.res.status, body: reply.body };
 }
 
 async function showBuild() {

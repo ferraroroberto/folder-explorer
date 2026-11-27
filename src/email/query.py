@@ -33,6 +33,8 @@ OPERATORS = ("from", "to", "cc", "with", "subject", "filename", "has", "larger",
 
 # The FTS5 column order of emails_fts, fixed by every consumer's bm25 weights.
 FTS_SUBJECT, FTS_SENDER, FTS_RECIPIENTS, FTS_PREVIEW = 0, 1, 2, 3
+# Relevance over those columns, in that order: a subject word counts most, a preview word least.
+FTS_BM25 = "bm25(emails_fts, 10.0, 3.0, 3.0, 1.0)"
 
 # MAPI PidTagFlagStatus values.
 FLAG_FLAGGED, FLAG_DONE = 2, 1

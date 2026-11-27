@@ -5,16 +5,16 @@ from __future__ import annotations
 import logging
 import os
 from contextlib import ExitStack
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from src import folder_search, store
 from src.docs import dropmatch, listing
 from src.email.search import EmailIndexHolder
-from src.email.settings import is_under, under_any
 from src.folder_search import item_path
-from src.index import IndexPool
+from src.index import Index, IndexPool
 from src.request_timing import RequestStats
-from src.roots import Root, resolve_roots
+from src.roots import Root, innermost_root, names_below, resolve_roots, under_any
 
 logger = logging.getLogger(__name__)
 
@@ -48,24 +48,53 @@ def refresh_pool(roots: list[Root]) -> None:
         logger.info("ℹ️ removed %d replaced index file(s)", len(removed))
 
 
+@dataclass
+class Place:
+    """Where a folder or file sits in its root's current scan."""
+
+    root: Root
+    scan: dict[str, Any]
+    # None when the scan has no such folder (made after the scan ran).
+    folder: Optional[int]
+    # The file's index record when a file was asked for and the scan has it.
+    file: Optional[dict[str, Any]] = None
+    # The folder's names from the root down, filled only when asked for.
+    folder_names: list[str] = field(default_factory=list)
+
+
+def place_in(root: Root, names: list[str], *, is_file: bool, folder_names: bool = False) -> Optional[Place]:
+    """The folder (or file) ``names`` spells below ``root`` in its current scan; None when the root has no finished scan."""
+    scan = store.current_index(root.key)
+    if scan is None:
+        return None
+    index, lock = POOL.get(store.index_dir() / scan["index_file"])
+    with lock:
+        folder, found = index.find_by_names(names) if is_file else (index.find_folder(names), None)
+        above = _names_of(index, folder) if folder_names else []
+    return Place(root, scan, folder, found, above)
+
+
+def _names_of(index: Index, folder: Optional[int]) -> list[str]:
+    return [] if folder is None else [p["name"] for p in index.path(folder)]
+
+
+def locate(roots: list[Root], path: str, *, is_file: bool) -> Optional[Place]:
+    """The place of the path ``path``: the innermost root holding it decides.
+
+    None when no root holds it, that root has no finished scan or the scan has no such folder.
+    """
+    root = innermost_root(path, roots)
+    place = None if root is None else place_in(root, names_below(path, root.path), is_file=is_file)
+    return None if place is None or place.folder is None else place
+
+
 def locate_folder(roots: list[Root], path: str) -> Optional[dict[str, Any]]:
     """A folder's place in its root's current scan: ``{root, scan_id, id}``, so ``/api/open`` can name it by id.
 
-    The innermost root holding ``path`` decides; ``None`` when no scanned root
-    holds it or the scan has no such folder (made after the scan ran).
+    ``None`` as for :func:`locate`.
     """
-    for root in sorted(roots, key=lambda r: len(r.path), reverse=True):
-        if not is_under(path, root.path):
-            continue
-        scan = store.current_index(root.key)
-        if scan is None:
-            return None
-        names = [p for p in os.path.relpath(path, root.path).split(os.sep) if p and p != "."]
-        index, lock = POOL.get(store.index_dir() / scan["index_file"])
-        with lock:
-            folder = index.find_folder(names)
-        return None if folder is None else {"root": root.key, "scan_id": scan["id"], "id": folder}
-    return None
+    place = locate(roots, path, is_file=False)
+    return None if place is None else {"root": place.root.key, "scan_id": place.scan["id"], "id": place.folder}
 
 
 def _open_scans(cfg: dict[str, Any]) -> list[tuple[Root, dict[str, Any], tuple[Any, Any]]]:

@@ -71,6 +71,11 @@ def test_a_markdown_row_opens_in_the_document_sheet(page: Page, app_url: str, br
     expect(body.locator(".doc-prose :is(h1, h2)")).to_have_text(HEADINGS)
     expect(body.locator("table td").first).to_have_text("A1")
     expect(body.locator(".code-listing .k").first).to_have_text("def")
+    # One tap, one clipboard write: the main page already binds the vendored copy control, and the sheet adds no second one.
+    page.evaluate("() => { window.copies = 0; navigator.clipboard.writeText = async () => { window.copies += 1; }; }")
+    body.locator(".code-listing-copy").first.click()
+    expect(body.locator(".code-listing-status").first).to_have_text("Copied")
+    assert page.evaluate("() => window.copies") == 1
     expect(body.locator(".doc-link-off")).to_have_count(2)
     page.wait_for_function(IMAGE_LOADED, arg="#docSheetBody img[data-doc-img]")
     _themes(page, lambda: expect(body.locator("h1")).to_be_visible(), SHEET_SCROLLER)

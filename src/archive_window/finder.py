@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol
 
-from src.email.settings import under_any
+from src.roots import under_any
 from src.search_window.model import (
     FOLDERS,
     HINTS,

@@ -466,6 +466,15 @@ class Index:
         row = self.folder(fid)
         return int(row["lo"]), int(row["hi"])
 
+    def find_by_names(self, names: list[str]) -> tuple[Optional[int], Optional[dict[str, Any]]]:
+        """The folder holding the file ``names`` spells and that file; each None when the scan doesn't have it.
+
+        No names at all is the root folder itself, with no file.
+        """
+        folder = self.find_folder(names[:-1])
+        found = self.find_file(folder, names[-1]) if folder is not None and names else None
+        return folder, found
+
     def find_file(self, folder_id: int, name: str) -> Optional[dict[str, Any]]:
         """One file's id, indexed size and cloud state, by its folder and name."""
         row = self.conn.execute(

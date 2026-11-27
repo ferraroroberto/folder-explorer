@@ -193,7 +193,7 @@ def test_a_config_without_a_budget_has_no_limit_in_the_status(isolated: Path, se
 
 def test_spawn_passes_fresh_to_the_child(isolated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[list[str]] = []
-    monkeypatch.setattr(indexer.subprocess, "Popen", lambda cmd, **kw: seen.append(cmd))
+    monkeypatch.setattr(indexer, "start_child", lambda cmd, log: seen.append(cmd))
     indexer.spawn("app", fresh=True)
     indexer.spawn("app", "X")
     assert seen[0][-1] == "--fresh" and "--fresh" not in seen[1]

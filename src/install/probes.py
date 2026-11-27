@@ -14,11 +14,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from src import password
+from src import config, password
+from src.secrets_env import TOKEN_VAR, read_env_file
 
-ROOT = Path(__file__).resolve().parents[2]
-TOKEN_VAR = "FOLDER_EXPLORER_TOKEN"
-DEFAULT_PORT = 8453
 _PROBE_TIMEOUT_S = 2.0
 OK, MISSING, UNKNOWN = 0, 1, 2
 
@@ -26,16 +24,12 @@ OK, MISSING, UNKNOWN = 0, 1, 2
 def token_set(env_file: Path) -> bool | None:
     """Whether ``.env`` gives the token a value; None when the file cannot be read."""
     try:
-        lines = env_file.read_text(encoding="utf-8").splitlines()
+        env_file.read_bytes()  # read_env_file reads an unreadable file as an empty one
     except FileNotFoundError:
         return False
     except OSError:
         return None
-    for line in lines:
-        key, sep, value = line.partition("=")
-        if sep and key.strip() == TOKEN_VAR:
-            return bool(value.strip().strip('"').strip("'"))
-    return False
+    return bool(read_env_file(env_file).get(TOKEN_VAR))
 
 
 def served_sha(port: int) -> str | None:
@@ -56,17 +50,8 @@ def served_sha(port: int) -> str | None:
     return None
 
 
-def _port(root: Path) -> int:
-    """The port ``config.json`` names; the default when the file is missing, unreadable or names none."""
-    try:
-        raw = json.loads((root / "config.json").read_text(encoding="utf-8")).get("port")
-    except (OSError, ValueError, AttributeError):
-        return DEFAULT_PORT
-    return raw if isinstance(raw, int) else DEFAULT_PORT
-
-
-def _running(root: Path) -> int:
-    return OK if served_sha(_port(root)) else MISSING
+def _running(_root: Path) -> int:
+    return OK if served_sha(config.load()["port"]) else MISSING
 
 
 def _token(root: Path) -> int:
@@ -80,7 +65,7 @@ def _password(_root: Path) -> int:
 PROBES = {"running": _running, "token": _token, "password": _password}
 
 
-def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
+def main(argv: list[str] | None = None, root: Path = config.PROJECT_ROOT) -> int:
     args = sys.argv[1:] if argv is None else argv
     if len(args) != 1 or args[0] not in PROBES:
         print(f"usage: python -m src.install.probes {{{'|'.join(PROBES)}}}", file=sys.stderr)

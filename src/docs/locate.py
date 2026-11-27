@@ -56,5 +56,4 @@ def find_item(root_path: str, index: Index, path: str) -> Optional[dict[str, Any
     names = [p for p in rel.split("\\") if p and p != "."]
     if not names or ".." in names:
         return None
-    folder = index.find_folder(names[:-1])
-    return index.find_file(folder, names[-1]) if folder is not None else None
+    return index.find_by_names(names)[1]

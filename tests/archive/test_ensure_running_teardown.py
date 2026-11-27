@@ -88,7 +88,7 @@ def _arrange(monkeypatch, *, active, proc: _FakeProc | None):
         return proc
 
     monkeypatch.setattr(process_mod, "get_active_application", fake_active)
-    monkeypatch.setattr(process_mod, "_outlook_executable", lambda: FAKE_EXE)
+    monkeypatch.setattr(process_mod, "outlook_exe", lambda: FAKE_EXE)
     monkeypatch.setattr(process_mod, "_spawn_outlook", fake_spawn)
     monkeypatch.setattr(process_mod, "_POLL_INTERVAL_SECONDS", 0.0)
     return calls
@@ -172,7 +172,7 @@ def test_a_process_that_will_not_die_is_reported_as_still_running(monkeypatch):
 
 def test_a_spawn_that_fails_outright_raises_without_a_teardown(monkeypatch):
     monkeypatch.setattr(process_mod, "get_active_application", lambda: None)
-    monkeypatch.setattr(process_mod, "_outlook_executable", lambda: FAKE_EXE)
+    monkeypatch.setattr(process_mod, "outlook_exe", lambda: FAKE_EXE)
 
     def boom(exe: str):
         raise OSError("not executable")

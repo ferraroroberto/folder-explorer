@@ -29,6 +29,7 @@ from src import search_tiers as tiers
 from src.email import relaxed
 from src.email.query import (
     FLAG_FLAGGED,
+    FTS_BM25,
     FTS_PREVIEW,
     FTS_SENDER,
     FTS_SUBJECT,
@@ -47,7 +48,6 @@ FACETS = 5
 # Words around a match in a hit's snippet.
 SNIPPET_TOKENS = 18
 
-_BM25 = "bm25(emails_fts, 10.0, 3.0, 3.0, 1.0)"
 _HIT_COLUMNS = ("id", "file_path", "folder_path", "filename", "subject", "sender", "recipients", "date_sent",
                 "body_preview", "flag_status", "message_id")
 _OPTIONAL = ("to_addrs", "cc_addrs", "attachment_names", "has_attachments", "size")
@@ -118,7 +118,7 @@ class EmailIndex:
         extra = ""
         if match:
             extra = ", %s AS rank, %s AS hl_subject, %s AS hl_sender, snippet(emails_fts, %d, '%s', '%s', '…', %d) AS snip" % (
-                _BM25, _hl(FTS_SUBJECT), _hl(FTS_SENDER), FTS_PREVIEW, MARK_START, MARK_END, SNIPPET_TOKENS)
+                FTS_BM25, _hl(FTS_SUBJECT), _hl(FTS_SENDER), FTS_PREVIEW, MARK_START, MARK_END, SNIPPET_TOKENS)
         return self.conn.execute("SELECT " + self._select + extra + body + " ORDER BY " + order + " LIMIT ? OFFSET ?",
                                  args + [limit, offset]).fetchall()
 

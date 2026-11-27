@@ -14,8 +14,8 @@ from fastapi.responses import JSONResponse
 from app.webapp.state import EMAILS
 from src import config
 from src.email import indexer
-from src.email.settings import EmailPart, email_part, is_under
-from src.roots import resolve_roots
+from src.email.settings import EmailPart, email_part
+from src.roots import is_under, resolve_roots
 from src.run_state import RunState
 
 router = APIRouter(prefix="/api/email")

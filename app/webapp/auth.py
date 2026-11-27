@@ -66,6 +66,12 @@ def is_pc_itself(scope_or_request: Any) -> bool:
     return host in LOOPBACK or is_local_address(host)
 
 
+def require_this_pc(request: Request) -> None:
+    """The dependency of a PC-only route: 403 for a caller on any other device."""
+    if not is_pc_itself(request):
+        raise HTTPException(status_code=403, detail="this works on the PC only")
+
+
 def token_ok(presented: str) -> bool:
     return secrets_equal(presented, get_secret(TOKEN_VAR))
 

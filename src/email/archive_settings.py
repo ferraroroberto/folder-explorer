@@ -30,7 +30,7 @@ DEFAULT_ARCHIVE_FOLDER = "Archive"
 DEFAULT_ARCHIVED_CATEGORY = "Archived by task-os"
 DEFAULT_DISMISSED_CATEGORY = "Dismissed by task-os"
 
-# The body preview a live mail is read with, the same length the index stores.
+# Characters of a body kept as its preview: what the email index stores and what a live mail is read with.
 BODY_PREVIEW_LENGTH = 500
 
 

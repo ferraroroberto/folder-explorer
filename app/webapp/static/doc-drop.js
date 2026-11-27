@@ -16,7 +16,7 @@
  * place and a toast says why.
  */
 
-import { api } from './api.js';
+import { postRaw } from './api.js';
 import { NO_ANSWER, refusal } from './doc-answer.js';
 import { dragHasFiles, fileItemFor, matchBody, noHandleNote, pickDrop, toHex, whyNote } from './drop-files.js';
 import { handleFrom, handlesSupported, renderDropped } from './localdoc/local-doc.js';
@@ -26,17 +26,14 @@ import { glyph } from './fmt.js';
 import { showToast } from './_vendored/toast/toast.js';
 import { isOn } from './state.js';
 
-const JSON_HEAD = { 'Content-Type': 'application/json' };
-
 async function post(path, body) {
-  let res;
+  let reply;
   try {
-    res = await api(path, { method: 'POST', headers: JSON_HEAD, body: JSON.stringify(body) });
+    reply = await postRaw(path, body);
   } catch (e) {
     return { ok: false, ...NO_ANSWER };
   }
-  let data = null;
-  try { data = await res.json(); } catch (e) { data = null; }
+  const { res, body: data } = reply;
   return res.ok ? { ok: true, body: data } : { ok: false, ...refusal(res.status, data) };
 }
 

@@ -9,31 +9,31 @@ from pathlib import Path
 import pytest
 
 import src.explorer_window as explorer
-from src.explorer_window import ExplorerUnavailableError, pick_foremost_folder
+from src.explorer_window import ExplorerUnavailableError, pick_foremost
 
 
 def test_no_eligible_windows_returns_none() -> None:
-    assert pick_foremost_folder({}, [111, 222]) is None
+    assert pick_foremost({}, [111, 222]) is None
 
 
 def test_single_window_wins() -> None:
-    assert pick_foremost_folder({222: r"E:\mail\alpha"}, [999, 222]) == r"E:\mail\alpha"
+    assert pick_foremost({222: r"E:\mail\alpha"}, [999, 222]) == (222, r"E:\mail\alpha")
 
 
 def test_highest_z_order_window_wins_not_the_first_listed() -> None:
     # The shell lists oldest first; the window looked at last is the one highest in the z-order.
     folders = {111: r"E:\mail\old", 222: r"E:\mail\current"}
-    assert pick_foremost_folder(folders, [222, 111]) == r"E:\mail\current"
+    assert pick_foremost(folders, [222, 111]) == (222, r"E:\mail\current")
 
 
 def test_windows_that_are_not_explorer_never_block_the_pick() -> None:
     # The browser and the archive window sit in front but are not in the eligible mapping.
-    assert pick_foremost_folder({111: r"E:\mail\alpha"}, [900, 901, 111]) == r"E:\mail\alpha"
+    assert pick_foremost({111: r"E:\mail\alpha"}, [900, 901, 111]) == (111, r"E:\mail\alpha")
 
 
 def test_the_newest_window_wins_when_the_z_order_has_no_match() -> None:
     folders = {111: r"E:\mail\old", 222: r"E:\mail\newest"}
-    assert pick_foremost_folder(folders, []) == r"E:\mail\newest"
+    assert pick_foremost(folders, []) == (222, r"E:\mail\newest")
 
 
 def test_only_the_explorer_program_hosts_a_destination() -> None:
@@ -118,10 +118,7 @@ def test_a_hidden_tab_never_speaks_for_its_window(monkeypatch: pytest.MonkeyPatc
 
 def test_every_module_that_lists_shell_windows_keeps_to_the_shown_tab() -> None:
     # Tabs share their window's handle, so a reader that keys by handle without this check answers a hidden tab.
-    # window_front keeps every tab of a window on purpose (it matches the folder an open just showed).
-    by_design = {"window_front.py"}
+    # shown_tabs() is that one reader; window_front keeps every tab on purpose (it matches the folder an open just showed).
     src = Path(__file__).resolve().parent.parent / "src"
     readers = [p for p in src.rglob("*.py") if 'Dispatch("Shell.Application")' in p.read_text(encoding="utf-8")]
-    assert {p.name for p in readers} >= {"desktop.py", "explorer_window.py"}
-    unchecked = [p.name for p in readers if p.name not in by_design and "is_shown_tab(" not in p.read_text(encoding="utf-8")]
-    assert unchecked == []
+    assert sorted(p.name for p in readers) == ["explorer_window.py", "window_front.py"]

@@ -34,15 +34,14 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
+from src.email.archive_settings import BODY_PREVIEW_LENGTH
 from src.email.manifest import Manifest, MsgFile
 from src.email.preview import clean_preview
 from src.email.reader import ReadError, read_facts
-from src.email.settings import is_under
+from src.roots import is_under
 
 logger = logging.getLogger(__name__)
 
-# Characters of the body kept as the indexed preview, as the older scanner did.
-PREVIEW_CHARS = 500
 # Rows written per commit, so a long run shows progress and a crash loses little.
 COMMIT_EVERY = 200
 # The fewest seconds between two progress reports, so a fast run is not one write per file.
@@ -157,7 +156,7 @@ class Stage:
             self.counts.waiting_bytes += f.size
             return
         try:
-            facts = self.read(f.path, PREVIEW_CHARS)
+            facts = self.read(f.path, BODY_PREVIEW_LENGTH)
         except ReadError as exc:
             self._fail(f, exc.code + ": " + str(exc))
             self._tick()

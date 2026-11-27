@@ -196,10 +196,11 @@ def test_a_probe_that_cannot_read_its_file_is_unknown_and_a_bad_name_is_refused(
 def test_the_running_probe_reads_the_port_from_the_config(checkout: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[int] = []
     monkeypatch.setattr(probes, "served_sha", lambda port: seen.append(port) or None)
+    monkeypatch.setenv(config.CONFIG_ENV, str(checkout / "config.json"))
     assert probes.main(["running"], checkout) == probes.MISSING
     (checkout / "config.json").write_text('{"port": 9123}', encoding="utf-8")
     probes.main(["running"], checkout)
-    assert seen == [probes.DEFAULT_PORT, 9123]
+    assert seen == [config.DEFAULTS["port"], 9123]
 
 
 def _startup(tmp_path: Path) -> tuple[dict[str, str], Path]:

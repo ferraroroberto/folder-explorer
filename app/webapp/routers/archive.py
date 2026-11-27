@@ -34,14 +34,13 @@ from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
-from app.webapp.auth import is_pc_itself
+from app.webapp.auth import is_pc_itself, require_this_pc
 from app.webapp.feature_gate import require
 from app.webapp.state import ScanChanged, locate_folder, sheet_folders, sheet_subfolders
-from src import config, features, macro_home
+from src import child, config, features, macro_home
 from src.config import PROJECT_ROOT
 from src.desktop import outlook_exe
 from src.email import archive_sheet
-from src.email import body as child
 from src.email.archive import DATE_PREFIX_CHOICES
 from src.email.archive_sheet import ERR_FAILED, ERR_TIMEOUT, error_document
 from src.email.suggester import EmailData
@@ -164,11 +163,6 @@ class _FollowUps:
 
 
 FOLLOW_UPS = _FollowUps()
-
-
-def _pc_only(request: Request) -> None:
-    if not is_pc_itself(request):
-        raise HTTPException(status_code=403, detail="this works on the PC only")
 
 
 def bridge(args: list[str], timeout: float) -> dict[str, Any]:
@@ -327,10 +321,9 @@ def _take_pending() -> Optional[dict[str, Any]]:
     return doc
 
 
-@router.post("/archive/current")
-def current(request: Request) -> dict[str, Any]:
+@router.post("/archive/current", dependencies=[Depends(require_this_pc)])
+def current() -> dict[str, Any]:
     """The sheet's document for the mail open or selected in Outlook; the child reads it, this process ranks it."""
-    _pc_only(request)
     doc = bridge(["prepare", "--current", "--defer-ranking"], PREPARE_TIMEOUT_S)
     data = archive_sheet.rank_data(doc.pop("rank_input", None))
     if doc.get("ok") and data is not None:
@@ -338,14 +331,13 @@ def current(request: Request) -> dict[str, Any]:
     return PREPARED.keep(with_locations(doc))
 
 
-@router.post("/archive/handoff")
-def handoff(request: Request, doc: dict[str, Any] = Body(...)) -> dict[str, bool]:
+@router.post("/archive/handoff", dependencies=[Depends(require_this_pc)])
+def handoff(doc: dict[str, Any] = Body(...)) -> dict[str, bool]:
     """The macro's entry gives its mail; ``shown`` says whether a page is open to show it.
 
     A mail still ranking is shown at once and ranked here right after, and the page gets the same
     token again with its folders filled in.
     """
-    _pc_only(request)
     started = time.monotonic()
     data = archive_sheet.rank_data(doc.pop("rank_input", None))
     ranking = bool(doc.get("ok") and doc.get("ranking") and data is not None)
@@ -364,14 +356,13 @@ def handoff(request: Request, doc: dict[str, Any] = Body(...)) -> dict[str, bool
     return {"shown": shown}
 
 
-@router.get("/archive/pending")
+@router.get("/archive/pending", dependencies=[Depends(require_this_pc)])
 async def pending(request: Request, wait: float = Query(0.0, ge=0.0, le=PENDING_WAIT_MAX_S)) -> dict[str, Any]:
     """The mail the macro handed over since the last poll, once; a page polls this while it is visible.
 
     ``wait`` holds the poll open up to that many seconds and answers the moment a hand-off arrives, so
     the sheet opens without waiting for the next poll. A page that went away ends the wait.
     """
-    _pc_only(request)
     deadline = time.monotonic() + wait
     while True:
         doc = _take_pending()
@@ -384,13 +375,12 @@ async def pending(request: Request, wait: float = Query(0.0, ge=0.0, le=PENDING_
             return {"mail": None}
 
 
-@router.post("/archive/file")
-def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+@router.post("/archive/file", dependencies=[Depends(require_this_pc)])
+def file_mail(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
     """File the prepared mail in the chosen folder, with the chosen category or none.
 
     ``duplicate: true`` files another copy of an archived one; ``date_prefix`` is ``auto``, ``on`` or ``off``.
     """
-    _pc_only(request)
     ids = PREPARED.ids(str(body.get("token", "")))
     folder = body.get("folder")
     if ids is None:
@@ -422,14 +412,13 @@ def file_mail(request: Request, body: dict[str, Any] = Body(...)) -> dict[str, A
     return doc
 
 
-@router.get("/archive/followup")
+@router.get("/archive/followup", dependencies=[Depends(require_this_pc)])
 async def followup(request: Request, token: str = Query(..., max_length=64),
                    wait: float = Query(0.0, ge=0.0, le=PENDING_WAIT_MAX_S)) -> dict[str, Any]:
     """What followed a filing (the category, the indexing): ``{"done": false}`` while it runs, then ``{"done": true, "result"}``.
 
     ``wait`` holds the poll open until it ends; the result is given once, and 404 says no filing under that token is known.
     """
-    _pc_only(request)
     deadline = time.monotonic() + wait
     while True:
         known, doc = FOLLOW_UPS.take(token)
@@ -444,39 +433,36 @@ async def followup(request: Request, token: str = Query(..., max_length=64),
             return {"done": False}
 
 
-@router.post("/archive/explorer")
-def explorer(request: Request) -> dict[str, Any]:
+@router.post("/archive/explorer", dependencies=[Depends(require_this_pc)])
+def explorer() -> dict[str, Any]:
     """The folder open in the foremost File Explorer window on this PC, when it is inside an email folder.
 
     Answers the sheet's document shape: ``folder_path`` and its place in the scan, or an error whose code says
     whether Windows couldn't be asked, no Explorer folder is open, or the folder is outside the email folders.
     """
-    _pc_only(request)
     doc = bridge(["explorer"], EXPLORER_TIMEOUT_S)
     if doc.get("ok"):
         doc["location"] = locate_folder(resolve_roots(config.load()["roots"]), str(doc["folder_path"]))
     return doc
 
 
-@router.get("/archive/folders")
-def folders(request: Request, q: str = Query("", max_length=200)) -> dict[str, Any]:
+@router.get("/archive/folders", dependencies=[Depends(require_this_pc)])
+def folders(q: str = Query("", max_length=200)) -> dict[str, Any]:
     """Every folder Quick search finds for the same words, those a mail can be filed in first, for "Find a folder".
 
     Each folder says ``fileable`` (inside the email folders) and carries its place in the scan; ``total`` counts
     every match, of which the first rows are listed.
     """
-    _pc_only(request)
     return sheet_folders(config.load(), q)
 
 
-@router.get("/archive/subfolders")
-def subfolders(request: Request, root: str = Query(..., max_length=200), scan_id: int = Query(...),
+@router.get("/archive/subfolders", dependencies=[Depends(require_this_pc)])
+def subfolders(root: str = Query(..., max_length=200), scan_id: int = Query(...),
                id: int = Query(...)) -> dict[str, Any]:
     """The subfolders of the folder a listed row names by its place in the scan, in the same shape as ``/archive/folders``.
 
     Never takes a path: the folder is looked up by root, scan id and folder id, and 409 says a newer scan replaced it.
     """
-    _pc_only(request)
     try:
         return sheet_subfolders(config.load(), root, scan_id, id)
     except ScanChanged as exc:

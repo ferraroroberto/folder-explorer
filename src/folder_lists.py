@@ -20,8 +20,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from src import config
-from src.email.settings import is_under, under_any
-from src.roots import normalize, resolve_roots
+from src.roots import is_under, normalize, resolve_roots, under_any
 
 logger = logging.getLogger(__name__)
 

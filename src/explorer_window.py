@@ -2,8 +2,9 @@
 
 Two layers, split so the choice is testable without Windows:
 
-- :func:`pick_foremost_folder` is pure: given the eligible windows and the window
-  z-order it says which one wins.
+- :func:`pick_foremost` is pure: given the eligible windows and the window
+  z-order it says which one wins. :func:`shown_tabs` lists the windows; opening a
+  folder in the foremost one (``src/desktop.py``) uses both.
 - :func:`get_current_explorer_folder` asks the shell which windows are open and
   reads the z-order. It tells "the shell answered and nothing is open" (``None``)
   apart from "the shell could not be asked" (:class:`ExplorerUnavailableError`),
@@ -19,8 +20,11 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Sequence
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 # Legacy Internet Explorer instances sit in the same shell collection and are not destinations; the
 # hosting program's name tells them apart, and a name with no extension is the same program.
@@ -60,38 +64,46 @@ class ExplorerUnavailableError(RuntimeError):
     """The Windows shell could not be asked at all, which is not the same answer as "no window is open"."""
 
 
-def pick_foremost_folder(folders_by_hwnd: dict[int, str], z_order: Sequence[int]) -> str | None:
-    """The folder of the highest-z-order eligible window.
+def pick_foremost(by_hwnd: dict[int, T], z_order: Sequence[int]) -> tuple[int, T] | None:
+    """The highest-z-order eligible window as ``(handle, value)``.
 
-    ``folders_by_hwnd`` is in the order the shell listed the windows (oldest first); ``z_order`` is every
-    top-level window handle, topmost first, and holds handles that are not Explorer windows. When no
-    eligible window is in ``z_order`` the newest listed one wins, and ``None`` means there is no eligible window.
+    ``by_hwnd`` is in the order the shell listed the windows (oldest first); ``z_order`` is every top-level
+    window handle, topmost first, and holds handles that are not Explorer windows. When no eligible window
+    is in ``z_order`` the newest listed one wins, and ``None`` means there is no eligible window.
     """
-    if not folders_by_hwnd:
+    if not by_hwnd:
         return None
-    for hwnd in z_order:
-        folder = folders_by_hwnd.get(hwnd)
-        if folder is not None:
-            return folder
     # A minimised window, or one that closed during the snapshot, is missing from the z-order; the newest is the closest stand-in.
-    return list(folders_by_hwnd.values())[-1]
+    hwnd = next((h for h in z_order if h in by_hwnd), list(by_hwnd)[-1])
+    return hwnd, by_hwnd[hwnd]
+
+
+def shown_tabs() -> dict[int, Any]:
+    """Window handle to the shell object of the shown tab of every File Explorer window, oldest first.
+
+    Every tab of a window reports the window's handle, so only the shown tab speaks for it; a hidden tab
+    would answer, or be navigated, where the user isn't looking.
+    """
+    import win32com.client  # noqa: PLC0415 - Windows only, imported where it is used
+
+    tabs: dict[int, Any] = {}
+    for window in win32com.client.Dispatch("Shell.Application").Windows():
+        try:
+            if is_explorer(str(window.FullName or "")) and is_shown_tab(window):
+                tabs[int(window.HWND)] = window
+        except Exception as exc:  # noqa: BLE001 - a window can close while the shell is listing
+            logger.debug("Skipping a shell window: %s", exc)
+    return tabs
 
 
 def _enumerate_explorer_folders() -> dict[int, str]:
     """Window handle to folder path for every File Explorer window showing a real folder.
 
-    Every tab of a window reports the window's handle, so only the shown tab speaks for it; a hidden tab
-    would answer a folder the user isn't looking at. This PC, Quick Access, the Recycle Bin and the like
-    have no folder path, so they are skipped.
+    This PC, Quick Access, the Recycle Bin and the like have no folder path, so they are skipped.
     """
-    import win32com.client  # noqa: PLC0415 - Windows only, imported where it is used
-
     folders: dict[int, str] = {}
-    for window in win32com.client.Dispatch("Shell.Application").Windows():
+    for hwnd, window in shown_tabs().items():
         try:
-            if not is_explorer(str(window.FullName or "")) or not is_shown_tab(window):
-                continue
-            hwnd = int(window.HWND)
             path = str(window.Document.Folder.Self.Path or "")
         except Exception as exc:  # noqa: BLE001 - a window can close while the shell is listing
             logger.debug("Skipping a shell window: %s", exc)
@@ -137,8 +149,8 @@ def get_current_explorer_folder() -> str | None:
         except Exception as exc:  # noqa: BLE001 - without a z-order the newest window still answers
             logger.warning("⚠️ explorer: can't read the window order: %s", exc)
             z_order = []
-        chosen = pick_foremost_folder(folders, z_order)
+        picked = pick_foremost(folders, z_order)
         logger.info("ℹ️ explorer: the foremost window is open on a folder")
-        return chosen
+        return None if picked is None else picked[1]
     finally:
         pythoncom.CoUninitialize()

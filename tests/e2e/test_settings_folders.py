@@ -179,6 +179,8 @@ def test_every_screenshot_setting_is_in_settings_and_a_refusal_puts_the_saved_va
     sheet = open_setting(page, "screenshot")
     clipboard = sheet.locator("#snapClipboardSlot [role=switch]")
     expect(clipboard).to_have_attribute("aria-checked", "true")
+    as_file = sheet.locator("#snapAsFileSlot [role=switch]")
+    expect(as_file).to_have_attribute("aria-checked", "true")
     expect(sheet.locator("#snapLoupeSlot [role=switch]")).to_have_attribute("aria-checked", "true")
     expect(sheet.locator("#snapQuality")).to_have_value("90")
     expect(sheet.locator("#snapPrefix")).to_have_value("snap")
@@ -194,6 +196,10 @@ def test_every_screenshot_setting_is_in_settings_and_a_refusal_puts_the_saved_va
         expect(clipboard).to_have_attribute("aria-checked", "false")
         expect(sheet.locator("#snapClipboardNote")).to_contain_text("only saved as a file")
         assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["copy_to_clipboard"] is False
+        with page.expect_response(_saved):
+            as_file.click()
+        expect(sheet.locator("#snapAsFileNote")).to_contain_text("only the image")
+        assert page.request.get(app_url + "/api/config").json()["config"]["snap"]["copy_as_file"] is False
         sheet.locator("#snapPrefix").fill("shot")
         with page.expect_response(_saved):
             sheet.locator("#snapPrefix").press("Enter")
@@ -211,7 +217,7 @@ def test_every_screenshot_setting_is_in_settings_and_a_refusal_puts_the_saved_va
         sheet.locator("#snapOpenFolder").click()
         expect(page.locator(".toast").last).to_contain_text("Could not open the folder")
     finally:
-        page.request.post(app_url + "/api/config", data={"snap": {"jpeg_quality": 90, "copy_to_clipboard": True, "file_prefix": "snap"}})
+        page.request.post(app_url + "/api/config", data={"snap": {"jpeg_quality": 90, "copy_to_clipboard": True, "copy_as_file": True, "file_prefix": "snap"}})
 
 
 def test_the_archive_category_switch_is_off_by_default_and_saves(page: Page, app_url: str) -> None:

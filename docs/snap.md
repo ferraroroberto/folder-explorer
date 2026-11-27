@@ -1,6 +1,6 @@
 # Region screenshot
 
-The tray's screenshot: press a global hotkey anywhere, click one corner of an area on the frozen screen, move, click again, and the selection is saved as a timestamped JPEG and copied to the clipboard. No editor, no dialog. Esc or a right-click cancels and saves nothing. It runs inside the tray process (`pythonw -m app.tray`), so it is there whenever the tray is, and a second tray never starts (the tray's mutex).
+The tray's screenshot: press a global hotkey anywhere, click one corner of an area on the frozen screen, move, click again, and the selection is saved as a timestamped JPEG and copied to the clipboard, as an image and as the file. No editor, no dialog. Esc or a right-click cancels and saves nothing. It runs inside the tray process (`pythonw -m app.tray`), so it is there whenever the tray is, and a second tray never starts (the tray's mutex).
 
 ## Selecting an area
 
@@ -12,13 +12,17 @@ By default the first click anchors a corner and releasing it changes nothing; mo
 - **F6** shows or hides the loupe and saves the choice as `snap.show_loupe`.
 - **Arrow keys** move the cursor one pixel, **Shift+arrow** ten, before or after the first click, so an edge can be placed exactly.
 
+## What lands on the clipboard
+
+With **Copy to clipboard** on, a capture puts the image there (`CF_DIB`). With **Copy the file too** also on, the same clipboard open adds the saved file (`CF_HDROP`, with `Preferred DropEffect` set to copy), and each app takes the format it understands: Ctrl+V in a File Explorer folder pastes a copy of the file, an image editor or a chat box pastes the image. Some apps prefer a file when both are offered and attach it instead of showing it inline; turn **Copy the file too** off for those. A capture that could not be saved has no file to offer, so only the image goes on the clipboard and `tray.log` says why. The write retries for a moment while another app holds the clipboard open. It lives in `src/snap/clipboard.py`.
+
 ## Tray menu
 
-**Screenshot** in the tray menu shows the hotkey in its title and holds **Copy to clipboard on save**, **Show loupe (F6)**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix...** (a dialog; a character Windows refuses in a filename, an empty value or more than 40 characters is refused), **Open folder** and **Change folder...**. Each is also a row of Settings (below). Each is written to the `snap` block of `config.json` (only that key changes) and applies from the next capture. While the tray runs, it looks at `config.json` every two seconds and redraws the menu when the file changes, so a setting changed in Settings shows its check here too. A hotkey another application already owns is shown first in the submenu ("Not running: ...") and logged, and the rest of the tray is unaffected.
+**Screenshot** in the tray menu shows the hotkey in its title and holds **Copy to clipboard on save**, **Copy the file too (paste into a folder)**, **Show loupe (F6)**, **JPEG quality** (70, 80, 90, 95, 100), **Filename prefix...** (a dialog; a character Windows refuses in a filename, an empty value or more than 40 characters is refused), **Open folder** and **Change folder...**. Each is also a row of Settings (below). Each is written to the `snap` block of `config.json` (only that key changes) and applies from the next capture. While the tray runs, it looks at `config.json` every two seconds and redraws the menu when the file changes, so a setting changed in Settings shows its check here too. A hotkey another application already owns is shown first in the submenu ("Not running: ...") and logged, and the rest of the tray is unaffected.
 
 ## Settings
 
-The **Screenshot** row under **Tray and screenshot** in Settings opens a sheet holding every setting the tray menu does, plus the hotkey: **Hold to capture**, **Copy to clipboard**, **Show loupe**, **JPEG quality** (70, 80, 90, 95, 100), **File prefix**, **Hotkey** and **Save folder**. A switch or a menu saves at once; a text field saves when you leave it or press Enter. Each goes through `POST /api/config` into `snap_settings.validate()`, so Settings and the tray refuse the same values with the same sentence, and a refused value leaves `config.json` untouched and puts the saved one back in the field. Only the changed key is written.
+The **Screenshot** row under **Tray and screenshot** in Settings opens a sheet holding every setting the tray menu does, plus the hotkey: **Hold to capture**, **Copy to clipboard**, **Copy the file too**, **Show loupe**, **JPEG quality** (70, 80, 90, 95, 100), **File prefix**, **Hotkey** and **Save folder**. A switch or a menu saves at once; a text field saves when you leave it or press Enter. Each goes through `POST /api/config` into `snap_settings.validate()`, so Settings and the tray refuse the same values with the same sentence, and a refused value leaves `config.json` untouched and puts the saved one back in the field. Only the changed key is written.
 
 - **Hotkey:** read once when the tray starts, so a new combo applies the next time the tray starts; the row says so. A combo another application owns is reported where it always was, as "Not running: ..." at the top of the tray's Screenshot menu and in `tray.log`; Settings does not probe it, because the tray holds the registration.
 - **Save folder:** shown, never edited, so a phone can never change where the PC writes files. **Open folder** (`POST /api/snap/open-folder`, this PC only) shows the configured folder in File Explorer through `src/desktop.py`, making it first when no capture has yet; the page names no path. Change it from the tray's **Change folder...** or in `config.json`.
@@ -32,6 +36,7 @@ The **Screenshot** row under **Tray and screenshot** in Settings opens a sheet h
 | `hotkey` | `ctrl+shift+a` | One or more of `ctrl`, `shift`, `alt`, `win`, then a letter, digit, `f1`-`f24`, `printscreen` or `space`; read when the tray starts |
 | `jpeg_quality` | `90` | 1-100 |
 | `copy_to_clipboard` | `true` | Also put the capture on the clipboard |
+| `copy_as_file` | `true` | With `copy_to_clipboard`, put the saved file there too (see [What lands on the clipboard](#what-lands-on-the-clipboard)) |
 | `file_prefix` | `snap` | Start of every file name |
 | `show_loupe` | `true` | Whether the loupe is shown |
 | `hold_to_capture` | `false` | `false`: click, move, click; `true`: press, drag, release |

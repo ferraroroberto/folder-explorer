@@ -1212,7 +1212,7 @@ flowchart LR
 - **Root:** `data-surface`
 - **Reach:** Settings, Tray and screenshot, Screenshot (Screenshot block on)
 - **Holds:**
-  - Hold to capture, Copy to clipboard and Show loupe switches
+  - Hold to capture, Copy to clipboard, Copy the file too and Show loupe switches
   - JPEG quality, File prefix and Hotkey
   - Save folder, with Open folder on the PC
   - a note under each

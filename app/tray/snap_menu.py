@@ -46,7 +46,7 @@ def refresh_when_config_changes(refresh: Callable[[], None], stop: threading.Eve
 
 
 def snap_menu_item(snap: SnapService) -> pystray.MenuItem:
-    """The submenu: clipboard, JPEG quality, filename prefix, loupe, then the save folder; a hotkey that could not be taken shows first."""
+    """The submenu: clipboard (image, and the file too), JPEG quality, filename prefix, loupe, then the save folder; a hotkey that could not be taken shows first."""
 
     def pick_quality(quality: int) -> Callable[[], None]:
         return lambda: snap.set_setting("jpeg_quality", quality)
@@ -70,6 +70,12 @@ def snap_menu_item(snap: SnapService) -> pystray.MenuItem:
             "Copy to clipboard on save",
             lambda: snap.set_setting("copy_to_clipboard", not snap.current().copy_to_clipboard),
             checked=lambda _item: snap.current().copy_to_clipboard,
+        ),
+        pystray.MenuItem(
+            "Copy the file too (paste into a folder)",
+            lambda: snap.set_setting("copy_as_file", not snap.current().copy_as_file),
+            checked=lambda _item: snap.current().copy_as_file,
+            enabled=lambda _item: snap.current().copy_to_clipboard,
         ),
         pystray.MenuItem(
             "Show loupe (F6)",

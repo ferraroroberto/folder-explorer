@@ -57,6 +57,7 @@
     "hotkey": "ctrl+shift+a",
     "jpeg_quality": 90,
     "copy_to_clipboard": true,
+    "copy_as_file": true,
     "file_prefix": "snap",
     "show_loupe": true,
     "hold_to_capture": false

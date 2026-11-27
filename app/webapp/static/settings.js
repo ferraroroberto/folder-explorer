@@ -19,6 +19,7 @@ let moveSwitch = null;
 let traySwitch = null;
 let snapHoldSwitch = null;
 let snapClipboardSwitch = null;
+let snapAsFileSwitch = null;
 let snapLoupeSwitch = null;
 let autoSwitch = null;
 let onRootsChanged = () => {};
@@ -155,6 +156,10 @@ function renderSnap(snap, folder) {
   $('snapClipboardNote').textContent = snap.copy_to_clipboard
     ? 'On: a saved screenshot is also put on the clipboard, ready to paste.'
     : 'Off: a screenshot is only saved as a file.';
+  setSwitch(snapAsFileSwitch, snap.copy_as_file);
+  $('snapAsFileNote').textContent = snap.copy_as_file
+    ? 'On: with Copy to clipboard, Ctrl+V in a File Explorer folder pastes a copy of the file. Apps paste the image, though some attach the file instead.'
+    : 'Off: the clipboard holds only the image.';
   setSwitch(snapLoupeSwitch, snap.show_loupe);
   $('snapLoupeNote').textContent = snap.show_loupe
     ? 'On: a magnifier follows the cursor while you select. F6 shows or hides it.'
@@ -294,7 +299,7 @@ function buildFolderLists() {
   });
 }
 
-/** The screenshot sheet's three switches, its menus and fields, and Open folder. */
+/** The screenshot sheet's four switches, its menus and fields, and Open folder. */
 function buildSnapControls() {
   snapHoldSwitch = switchEl(false, {
     label: 'Hold to capture',
@@ -306,6 +311,11 @@ function buildSnapControls() {
     onToggle: (next) => saveSnap({ copy_to_clipboard: next }),
   });
   $('snapClipboardSlot').appendChild(snapClipboardSwitch);
+  snapAsFileSwitch = switchEl(true, {
+    label: 'Copy the file too',
+    onToggle: (next) => saveSnap({ copy_as_file: next }),
+  });
+  $('snapAsFileSlot').appendChild(snapAsFileSwitch);
   snapLoupeSwitch = switchEl(true, {
     label: 'Show loupe',
     onToggle: (next) => saveSnap({ show_loupe: next }),

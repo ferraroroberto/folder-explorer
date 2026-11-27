@@ -77,17 +77,17 @@ A PC with an AllSigned PowerShell execution policy needs nothing different: `set
 
 What moves is declared in `[install.migrate]` of `.fleet.toml`: `config.json`, `.env`, `mailboxes.json`, `config\app_password.json` and `webapp\certificates\`, each only when the old copy has it. The runtime-data folder (`C:\sqlite\folder-explorer\` unless an environment variable names another) holds the scan history and indexes; it stays where it is and both copies share it. `.venv` is never copied. The installer does the whole move, and nothing in it deletes the old copy.
 
-**Reinstall in the same folder (the usual case).** Open a plain PowerShell terminal (not a session started by something that runs from the app's folder) and run these in order, from the folder above the app:
+**Reinstall in the same folder (the usual case).** It works whatever version the installed copy is, because it runs from a fresh clone and never runs the old copy's code. Open a plain PowerShell terminal (not a session started by something that runs from the app's folder) and run these in order from `<root>`, the folder that holds the app:
 
 ```powershell
-cd <parent folder of the checkout>
+cd <root>
 git -C folder-explorer worktree list            # only the checkout itself: finish and remove any other first
-git -C folder-explorer pull --ff-only           # so the current installer is the one that runs
-.\folder-explorer\setup.bat -InPlace -WhatIf    # read the backup name, every step and every file it would copy; nothing changes
-.\folder-explorer\setup.bat -InPlace
+git clone <this repository's URL> folder-explorer.incoming          # a fresh clone beside the install; run nothing in it yet
+.\folder-explorer.incoming\setup.bat -Replace folder-explorer -WhatIf   # read the backup name, every step and every file it would copy; nothing changes
+.\folder-explorer.incoming\setup.bat -Replace folder-explorer
 ```
 
-It stops every process that runs from the folder (the tray, the web app, and a scan or an archive verb in flight), renames the folder to `folder-explorer.bak-YYYYMMDD-N`, clones the `origin` remote's default branch into the same path, then copies, installs, starts with `tray.bat --restart` and verifies. It passes only when the new clone serves its own commit, and then ends with `in place: [ok] setup.bat -MigrateFrom` and exit code 0. The path is unchanged, so the launcher's app entry, a scheduled scan job, the Startup shortcut and `FOLDER_EXPLORER_HOME` need no edit.
+`git -C folder-explorer remote get-url origin` prints the URL to clone: the clone must have the same `origin` as the install. It stops every process that runs from `folder-explorer` (the tray, the web app, and a scan or an archive verb in flight), renames the folder to `folder-explorer.bak-YYYYMMDD-N` (uncommitted edits stay there), moves `folder-explorer.incoming` to `folder-explorer`, then copies, installs, starts with `tray.bat --restart` and verifies. It passes only when the new clone serves its own commit, and then ends with `[ok] setup.bat -MigrateFrom` and exit code 0. The path is unchanged, so the launcher's app entry, a scheduled scan job, the Startup shortcut and `FOLDER_EXPLORER_HOME` need no edit. On an install whose `setup.bat` already has `-InPlace`, `.\folder-explorer\setup.bat -InPlace` does the same and makes the clone itself.
 
 **Beside it (another folder, or an old copy that is not a git clone):**
 
@@ -103,7 +103,7 @@ Verify takes the port from the new copy's `config.json` (`port`; 8453 when it se
 
 Only you can do these steps:
 
-- **Linked worktrees and local work:** a linked git worktree of the old copy points at the path the fresh clone takes over, so `-InPlace` breaks it. Local commits, uncommitted edits and ignored files that are not listed above stay in the backup only.
+- **Linked worktrees and local work:** a linked git worktree of the old copy points at the path the fresh clone takes over, so `-Replace` and `-InPlace` break it. Local commits, uncommitted edits and ignored files that are not listed above stay in the backup only.
 - **Repoint** what stores the old path, after a `-MigrateFrom` into another folder: the run lists the Startup links, Run keys and scheduled tasks that still point at it. Also set again what it cannot see: `FOLDER_EXPLORER_HOME` for the Outlook macro, **Associate Markdown files with this app** in Settings, and any launcher job that runs the scan.
 - **Another PC:** copy the old folder across first and use it as `<old folder>`, without `-StopOld`. Then issue a new certificate and edit the folder paths in `config.json` ([What to edit after copying](setup-and-migration.md#what-to-edit-after-copying)). Runtime data does not travel with the installer ([What to copy](setup-and-migration.md#what-to-copy)).
 - **Check the app itself:** Settings → Available features shows every block you meant to keep on; Explore shows each root's folders with sizes; with the Email block on, Search → Emails finds a mail you know; with remote access on, another device can open the tailnet address and sign in.

@@ -174,10 +174,10 @@ request_budget_probe = { src = "tests/e2e/budget/_request_budget.py", sha = "ce2
 webkit_budget_check = { src = "scripts/tools/webkit_budget_check.py", sha = "48d235419a5f2d3c52ebc6de75a52c279acedab3", dest = "scripts/tools/webkit_budget_check.py" }
 poll = { src = "app/webapp/static/_vendored/poll", sha = "2e2a4cca9d3180980db6f8cd7f03a6f12737b7db", dest = "app/webapp/static/_vendored/poll" }
 installer = { src = "src/installer.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "src/installer.py" }
-installer_migrate = { src = "src/installer_migrate.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "src/installer_migrate.py" }
-installer_declaration = { src = "src/installer_declaration.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "src/installer_declaration.py" }
-installer_inplace = { src = "src/installer_inplace.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "src/installer_inplace.py" }
-install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", sha = "a40310fe47f82ed7af62835fbfb3ea7ba9e04f8d", dest = "scripts/install_standard_ratchet.py" }
+installer_migrate = { src = "src/installer_migrate.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_migrate.py" }
+installer_declaration = { src = "src/installer_declaration.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_declaration.py" }
+installer_inplace = { src = "src/installer_inplace.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "src/installer_inplace.py" }
+install_standard_ratchet = { src = "scripts/install_standard_ratchet.py", sha = "87981135d4ea66f76621d9b2f400efc28b68d2d9", dest = "scripts/install_standard_ratchet.py" }
 self_restart = { src = "src/self_restart.py", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "src/self_restart.py" }
 ratchet_baseline = { src = "scripts/ratchet_baseline.py", sha = "48db2132dab2dfc38b6154948ca17fd1f4b9232f", dest = "scripts/ratchet_baseline.py" }
 ps_script = { src = "src/ps_script.py", sha = "2d786d295c9b8d545aaf35703889638096f251ad", dest = "src/ps_script.py" }
@@ -207,7 +207,7 @@ inputs  = ["requirements-tray.txt", "requirements-email.txt", "requirements-outl
 check    = ["{python}", "-m", "src.install.startup", "status"]
 register = ["{python}", "-m", "src.install.startup", "enable"]
 
-# What `setup.bat -MigrateFrom` and `-InPlace` verify and carry over (docs/install.md#migrate). The port is this PC's
+# What `setup.bat -MigrateFrom`, `-Replace` and `-InPlace` verify and carry over (docs/install.md#migrate). The port is this PC's
 # config.json `port`, the top-level `port` when it sets none. The installed app serves HTTPS with its tailnet
 # certificate, which names the tailnet host and never 127.0.0.1, so the loopback check accepts any certificate; plain
 # HTTP is asked second. The start command is the default, tray.bat --restart.

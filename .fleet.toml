@@ -75,6 +75,12 @@ target = "docs/design/unified-app-mockup.html"
 detail = "3 page-foot elements — mount one footer, outside the tab panels"
 reason = "Evidence is the design mock-up under docs/design, which is never served; the shipped page mounts one footer outside the tab panels"
 
+# The one 28px stray is .saved-row (search.css): a wrapping strip of saved-search chips, not a list row.
+[[design.accepted]]
+check  = "row-height-scale"
+detail = "row/action-rail heights outside the 44px, 52px, 60px scale: 28pxx1"
+reason = "Not a list row or action rail: .saved-row holds the height of its 28px chips so nothing shifts when the saved searches load; each control has a 44px target and wrapped lines sit 16px apart"
+
 # Whether a scan or an email run is running, finished, failed or died: one derive function over the
 # run row and its lock (docs/run-state.md). tests/test_run_state.py carries the transition proof.
 [[state_machines]]
@@ -104,7 +110,7 @@ icon-button = { src = "app/webapp/static/_vendored/icon-button", sha = "c8ec10d6
 button = { src = "app/webapp/static/_vendored/button", sha = "7a1a7561331edded3dc91128a42076fb3b0262f8", dest = "app/webapp/static/_vendored/button" }
 modal = { src = "app/webapp/static/_vendored/modal", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/modal" }
 empty-state = { src = "app/webapp/static/_vendored/empty-state", sha = "a04abc7b3af872cbac974401dd0945587eac6cef", dest = "app/webapp/static/_vendored/empty-state" }
-toast = { src = "app/webapp/static/_vendored/toast", sha = "e56c8330f8500b83635773033a09de6fc3cba342", dest = "app/webapp/static/_vendored/toast" }
+toast = { src = "app/webapp/static/_vendored/toast", sha = "f774234582bc8fe2ce2e44804275b690b192f40d", dest = "app/webapp/static/_vendored/toast" }
 build-watch = { src = "app/webapp/static/_vendored/build-watch", sha = "48602060fffdacbcdcdde66b9886c6471d835ff3", dest = "app/webapp/static/_vendored/build-watch" }
 action-row = { src = "app/webapp/static/_vendored/action-row", sha = "8f15c49560adbc076d24a8a63dd671868ffa7a4e", dest = "app/webapp/static/_vendored/action-row" }
 text-size = { src = "app/webapp/static/_vendored/text-size", sha = "c8ec10d6ba57a5790fdaabad66a93d8414985d89", dest = "app/webapp/static/_vendored/text-size" }

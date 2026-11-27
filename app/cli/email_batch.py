@@ -45,8 +45,8 @@ Exit codes:
        still have failed, each with its own `error` inside the document
     1  (`dismiss` only) the run completed and stdout carries its document, but
        at least one mail was not moved and tagged — each with its own `error`
-    2  the run could not start: config.json unusable (``config_missing``), unreadable input, a folder outside
-       the archive roots, Outlook unreachable, (draft) no self address to
+    2  the run could not start: config.json unusable (``config_missing``), unreadable input, a folder or (draft)
+       a `reply_to.msg_path` outside the archive roots, Outlook unreachable, (draft) no self address to
        blind-copy, (draft) a `reply_to` mail that cannot be found or replied to
        (`reply_source_not_found` / `reply_unavailable`), (draft --update / read /
        send) a draft that is gone, sent,
@@ -413,7 +413,7 @@ def _add_draft_read_send_parsers(sub: Any) -> list[argparse.ArgumentParser]:
     p_draft.add_argument(
         "--spec", required=True,
         help="JSON file: {to, cc, bcc, subject, body_text | body_html, "
-             "attachments, ref, display, reply_to: {message_id | msg_path}, reply_all}",
+             "attachments, ref, display, reply_to: {message_id | msg_path in email.roots}, reply_all}",
     )
     p_draft.add_argument(
         "--update", metavar="ENTRY_ID",
@@ -553,7 +553,7 @@ class _Request:
     category: str | None = None
 
 
-def _read_request(args: argparse.Namespace) -> _Request:
+def _read_request(args: argparse.Namespace, cfg: dict[str, Any]) -> _Request:
     """Validate every flag and input file of the verb.
 
     Read before touching Outlook: a malformed file should fail in milliseconds,
@@ -574,7 +574,7 @@ def _read_request(args: argparse.Namespace) -> _Request:
 
         if verb == "draft":
             try:
-                request.spec = draft.load_spec(args.spec)
+                request.spec = draft.load_spec(args.spec, cfg)
             except draft.SpecError as exc:
                 raise ValueError(str(exc)) from exc
             if args.update is not None and not args.update.strip():
@@ -858,7 +858,7 @@ def main(argv: list[str] | None = None) -> int:
         return _fail(verb, ERROR_CONFIG_MISSING, f"{type(exc).__name__}: {exc}")
 
     try:
-        request = _read_request(args)
+        request = _read_request(args, cfg)
     except _Refusal as exc:
         return _fail(verb, exc.code, str(exc))
 

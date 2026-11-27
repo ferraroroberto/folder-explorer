@@ -27,6 +27,10 @@ Design decisions:
   overrides; a mail that cannot be found is ``reply_source_not_found`` and no
   draft exists. The document reports what was replied to and whether the draft
   holds the In-Reply-To, as honestly as ``ref_header``.
+- **A ``msg_path`` stays inside ``email.roots``.** Outlook opens the file it
+  names, so it is fenced like every other mail path: resolved first, and the
+  resolved path is the one checked and opened. With no email folder configured,
+  every ``msg_path`` is refused.
 - **An update edits the same item** (``update``): a caller iterating on one
   mail gets one draft, not a trail of near-duplicates. Only an unsent item in
   Drafts whose body the tool marked is touched; anything else is refused before
@@ -41,6 +45,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from src.email.archive_paths import archive_roots, resolve_under_roots
 from src.email.archive_settings import get_outlook_self_address
 from src.email.batch.common import header
 from src.email.mailboxes import Mailbox
@@ -139,7 +144,20 @@ def html_to_text(body_html: str) -> str | None:
     return text if text_to_html(text) == body_html else None
 
 
-def _reply_target(data: dict[str, Any]) -> ReplyTarget | None:
+def _reply_msg_path(value: str, cfg: dict[str, Any]) -> str:
+    """The resolved ``.msg`` Outlook may open for a reply, inside ``email.roots``."""
+    if not Path(value).is_absolute():
+        raise SpecError(f"`reply_to.msg_path` must be an absolute path: {value}")
+    # Fenced before the file is looked at: nothing outside the email folders is touched.
+    resolved, _ = resolve_under_roots(value, archive_roots(cfg))
+    if resolved is None:
+        raise SpecError(f"`reply_to.msg_path` is not inside `email.roots`: {value}")
+    if resolved.suffix.lower() != ".msg" or not resolved.is_file():
+        raise SpecError(f"`reply_to.msg_path` is not an existing .msg file: {value}")
+    return str(resolved)
+
+
+def _reply_target(data: dict[str, Any], cfg: dict[str, Any]) -> ReplyTarget | None:
     """The validated ``reply_to`` / ``reply_all`` of a spec, or ``None``."""
     reply_all = data.get("reply_all", False)
     if not isinstance(reply_all, bool):
@@ -165,17 +183,15 @@ def _reply_target(data: dict[str, Any]) -> ReplyTarget | None:
         if not value:
             raise SpecError("`reply_to.message_id` must be a non-empty string")
     else:
-        path = Path(value.strip())
-        if not path.is_absolute():
-            raise SpecError(f"`reply_to.msg_path` must be an absolute path: {value}")
-        if path.suffix.lower() != ".msg" or not path.is_file():
-            raise SpecError(f"`reply_to.msg_path` is not an existing .msg file: {value}")
-        value = str(path)
+        value = _reply_msg_path(value.strip(), cfg)
     return ReplyTarget(kind=kind, value=value, reply_all=reply_all)
 
 
-def parse_spec(data: Any) -> DraftSpec:
+def parse_spec(data: Any, cfg: dict[str, Any] | None = None) -> DraftSpec:
     """Validate a decoded spec and return it as a :class:`DraftSpec`.
+
+    A ``reply_to.msg_path`` must be inside ``cfg``'s ``email.roots``; with no
+    ``cfg`` every ``msg_path`` is refused.
 
     Raises:
         SpecError: with a message naming the offending field.
@@ -186,7 +202,7 @@ def parse_spec(data: Any) -> DraftSpec:
     if unknown:
         raise SpecError(f"unknown spec keys: {', '.join(unknown)}")
 
-    reply_to = _reply_target(data)
+    reply_to = _reply_target(data, cfg or {})
     # A reply takes its recipients and subject from Outlook; a key that is
     # present overrides, one that is absent leaves Outlook's own.
     to = _address_list(data, "to", required=True) if reply_to is None or "to" in data else None
@@ -234,14 +250,14 @@ def parse_spec(data: Any) -> DraftSpec:
     )
 
 
-def load_spec(path: str) -> DraftSpec:
+def load_spec(path: str, cfg: dict[str, Any] | None = None) -> DraftSpec:
     """Read and validate a spec file. Every failure is a :class:`SpecError`."""
     try:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError) as exc:
         raise SpecError(f"{path}: {exc}") from exc
-    return parse_spec(data)
+    return parse_spec(data, cfg)
 
 
 # ---------------------------------------------------------- self address ---

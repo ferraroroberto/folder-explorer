@@ -14,10 +14,9 @@ its ``tier`` and a ``score`` from 0 to 1, the mean of its words' scores. A
 folder whose subfolders are named like email addresses is a "folder of
 people"; with ``prune`` on, every match at or below it folds into that one
 result. ``skip`` hides leading path components from the displayed path
-only; the full path is always kept for copying and opening. A OneDrive
-library lives on a local drive too, so with ``onedrive_prevails`` a folder
-in a scanned library is listed once, as the library's row, and the drive's
-copy is left out.
+only; the full path is always kept for copying and opening. Two roots can
+reach one folder (a OneDrive library lives on a local drive too), and it is
+listed once: the synced root's row, else the first configured root's.
 
 This is a query over the scan's index, never a walk: it reads no folder on disk.
 """
@@ -25,6 +24,7 @@ This is a query over the scan's index, never a walk: it reads no folder on disk.
 from __future__ import annotations
 
 import bisect
+import logging
 import os
 from contextlib import contextmanager
 from typing import Any, Iterable, Iterator, Optional, Sequence
@@ -33,8 +33,10 @@ from src import search_tiers as tiers
 from src import store
 from src.folder_match import WORD_RE, fold, fuzzy, name_words
 from src.index import MAX_NAMED, Index, open_index
-from src.roots import Root, normalize, relative_parts
+from src.roots import Root, normalize, parts_within, relative_parts
 from src.scanner import search_key
+
+logger = logging.getLogger(__name__)
 
 # Folders read per root before ranking, and results returned in all.
 CANDIDATES = 5000
@@ -102,22 +104,53 @@ def item_path(root: Root, index: Index, kind: str, item_id: int) -> str:
     return os.path.join(full_path(root, [p["name"] for p in index.path(folder)][1:]), row["name"])
 
 
-def synced_spans(root: Root, index: Index, indexes: list[tuple[Root, Index]]) -> list[tuple[int, int]]:
-    """The id ranges in a local root's index that a scanned OneDrive root already lists.
+def _listed(index: Index, names: list[str]) -> bool:
+    """Whether the scan listed something in the folder ``names`` leads to.
 
-    A synced library sits on a local drive, so the drive's scan holds it too.
-    Only a library whose own index is searchable counts: hiding the drive's
-    copy of one that was never scanned would hide the only copy.
+    An empty row (a root that is itself a junction, a folder the scan could not
+    read) must not stand in for another root's copy.
     """
-    if root.kind != "local" or not index.searchable():
-        return []
-    spans = []
-    for other, other_index in indexes:
-        names = relative_parts(other.path, root.path) if other.kind == "synced" and other_index.searchable() else None
-        span = index.subtree_span(names) if names else None
-        if span is not None:
-            spans.append(span)
-    return spans
+    fid = index.find_folder(names)
+    if fid is None:
+        return False
+    row = index.folder(fid)
+    return int(row["hi"]) > int(row["lo"]) or int(row["files"]) > 0
+
+
+def _shared_span(root: Root, index: Index, other: Root, other_index: Index, onedrive_prevails: bool) -> Optional[Span]:
+    """The id range in ``root``'s index of the folders ``other``'s index lists too, or ``None``."""
+    names = parts_within(other.path, root.path)
+    if names is not None:
+        # A OneDrive library under the drive that holds it is the user's choice to see once or twice.
+        chosen = bool(names) and root.kind == "local" and other.kind == "synced" and not onedrive_prevails
+        return None if chosen or not _listed(other_index, []) else index.subtree_span(names)
+    names = parts_within(root.path, other.path)
+    return index.root_span() if names is not None and _listed(other_index, names) else None
+
+
+def repeat_spans(indexes: list[tuple[Root, Index]], onedrive_prevails: bool,
+                 held: dict[str, set[str]]) -> tuple[dict[str, list[Span]], list[tuple[Root, Root]]]:
+    """Each root's id ranges that a preferred root lists too, and the ``(left out, kept)`` pairs behind them.
+
+    Two roots can reach one folder (one inside the other, a junction, a share,
+    a library synced under a drive). A synced root's row is preferred, else
+    the first root in configured order. A root counts only when its scan is
+    searchable, and only when it searches every ``held`` path (the ``within``
+    folders) the other does, so no folder loses its only row. Worked out from
+    the root paths and the indexes, never per match.
+    """
+    ranked = [entry for entry in sorted(indexes, key=lambda e: e[0].kind != "synced") if entry[1].searchable()]
+    spans: dict[str, list[Span]] = {}
+    pairs: list[tuple[Root, Root]] = []
+    for pos, (root, index) in enumerate(ranked):
+        for other, other_index in ranked[:pos]:
+            if not held.get(root.key, set()) <= held.get(other.key, set()):
+                continue
+            span = _shared_span(root, index, other, other_index, onedrive_prevails)
+            if span is not None:
+                spans.setdefault(root.key, []).append(span)
+                pairs.append((root, other))
+    return {key: merge_spans(found) for key, found in spans.items()}, pairs
 
 
 def in_spans(spans: Sequence[tuple[int, int]], fid: int) -> bool:
@@ -443,10 +476,11 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     (a root's own path keeps that whole root); a root holding none of them is
     not searched, and ``missing`` lists the paths no scanned root holds.
 
-    With ``onedrive_prevails`` a folder inside a scanned OneDrive root is
-    listed once, as that root's row, not also under the drive that holds it.
-    The drive's copies are left out of the query itself, so the total, the
-    candidate cap and the folding of folders of people all see the same list.
+    A folder two roots reach is listed once (``repeat_spans``); with
+    ``onedrive_prevails`` off, a scanned OneDrive folder is also listed under
+    the drive that holds it. The left-out copies are excluded from the query
+    itself, so the total, the candidate cap and the folding of folders of
+    people all see the same list.
     """
     terms = parse_terms(text)
     if not terms:
@@ -454,17 +488,20 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     merged: list[tuple[dict[str, Any], Root, Index]] = []
     truncated = False
     stale = []
-    held: set[str] = set()
-    scopes: list[tuple[Root, Index, list[Span], list[Span]]] = []
+    held: dict[str, set[str]] = {}
+    searched: list[tuple[Root, Index, list[Span]]] = []
     for root, index in indexes:
         only: Optional[list[Span]] = None
         if within:
-            only, found_here = within_spans(root, index, within)
-            held |= found_here
+            only, held[root.key] = within_spans(root, index, within)
             if only == []:
                 continue
-        spans = synced_spans(root, index, indexes) if onedrive_prevails else []
-        scopes.append((root, index, spans, only or []))
+        searched.append((root, index, only or []))
+    repeats, pairs = repeat_spans([(root, index) for root, index, _ in searched], onedrive_prevails, held)
+    if pairs:
+        logger.info("ℹ️ folder search: roots reaching the same folders, listed once: %s",
+                    "; ".join("%s left out in favour of %s" % (dropped.name, kept.name) for dropped, kept in pairs))
+    scopes = [(root, index, repeats.get(root.key, []), only) for root, index, only in searched]
     for root, index, spans, only in scopes:
         part = search_root(root, index, terms, prune, skip, spans, limit, only)
         merged.extend((hit, root, index) for hit in part["results"])
@@ -483,4 +520,4 @@ def search(indexes: list[tuple[Root, Index]], text: str, prune: bool, skip: int,
     # Paths are rebuilt only for the results shown: each costs one lookup per level.
     shown = [_with_path(hit, root, index, skip) for hit, root, index in merged[:limit]]
     return {"results": shown, "total": len(merged), "truncated": truncated or len(merged) > limit,
-            "needs_rescan": stale, "missing": [p for p in within if p not in held]}
+            "needs_rescan": stale, "missing": [p for p in within if not any(p in found for found in held.values())]}

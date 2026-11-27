@@ -1,7 +1,7 @@
 # Folder search: matching, ranking and the CLI contract
 
 How Search's **Folders** mode matches a query against the current index, the
-OneDrive dedupe it applies before counting or ranking, and the JSON contract
+one-row-per-folder rule it applies before counting or ranking, and the JSON contract
 another app gets with no app running.
 
 ## Matching
@@ -68,18 +68,28 @@ A folder whose subfolders are named like email addresses (a "folder of
 people") shows once in the results, with a count of how many, rather than one
 row per address.
 
-## OneDrive dedupe
+## One row per folder
 
-A folder inside a scanned OneDrive root is also on the drive that holds it,
-so without dedupe every match would show twice. **Show OneDrive folders once**
-(Settings → Display, on by default) lists it only as the OneDrive row: the
-drive's copy is left out of the query itself, so the result count matches the
-list, and a library with no finished scan still keeps the drive's copy. Three
-settings live under `folder_search` in `config.json`, all also in Settings →
-Display: `skip_levels` (hide the first N path components in the shown path),
-`prune_people` (fold a people-named folder's children into one row) and
-`onedrive_prevails` (this dedupe). An index built before folder search exists
-asks for a rescan.
+Two roots can reach one folder: a root inside another, a path through a
+junction, a share onto a local folder, or a OneDrive library on the drive
+that holds it. The folder is listed once, as the synced root's row, else the
+first configured root's. The other root's copy is left out of the query
+itself, so the result count matches the list. It is worked out once per pair
+of roots (`repeat_spans`), never per match: from the resolved paths, then from
+the volume serial and file ID, which are never compared across two drive
+letters (a cloned disk repeats both). The copy stays when the preferred scan
+does not list that folder (not scanned yet, excluded, unreadable) or, for a
+search kept to some folders, does not search them. An info log line names the
+roots folded, never a path. Two separate copies on disk, such as a library
+synced twice into two folders, are two folders and both show.
+
+Three settings live under `folder_search` in `config.json`, all also in
+Settings → Display: `skip_levels` (hide the first N path components in the
+shown path), `prune_people` (fold a people-named folder's children into one
+row) and `onedrive_prevails` (**Show OneDrive folders once**, on by default;
+off, a OneDrive folder also shows under the drive that holds it, the one
+overlap that stays). An index built before folder search exists asks for a
+rescan.
 
 ## The CLI contract
 

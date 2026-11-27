@@ -82,12 +82,14 @@ class QuickSearchView:
         self.count = tk.Label(top, text="", bg=pal.card, fg=pal.muted, font=_font(SIZE_SMALL))
         self.count.pack(side="right")
         # Shown on the Emails tab only (``_paint_toggle``): the Folders tab always opens its folder.
-        self.open_folder = tk.BooleanVar(value=self.model.open_folder)
+        # Each variable names its root: the tray's screenshot has a Tk root of its own, made first, so a variable without one
+        # lives in that interpreter and never sees what this window's widgets write.
+        self.open_folder = tk.BooleanVar(root, value=self.model.open_folder)
         self.folder_toggle = tk.Checkbutton(top, text=OPEN_FOLDER, variable=self.open_folder, command=self._toggled, bg=pal.card,
                                             fg=pal.ink, activebackground=pal.card, activeforeground=pal.ink, selectcolor=pal.card_off,
                                             font=_font(SIZE_SMALL), highlightthickness=0, bd=0, cursor="hand2")
 
-        self.query = tk.StringVar(value=self.model.query)
+        self.query = tk.StringVar(root, value=self.model.query)
         self.entry = tk.Entry(frame, textvariable=self.query, font=_font(SIZE_BODY), relief="flat", bg=pal.card_off, fg=pal.ink,
                               insertbackground=pal.ink, highlightthickness=1, highlightbackground=pal.line, highlightcolor=pal.accent)
         self.entry.pack(fill="x", pady=(SPACE_SM, SPACE_SM), ipady=6)
@@ -243,7 +245,11 @@ class QuickSearchView:
             except queue.Empty:
                 break
             self.inflight -= 1
-            shown = self.model.apply(answer) or shown
+            applied = self.model.apply(answer)
+            # One line per search, with the query's length only: the tray log never holds what was searched for.
+            logger.info("ℹ️ quick search: %s, query length %d: %s, %d rows%s", answer.tab, len(answer.query),
+                        answer.status.value, len(answer.rows), "" if applied else " (dropped, the query moved on)")
+            shown = applied or shown
         if shown:
             self.status.configure(text="")
             self.paint()

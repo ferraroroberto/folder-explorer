@@ -86,7 +86,6 @@ from typing import Any
 
 from app.cli import cut_names
 from src import config, store
-from src.email.archive_paths import archive_roots
 from src.email.batch import common as batch_common
 from src.email.batch import dismiss, draft, find, send, sync
 from src.email.batch import revert as revert_verb
@@ -414,8 +413,7 @@ def _add_draft_read_send_parsers(sub: Any) -> list[argparse.ArgumentParser]:
     p_draft.add_argument(
         "--spec", required=True,
         help="JSON file: {to, cc, bcc, subject, body_text | body_html, "
-             "attachments, ref, display, reply_to: {message_id | msg_path, inside email.roots}, "
-             "reply_all}",
+             "attachments, ref, display, reply_to: {message_id | msg_path in email.roots}, reply_all}",
     )
     p_draft.add_argument(
         "--update", metavar="ENTRY_ID",
@@ -576,7 +574,7 @@ def _read_request(args: argparse.Namespace, cfg: dict[str, Any]) -> _Request:
 
         if verb == "draft":
             try:
-                request.spec = draft.load_spec(args.spec, archive_roots(cfg))
+                request.spec = draft.load_spec(args.spec, cfg)
             except draft.SpecError as exc:
                 raise ValueError(str(exc)) from exc
             if args.update is not None and not args.update.strip():

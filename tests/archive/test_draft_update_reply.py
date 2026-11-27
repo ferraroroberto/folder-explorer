@@ -461,7 +461,7 @@ def test_reply_overrides_are_kept_when_given(tmp_path):
     spec = draft.parse_spec({
         "body_text": "Hello", "reply_to": {"msg_path": str(msg)},
         "to": ["x@example.invalid"], "cc": [], "subject": "Own subject",
-    }, [tmp_path.resolve()])
+    }, _mail_cfg(tmp_path))
 
     assert (spec.to, spec.cc, spec.subject) == (["x@example.invalid"], [], "Own subject")
     assert spec.reply_to == ReplyTarget(REPLY_BY_MSG_PATH, str(msg))
@@ -490,7 +490,11 @@ def test_an_unusable_reply_spec_is_refused_with_the_field_named(overrides, messa
 def test_a_msg_path_must_be_an_existing_msg_file(tmp_path, name):
     (tmp_path / "saved.txt").write_text("x", encoding="utf-8")
     with pytest.raises(draft.SpecError, match="not an existing .msg file"):
-        draft.parse_spec(_reply_by_path(tmp_path / name), [tmp_path.resolve()])
+        draft.parse_spec(_reply_by_path(tmp_path / name), _mail_cfg(tmp_path))
+
+
+def _mail_cfg(*roots: Path) -> dict:
+    return {"email": {"roots": [str(root) for root in roots]}}
 
 
 def _reply_by_path(path: Path) -> dict:
@@ -502,7 +506,7 @@ def test_a_msg_path_outside_the_email_folders_is_refused(tmp_path, roots):
     """Outlook opens whatever this names, so it is fenced to ``email.roots``."""
     msg = _msg_file(tmp_path)
     with pytest.raises(draft.SpecError, match="not inside `email.roots`"):
-        draft.parse_spec(_reply_by_path(msg), [tmp_path / name for name in roots])
+        draft.parse_spec(_reply_by_path(msg), _mail_cfg(*(tmp_path / name for name in roots)))
 
 
 def test_a_msg_path_cannot_climb_out_of_an_email_folder(tmp_path):
@@ -510,7 +514,7 @@ def test_a_msg_path_cannot_climb_out_of_an_email_folder(tmp_path):
     root.mkdir()
     _msg_file(tmp_path)
     with pytest.raises(draft.SpecError, match="not inside `email.roots`"):
-        draft.parse_spec(_reply_by_path(root / ".." / "saved.msg"), [root.resolve()])
+        draft.parse_spec(_reply_by_path(root / ".." / "saved.msg"), _mail_cfg(root))
 
 
 @pytest.mark.parametrize("inside", [True, False])
@@ -520,7 +524,7 @@ def test_the_command_line_fences_a_msg_path_to_the_configured_email_folders(
     root = tmp_path / "archive"
     root.mkdir()
     msg = _msg_file(root if inside else tmp_path)
-    monkeypatch.setattr(main_batch, "load_config", lambda: {"email": {"roots": [str(root)]}})
+    monkeypatch.setattr(main_batch, "load_config", lambda: _mail_cfg(root))
 
     code, doc, clients = batch_process(_reply_by_path(msg))
 

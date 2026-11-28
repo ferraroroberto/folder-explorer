@@ -2,7 +2,7 @@
 
 Runs before ``email_batch`` is imported, so a machine without the block never loads the Outlook client or reads a
 request. The answer is the envelope every other "cannot start" uses, with the ``outlook_unavailable`` code the callers
-(task-os, life-os) already handle.
+(other local apps) already handle.
 """
 
 from __future__ import annotations

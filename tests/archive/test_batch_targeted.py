@@ -1,6 +1,6 @@
 """Tests for targeted batch mode (issue #71).
 
-A second caller (life-os) files one specific mail, or a handful matching a
+A second caller files one specific mail, or a handful matching a
 topic, into a folder it already knows. These tests pin what that caller relies
 on, on top of the full-Inbox contract ``test_batch.py`` pins:
 
@@ -12,7 +12,7 @@ on, on top of the full-Inbox contract ``test_batch.py`` pins:
 - ``--category`` overrides the configured category on ``apply`` and ``revert``;
 - ``apply`` refuses a ``folder_path`` outside the archive roots, per mail, with
   nothing written;
-- task-os's decision shape (boolean ``date_prefix``, no category) still files.
+- the first caller's decision shape (boolean ``date_prefix``, no category) still files.
 
 Everything here is synthetic: no real folder name, address or subject.
 """
@@ -240,14 +240,14 @@ def test_apply_and_revert_use_the_category_the_caller_names(cfg, archive_root):
 
     applied = batch.apply(client, cfg, [
         {"message_id": "a@example.invalid", "folder_path": str(archive_root / "X")},
-    ], category="Archived by life-os")
+    ], category="Archived by app-b")
 
-    assert applied["category"] == "Archived by life-os"
-    assert item.Categories == "Personal; Archived by life-os"
+    assert applied["category"] == "Archived by app-b"
+    assert item.Categories == "Personal; Archived by app-b"
 
-    reverted = revert_verb.revert(client, cfg, applied["results"], category="Archived by life-os")
+    reverted = revert_verb.revert(client, cfg, applied["results"], category="Archived by app-b")
 
-    assert reverted["category"] == "Archived by life-os"
+    assert reverted["category"] == "Archived by app-b"
     assert reverted["results"][0]["ok"] is True
     assert item.Categories == "Personal"
 
@@ -291,12 +291,12 @@ def test_apply_refuses_a_folder_outside_the_roots_and_writes_nothing(
     assert written_outside == []
 
 
-# ------------------------------------------------------ task-os compat -----
+# ------------------------------------------------------ app A compat -------
 
-def test_task_os_decision_shape_still_files_and_reverts(cfg, archive_root):
-    """task-os's archive flow (``src/archive_batch.py``): boolean date_prefix
+def test_app_a_decision_shape_still_files_and_reverts(cfg, archive_root):
+    """App A's archive flow: boolean date_prefix
     handed back from a plan candidate, no category override, schema 1."""
-    client = TargetedFakeClient([_mail("a@example.invalid", "Task-os shaped")])
+    client = TargetedFakeClient([_mail("a@example.invalid", "App-a shaped")])
     dest = archive_root / "Project Alpha"
 
     applied = batch.apply(client, cfg, [

@@ -36,8 +36,8 @@ DEFAULTS: dict[str, Any] = {
     "server": "hypercorn",
     # null = every local fixed drive plus OneDrive; a list names the roots.
     "roots": None,
-    # The in-app scan schedule. Off by default: on this PC the nightly
-    # app-launcher job runs the CLI, and the two must never double-run.
+    # The in-app scan schedule. Off by default: on this PC a nightly
+    # external scheduler job runs the CLI, and the two must never double-run.
     "schedule": "off",
     "schedule_time": "03:00",
     # Folders the walk skips, whatever root they sit in: the disk index,

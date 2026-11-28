@@ -2,7 +2,7 @@
 
     python -m app.cli folders search --query "<words>" [--limit N] --json
 
-For another local app (life-os's folders lookup) that wants the Search tab's
+For another local app that wants the Search tab's
 folder results without the web app running. The document is the Search tab's
 own answer plus ``schema_version`` and ``query``: ``results`` (each with
 ``path``, the full path on disk, ``display``, with the configured leading

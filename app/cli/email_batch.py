@@ -2,7 +2,7 @@
 Headless batch entry point – plan / apply / revert / dismiss / renumber / draft / read / send /
 mailboxes / find / sync, over JSON.
 
-Meant to be spawned as a subprocess by another local app (task-os, life-os),
+Meant to be spawned as a subprocess by another local app,
 never used interactively: every verb prints exactly one JSON document on
 stdout and logs to the usual log file and to stderr. Only `draft` opens a
 window — the compose window of the draft it creates, which it never sends.

@@ -42,14 +42,14 @@ def test_an_unrecognised_git_file_keeps_the_running_folder(tmp_path: Path, conte
         (None, macro_home.STATE_UNKNOWN),
         ("", macro_home.STATE_UNSET),
         ("   ", macro_home.STATE_UNSET),
-        (r"D:\Work\Sample-App", macro_home.STATE_OK),
-        ("d:/work/sample-app/", macro_home.STATE_OK),
-        (r'"D:\Work\Sample-App"', macro_home.STATE_OK),
-        (r"D:\Work\Other", macro_home.STATE_DIFFERENT),
+        (r"D:\Apps\Sample-App", macro_home.STATE_OK),
+        ("d:/apps/sample-app/", macro_home.STATE_OK),
+        (r'"D:\Apps\Sample-App"', macro_home.STATE_OK),
+        (r"D:\Apps\Other", macro_home.STATE_DIFFERENT),
     ],
 )
 def test_the_state_tells_unset_from_unknown_from_another_folder(current: str | None, state: str) -> None:
-    assert macro_home.state_for(current, r"D:\Work\Sample-App") == state
+    assert macro_home.state_for(current, r"D:\Apps\Sample-App") == state
 
 
 def test_the_setup_is_a_setx_line_for_the_primary_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

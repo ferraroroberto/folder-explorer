@@ -1,6 +1,6 @@
 # `code-listing` — a fenced block or a diff in its frame
 
-The fleet's canonical **code listing** (`~/.claude/design.md` → "Component contracts" → code-listing): the `card` surface on a hairline, a small `caption` header with the language or a title on the left and the **copy control** on the right, then the listing in mono at 13px (the one sanctioned off-scale size, for mono listings only).
+The fleet's canonical **code listing** (the fleet design system → "Component contracts" → code-listing): the `card` surface on a hairline, a small `caption` header with the language or a title on the left and the **copy control** on the right, then the listing in mono at 13px (the one sanctioned off-scale size, for mono listings only).
 
 **The copy control is an unpainted [`icon-button`](../icon-button/).** A glyph on nothing, named by `aria-label` and a tooltip, so it draws no fill, border or shadow at rest wherever the listing is placed. In particular, a listing inside a list item (a numbered setup step) does not read as a painted row verb: design-review `COMP-14` judges a painted button against its nearest `li`, and a labelled `button-surface` Copy failed it. After a copy, the glyph swaps to a check and the header says "Copied" for 1.5s; a refused copy says "Copy failed" instead.
 
@@ -55,7 +55,7 @@ It needs the vendored [`icon-button/`](../icon-button/) stylesheet and two glyph
 
 ## Required design tokens
 
-Wired to `~/.claude/design.md` (+ `design.dark.md`), never redefined here.
+Wired to the fleet design system (light + dark), never redefined here.
 
 | Token | Used for |
 | --- | --- |

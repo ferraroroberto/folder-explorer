@@ -120,7 +120,7 @@ from src.outlook.mapi import MailboxNotInOutlookError
 logger = logging.getLogger(__name__)
 
 # Default number of ranked folder candidates `plan` reports per mail. Larger
-# than archive.max_suggestions: the caller re-ranks (an LLM, in task-os's case) and
+# than archive.max_suggestions: the caller re-ranks (an LLM, in one caller's case) and
 # needs more than the engine's own top pick to choose from.
 DEFAULT_CANDIDATES = 10
 
@@ -168,7 +168,7 @@ def _candidate_dict(
 ) -> dict[str, Any]:
     """A ranked candidate, plus the ``date_prefix`` form its own folder would
     get under ``cfg`` — inferred per folder when ``archive.date_prefix`` is
-    ``"auto"``, otherwise the config's fixed boolean. The caller (task-os)
+    ``"auto"``, otherwise the config's fixed boolean. The caller
     hands this straight back as the ``date_prefix`` on its ``apply``
     decision for the folder it picks; see ``resolve_date_prefix_for_folder``.
 

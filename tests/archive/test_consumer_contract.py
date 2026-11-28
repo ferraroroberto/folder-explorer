@@ -1,6 +1,6 @@
 """The contract with the two apps that drive the batch verbs: every argv shape they send, replayed.
 
-task-os (its archive batch and row actions) and life-os (its shared email
+App A (its archive batch and row actions) and app B (its shared email
 helper) spawn ``email batch <verb>`` and parse the one JSON document it
 prints. ``CALLS`` lists every argv shape each sends today; each one is run
 through ``main()`` against a fake Outlook, and the test checks what those
@@ -33,8 +33,8 @@ from tests.archive.test_send import OTHER, _FakeDraft
 from tests.archive.test_send import _client as _draft_client
 from tests.archive.test_sync import FakeHandle, _ended
 
-TASK_OS, LIFE_OS = "task-os", "life-os"
-START = ["--start-timeout", "60.0"]  # task-os passes its own Outlook start timeout first
+APP_A, APP_B = "app-a", "app-b"
+START = ["--start-timeout", "60.0"]  # app A passes its own Outlook start timeout first
 INBOX_ID, SENT_ID, REF = "m-1@example.invalid", "s-1@example.invalid", "ref-0001"
 
 
@@ -63,57 +63,57 @@ _REVERT = ("message_id", "ok", "deleted", "missing", "refused", "file_errors", "
 _MAILBOX = ("alias", "address", "display_name", "aliases", "archive_folder", "default", "outlook_status")
 
 CALLS: list[Call] = [
-    # task-os: the archive batch and the row actions.
-    Call(TASK_OS, (*START, "plan", "--candidates", "10"), keys=("mailbox", "counts", "mails", "skipped", "category"),
+    # app A: the archive batch and the row actions.
+    Call(APP_A, (*START, "plan", "--candidates", "10"), keys=("mailbox", "counts", "mails", "skipped", "category"),
          item_keys={"mails": _PLAN_MAIL, "mails.candidates": _CANDIDATE}, registry=False),
-    Call(TASK_OS, (*START, "apply", "--decisions", "{decisions}"), keys=("counts", "results"),
+    Call(APP_A, (*START, "apply", "--decisions", "{decisions}"), keys=("counts", "results"),
          item_keys={"results": _APPLY}, registry=False),
-    Call(TASK_OS, (*START, "apply", "--decisions", "{decisions}", "--renumber"),
+    Call(APP_A, (*START, "apply", "--decisions", "{decisions}", "--renumber"),
          keys=("results", "renumbered", "renumber_refused"), item_keys={"results": _APPLY}, registry=False),
-    Call(TASK_OS, (*START, "revert", "--items", "{items}"), keys=("counts", "results"),
+    Call(APP_A, (*START, "revert", "--items", "{items}"), keys=("counts", "results"),
          item_keys={"results": _REVERT}, client="filed", registry=False),
-    Call(TASK_OS, (*START, "revert", "--items", "{items}", "--renumber"),
+    Call(APP_A, (*START, "revert", "--items", "{items}", "--renumber"),
          keys=("results", "renumbered", "renumber_refused"), item_keys={"results": _REVERT}, client="filed",
          registry=False),
-    # life-os: the shared email helper (mailtool) and its skills.
-    Call(LIFE_OS, ("mailboxes",), keys=("registry", "default", "mailboxes"), item_keys={"mailboxes": _MAILBOX}),
-    Call(LIFE_OS, ("plan", "--candidates", "0", "--message-id", INBOX_ID), keys=("mailbox", "filters", "mails"),
+    # app B: its shared email helper.
+    Call(APP_B, ("mailboxes",), keys=("registry", "default", "mailboxes"), item_keys={"mailboxes": _MAILBOX}),
+    Call(APP_B, ("plan", "--candidates", "0", "--message-id", INBOX_ID), keys=("mailbox", "filters", "mails"),
          item_keys={"mails": _PLAN_MAIL}),
-    Call(LIFE_OS, ("plan", "--candidates", "5", "--mailbox", "owner", "--message-id", INBOX_ID),
+    Call(APP_B, ("plan", "--candidates", "5", "--mailbox", "owner", "--message-id", INBOX_ID),
          item_keys={"mails.candidates": _CANDIDATE}),
-    Call(LIFE_OS, ("plan", "--candidates", "0", "--mailbox", "me", "--search", "budget", "--since", "2026-03-01"),
+    Call(APP_B, ("plan", "--candidates", "0", "--mailbox", "me", "--search", "budget", "--since", "2026-03-01"),
          keys=("mails", "counts")),
-    Call(LIFE_OS, ("plan", "--candidates", "0", "--ref", REF), keys=("mails",)),
-    Call(LIFE_OS, ("plan", "--folder", "sent", "--candidates", "0", "--ref", REF, "--since", "2026-03-14T09:00"),
+    Call(APP_B, ("plan", "--candidates", "0", "--ref", REF), keys=("mails",)),
+    Call(APP_B, ("plan", "--folder", "sent", "--candidates", "0", "--ref", REF, "--since", "2026-03-14T09:00"),
          keys=("mails", "counts"), item_keys={"mails": _PLAN_MAIL}),
-    Call(LIFE_OS, ("apply", "--decisions", "{decisions}", "--category", "Filed by an invented skill",
+    Call(APP_B, ("apply", "--decisions", "{decisions}", "--category", "Filed by an invented skill",
                    "--mailbox", "owner"), keys=("category", "archive_folder", "results"), item_keys={"results": _APPLY}),
-    Call(LIFE_OS, ("dismiss", "--message-id", INBOX_ID, "--category", "Dismissed by an invented skill"),
+    Call(APP_B, ("dismiss", "--message-id", INBOX_ID, "--category", "Dismissed by an invented skill"),
          keys=("archive_folder", "category", "counts", "results")),
-    Call(LIFE_OS, ("dismiss", "--message-id", "not-there@example.invalid", "--category", "Dismissed"),
+    Call(APP_B, ("dismiss", "--message-id", "not-there@example.invalid", "--category", "Dismissed"),
          exit=1, keys=("counts", "results")),
-    Call(LIFE_OS, ("draft", "--spec", "{spec}"), keys=("mailbox", "entry_id"), client="draft"),
-    Call(LIFE_OS, ("draft", "--spec", "{spec}", "--update", "draft-1"), keys=("mailbox", "entry_id"), client="draft"),
-    Call(LIFE_OS, ("read", "--entry-id", "draft-1"),
+    Call(APP_B, ("draft", "--spec", "{spec}"), keys=("mailbox", "entry_id"), client="draft"),
+    Call(APP_B, ("draft", "--spec", "{spec}", "--update", "draft-1"), keys=("mailbox", "entry_id"), client="draft"),
+    Call(APP_B, ("read", "--entry-id", "draft-1"),
          keys=("entry_id", "fingerprint", "subject", "to", "cc", "bcc", "attachments"), client="drafts",
          registry=False),
-    Call(LIFE_OS, ("send", "--entry-id", "draft-1", "--expect-hash", "{hash}", "{parts}", "--expect-to", OTHER),
+    Call(APP_B, ("send", "--entry-id", "draft-1", "--expect-hash", "{hash}", "{parts}", "--expect-to", OTHER),
          keys=("sent",), client="drafts", registry=False),
-    Call(LIFE_OS, ("find", "--query", "budget", "--limit", "25"),
+    Call(APP_B, ("find", "--query", "budget", "--limit", "25"),
          keys=("mailbox", "hits", "coverage_note", "truncated")),
-    Call(LIFE_OS, ("find", "--query", "budget", "--limit", "25", "--since", "2026-03-01",
+    Call(APP_B, ("find", "--query", "budget", "--limit", "25", "--since", "2026-03-01",
                    "--folders", "inbox,archive,sent", "--mailbox", "second"), keys=("hits", "truncated")),
-    Call(LIFE_OS, ("sync", "--timeout", "120"), keys=("mailboxes", "desktop")),
-    Call(LIFE_OS, ("sync", "--timeout", "120", "--mailbox", "owner"), keys=("mailboxes", "desktop")),
-    # The refusals life-os passes through by code.
-    Call(LIFE_OS, ("plan", "--candidates", "0", "--mailbox", "nobody"), exit=2, error="mailbox_unknown"),
-    Call(LIFE_OS, ("send", "--entry-id", "draft-1", "--expect-hash", "0" * 64, "--expect-to", OTHER),
+    Call(APP_B, ("sync", "--timeout", "120"), keys=("mailboxes", "desktop")),
+    Call(APP_B, ("sync", "--timeout", "120", "--mailbox", "owner"), keys=("mailboxes", "desktop")),
+    # The refusals app B passes through by code.
+    Call(APP_B, ("plan", "--candidates", "0", "--mailbox", "nobody"), exit=2, error="mailbox_unknown"),
+    Call(APP_B, ("send", "--entry-id", "draft-1", "--expect-hash", "0" * 64, "--expect-to", OTHER),
          exit=2, error="approval_mismatch", keys=("error",), client="drafts", registry=False),
-    Call(LIFE_OS, ("read", "--entry-id", "gone"), exit=2, error="draft_not_found", client="drafts",
+    Call(APP_B, ("read", "--entry-id", "gone"), exit=2, error="draft_not_found", client="drafts",
          registry=False),
-    Call(LIFE_OS, ("draft", "--spec", "{spec}", "--update", "draft-gone"), exit=2, error="draft_not_found",
+    Call(APP_B, ("draft", "--spec", "{spec}", "--update", "draft-gone"), exit=2, error="draft_not_found",
          client="draft"),
-    Call(LIFE_OS, ("plan", "--candidates", "0"), exit=2, error="mailbox_registry_invalid", client="bad_registry"),
+    Call(APP_B, ("plan", "--candidates", "0"), exit=2, error="mailbox_registry_invalid", client="bad_registry"),
 ]
 
 
@@ -264,8 +264,8 @@ def test_every_consumer_call_keeps_its_contract(replay, call: Call) -> None:
 
 def test_the_fixture_list_covers_every_verb_both_consumers_use() -> None:
     verbs = {(c.consumer, next(a for a in c.argv if not a.startswith("-") and a != "60.0")) for c in CALLS}
-    assert {v for c, v in verbs if c == TASK_OS} == {"plan", "apply", "revert"}
-    assert {v for c, v in verbs if c == LIFE_OS} == {
+    assert {v for c, v in verbs if c == APP_A} == {"plan", "apply", "revert"}
+    assert {v for c, v in verbs if c == APP_B} == {
         "mailboxes", "plan", "apply", "dismiss", "draft", "read", "send", "find", "sync"}
 
 

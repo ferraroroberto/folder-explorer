@@ -65,7 +65,7 @@ Matching is the Search tab's (docs/folder-search.md): case and accents never mat
 ```json
 {"schema_version": 1, "state": "ok", "reason": null, "query": "alpha budget",
  "results": [{"root": "d", "root_name": "D:", "kind": "local", "id": 812, "name": "Budget",
-              "path": "D:\\Projects\\Alpha\\Budget", "depth": 3, "tier": "exact", "score": 1.0, "size": 48000, "files": 4, "people": 0}],
+              "path": "D:\\Clients\\Alpha\\Budget", "depth": 3, "tier": "exact", "score": 1.0, "size": 48000, "files": 4, "people": 0}],
  "total": 1, "truncated": false, "needs_rescan": [], "missing": [], "page": "/#search?mode=folders&q=alpha%20budget"}
 ```
 
@@ -153,7 +153,7 @@ An index with no `flag_status` column (one built before flags were read) answers
 The folder shown in the foremost File Explorer window (its shown tab, never a hidden one), for an app that wants "the folder I have open" (a task's Folder field). It answers a caller on this PC only, reads no file and writes nothing; the one read of the windows lives in `src/explorer_window.py`, which the Archive sheet's own route also uses, and `tests/webapp/test_explorer_api_v1.py` pins the answers with the read faked. Unlike the sheet's route it does not keep to the email folders: any folder answers. It is not the search envelope: there is no `reason` on success, and every failure is `state: "error"` with its own `code`.
 
 ```json
-{"schema_version": 1, "state": "ok", "folder_path": "D:\\Projects\\Alpha"}
+{"schema_version": 1, "state": "ok", "folder_path": "D:\\Clients\\Alpha"}
 ```
 
 | `code` | HTTP | When |

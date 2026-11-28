@@ -1,7 +1,7 @@
 """The email index this app writes: ``emails.sqlite3`` in the runtime-data folder.
 
 Its ``emails`` table and ``emails_fts`` mirror keep the layout every consumer
-already reads (task-os, life-os, email-archiver's own verbs): the same
+already reads (other local apps, email-archiver's own verbs): the same
 columns, the FTS column order ``subject, sender, recipients, body_preview``
 their ``bm25(emails_fts, 10, 3, 3, 1)`` weights assume, and ``recipients``
 still filled with the To line. The split To and Cc, attachment names, an

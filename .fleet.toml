@@ -277,7 +277,7 @@ repeated_text_words = 12
 
 # [doc_refs_ratchet] -- README.md, CLAUDE.md and docs/ naming a path, module, link or
 # loopback port that does not exist. The app's own port comes from `port` above;
-# 8445 is app-launcher, whose jobs API registers the nightly scan.
+# 8445 is the external scheduler, whose jobs API registers the nightly scan.
 [doc_refs_ratchet]
 enabled    = true
 trees    = true

@@ -1,6 +1,6 @@
 """Tests for filing from Sent Items (issue #103).
 
-life-os files the self-BCC copy of a sent draft from the Inbox; when that copy
+A caller files the self-BCC copy of a sent draft from the Inbox; when that copy
 never arrives it asks for the sent mail itself. These tests pin what it relies
 on: `plan --folder sent` reads Sent Items only, `apply` with `source: "sent"`
 archives and tags the mail without moving it, and an unknown folder or source
